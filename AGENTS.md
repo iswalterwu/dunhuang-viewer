@@ -102,6 +102,7 @@ specs/<feature>/          # 每个功能性 feature 一个独立规格目录（�
 - **标注**：Phase 1 必选字段为主编号、出处认定、载体类型、题名 / 文本、文献类型、时代、书体、形制；蓝本为国图《总目录》著录体例与饶宗颐《敦煌书法丛刊》十类；AI 预标 + 所有者审核（D-014）
 - **Phase 1 范围**：纳入全部现有材料（含备份分片、页图、PSB）；每件写卷有「出处认定」（已确认 / 待核 / 非敦煌），不从目录名继承；非敦煌与待核材料保留但默认不进入敦煌分类浏览（D-015）
 - **开放标准**：影像与清单向 IIIF 靠拢，标注采用 W3C Web Annotation（D-017）
+- **目录服务**：Python 3.12 + FastAPI；独立 compose 项目 `dunhuang-catalog`（`catalog-db` 384m、`catalog-api` 512m，硬上限、禁额外 swap）；原图目录、备份目录与 v0 `cache/` 只读挂载；Phase 1 只在局域网与 Tailscale 开放（端口 8504）；校验 v0 的登录状态，缺少 `AUTH_SECRET` 时拒绝全部请求（D-018）
 - **部署形态**：NAS（设备实例非公开）本机 Docker Compose 服务，直读 NAS 磁盘原图，不拷贝、不全量转码（D-001）
 - **技术栈**：Python 3.12（镜像 `python:3.12-slim`）+ FastAPI/uvicorn 单体 `app.py`；前端原生 HTML/CSS/JS + OpenSeadragon，无构建步骤（D-002、D-004）
 - **图像管线**：libvips（pyvips）流式解码 + DZI 图块（`dzsave`，JPEG）；tifffile 读元数据并对未压缩 TIFF 做按行/按区域流式读取；Pillow 只作无 libvips 时的兜底（D-003）

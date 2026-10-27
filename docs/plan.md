@@ -130,6 +130,7 @@ D-001 ～ D-008 为 2026-10-27 追认登记的既有决策（依据为当时的�
 | D-015 | Phase 1 纳入全部现有材料；「出处认定」独立字段，非敦煌与待核材料保留但默认不进入敦煌分类 | 只收主目录；移出非敦煌材料 | 不丢信息、防止误标扩散（PD-16、PD-19） |
 | D-016 | 渐进迁移；PostgreSQL；Vue 3 + Vite + TypeScript；影像服务方案另登 ADR | 一次性重写；SQLite；其他前端框架 | v0 持续服务；支持并发与协作；与 related-project 一致（PD-17） |
 | D-017 | 开放标准：IIIF + W3C Web Annotation | 自定义格式 | 原机构已用 IIIF，便于互通（PD-18） |
+| D-018 | 目录服务的技术形态：Python + FastAPI；独立 compose 项目（PostgreSQL + API，内存上限 384m + 512m，只读挂载）；Phase 1 只在局域网与 Tailscale 开放；与 v0 共用登录，fail-closed | Node / TypeScript；并入 v0 | 与 v0 运行时一致、互不影响、可整体回滚（`catalog-foundation` Plan 阶段） |
 
 ## 4. 编号、定名与命名体系（调研摘要）
 
