@@ -1,6 +1,6 @@
 # specs/ — 功能规格目录
 
-每个功能性 feature 一个独立规格目录，例如 `stitch-workbench`、`region-lens`、`visual-unify`。
+每个功能性 feature 一个独立规格目录，例如 `catalog-foundation`、`name-normalization`、`annotation-workbench`（Phase 1 候选，见 `docs/plan.md` §8）。
 
 ```
 specs/<feature>/
