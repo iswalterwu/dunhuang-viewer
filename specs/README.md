@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| （暂无） | — | — | 2026-10-27 | Phase 0 只建立文档骨架，尚无 feature 立项 |
+| catalog-foundation | in-progress | 无 | 2026-10-27 | Spec 与 Clarify 完成（12 条需求 / 48 条验收规则，10 项歧义已依据数据与 ADR 闭环）→ 待 Gate 1 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。
