@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手动拼接 · 敦煌画卷</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .st-page { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .st-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            margin: 12px 14px 0; padding: 8px 14px; border-radius: 20px;
+            background: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.7);
+            box-shadow: var(--shadow-md); backdrop-filter: blur(24px); flex: 0 0 auto; }
+  .st-title { font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+  .st-tools { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+  .st-btn { padding: 7px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.75);
+            background: rgba(255,255,255,.65); color: var(--ink-2); cursor: pointer; font-size: 13px;
+            box-shadow: var(--shadow-sm); transition: all .15s; }
+  .st-btn:hover { color: var(--accent); background: #fff; }
+  .st-btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 0; }
+  .st-btn.primary:hover { filter: brightness(1.06); }
+  .st-btn:disabled { opacity: .5; cursor: default; }
+  .st-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 12px var(--st-panel-w, 340px);
+             padding: 12px 14px 8px; }
+  .st-resizer { cursor: col-resize; display: flex; align-items: center; justify-content: center; }
+  .st-resizer::after { content:""; width:4px; height:46px; border-radius:999px; background:rgba(148,163,184,.35); }
+  .st-resizer:hover::after { background: var(--accent); height: 80px; }
+  .st-stage { position: relative; min-width: 0; min-height: 0; border-radius: var(--radius-lg); overflow: hidden;
+              background: #f4f6fa; box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), var(--shadow-md); }
+  .st-stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  .st-stage.dragging canvas { cursor: grabbing; }
+  .st-hint { position: absolute; left: 14px; bottom: 12px; padding: 7px 14px; border-radius: 999px;
+             background: rgba(255,255,255,.85); border: 1px solid rgba(255,255,255,.9);
+             box-shadow: var(--shadow-sm); font-size: 12px; color: var(--ink-2); pointer-events: none; }
+  .st-panel { min-width: 0; min-height: 0; overflow-y: auto; border-radius: var(--radius-lg);
+              background: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.7);
+              box-shadow: var(--shadow-md); backdrop-filter: blur(24px); }
+  .st-panel-inner { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .st-card { border-radius: var(--radius-md); background: rgba(255,255,255,.55);
+             border: 1px solid rgba(255,255,255,.7); box-shadow: var(--shadow-sm); padding: 10px 12px; }
+  .st-card h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .st-piece { border-radius: 12px; background: rgba(255,255,255,.5); border: 1px solid rgba(255,255,255,.7);
+              padding: 8px 10px; margin-bottom: 7px; transition: all .15s; }
+  .st-piece.active { border-color: rgba(79,124,255,.5); background: rgba(79,124,255,.08); }
+  .st-piece.disabled { opacity: .55; filter: grayscale(1); }
+  .st-piece-head { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .st-piece-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .st-order { display: inline-flex; gap: 3px; }
+  .st-order button, .st-mini { width: 24px; height: 24px; padding: 0; border-radius: 8px; border: 1px solid rgba(148,163,184,.25);
+              background: #fff; cursor: pointer; font-size: 12px; color: var(--ink-2); }
+  .st-order button:hover, .st-mini:hover { color: var(--accent); border-color: var(--accent); }
+  .st-fields { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+  .st-fields label { font-size: 11.5px; color: var(--ink-3); display: flex; align-items: center; gap: 4px; }
+  .st-fields input { width: 74px; padding: 4px 6px; font-size: 12px; border-radius: 8px;
+                     border: 1px solid rgba(148,163,184,.3); background: #fff; color: var(--ink); }
+  .st-fields input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .st-ov { font-size: 11.5px; color: var(--ink-3); margin-top: 4px; }
+  .st-ov b { color: var(--accent); font-weight: 600; }
+  .st-status { position: fixed; right: 20px; bottom: 46px; padding: 10px 18px; border-radius: 16px;
+               background: rgba(255,255,255,.92); border: 1px solid rgba(255,255,255,.95);
+               box-shadow: var(--shadow-lg); font-size: 13px; color: var(--ink); z-index: 40; display: none; max-width: 60vw; }
+  .st-status.show { display: block; }
+  .st-progress { height: 6px; border-radius: 999px; background: rgba(148,163,184,.25); overflow: hidden; margin-top: 8px; }
+  .st-progress-bar { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s; }
+  .st-foot { color: var(--ink-3); font-size: 12px; margin: 0 22px 10px; }
+  @media (max-width: 900px) { .st-main { grid-template-columns: 1fr; } .st-panel, .st-resizer { display: none; } }
+</style>
+</head>
+<body class="st-page">
+<div class="st-top">
+  <a class="icon-btn back" id="backLink" href="/" title="返回">
+    <svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <span class="st-title" id="title">手动拼接</span>
+  <div class="st-tools">
+    <button class="st-btn" id="btnZoomOut" title="缩小（-）">－</button>
+    <button class="st-btn" id="btnZoomIn" title="放大（+）">＋</button>
+    <span id="zoomLabel" style="font-size:12px;color:var(--ink-3);min-width:52px;text-align:center">100%</span>
+    <button class="st-btn" id="btnFit">适应窗口</button>
+    <button class="st-btn" id="btnSeam">显示接缝</button>
+    <button class="st-btn" id="btnAuto">自动建议重叠</button>
+    <button class="st-btn" id="btnReset">重置排列</button>
+    <button class="st-btn" id="btnSave">保存方案</button>
+    <button class="st-btn primary" id="btnBuild">生成整卷</button>
+  </div>
+</div>
+
+<div class="st-main" id="stMain">
+  <div class="st-stage" id="stage">
+    <canvas id="canvas"></canvas>
+    <div class="st-hint" id="hint">拖动调整重叠与高低（勾选框可排除分片）· 右侧可旋转/右裁 · 滚轮或 +/- 缩放 · Shift 微调</div>
+  </div>
+  <div class="st-resizer" id="resizer"></div>
+  <aside class="st-panel" id="panel">
+    <div class="st-panel-inner">
+      <div class="st-card">
+        <h4>拼接说明</h4>
+        <div style="font-size:12px;line-height:1.7;color:var(--ink-2)">
+          拖动分片左右移动 = 调整与左侧的重叠（重叠部分生成时会自动裁掉）；上下拖动 = 调整高度差（生成时补背景边）。
+          右侧可微调、排序；满意后点「生成整卷」，会覆盖本卷目录下的 合并长卷.tif 并自动重建图块。
+        </div>
+        <div class="st-fields" style="margin-top:8px">
+          <label>背景色 <input id="bgColor" value="#ffffff" style="width:84px"></label>
+          <label>面板 <input id="panelW" type="range" min="240" max="620" value="340" style="width:110px" oninput="applyPanelWidth(this.value)"></label>
+        </div>
+      </div>
+      <div class="st-card">
+        <h4>分片（<span id="pieceCount">0</span>）</h4>
+        <div id="pieceList"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="st-foot" id="foot"></div>
+<div class="st-status" id="status"></div>
+
+<script>
+const itemId = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const canvas = $('canvas');
+const ctx = canvas.getContext('2d');
+
+let info = null;
+let pieces = [];        // [{id,name,w,h,x,y,trimr,img,loaded}]
+let selected = -1;
+let cam = { scale: 0.05, ox: 0, oy: 0 };
+let showSeams = true;
+let dirty = false;
+let dragging = null;
+let buildTimer = null;
+
+function setStatus(text, show = true) {
+  const el = $('status');
+  el.textContent = text;
+  el.classList.toggle('show', show);
+}
+
+function dimsOf(p) {
+  const ang = Number(p.angle || 0);
+  if (Math.abs(ang) < 1e-6) return { w: p.w, h: p.h };
+  const rad = ang * Math.PI / 180;
+  const c = Math.abs(Math.cos(rad)), s = Math.abs(Math.sin(rad));
+  return { w: Math.ceil(p.w * c + p.h * s), h: Math.ceil(p.w * s + p.h * c) };
+}
+
+function layoutInfo() {
+  // 计算每片裁剪后的右边界与整体包围盒
+  let prevEnd = 0;
+  const rows = [];
+  let maxBottom = 0, minTop = 0;
+  let first = true;
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.enabled === false) {
+      p._rw = 0; p._rh = 0; p._place = prevEnd; p._trim = 0; p._gap = 0;
+      p._tw = 0; p._end = prevEnd;
+      rows.push(p);
+      continue;
+    }
+    const dm = dimsOf(p);
+    p._rw = dm.w; p._rh = dm.h;
+    let place = p.x;
+    let gap = 0;
+    let trim = 0;
+    if (first) { place = p.x; first = false; }
+    else {
+      if (place < prevEnd) { trim = prevEnd - place; place = prevEnd; }
+      else { gap = place - prevEnd; }
+    }
+    const tw = Math.max(1, dm.w - trim - (p.trimr || 0));
+    p._place = place; p._trim = trim; p._gap = gap; p._tw = tw;
+    p._end = place + tw;
+    prevEnd = p._end;
+    maxBottom = Math.max(maxBottom, p.y + dm.h);
+    minTop = Math.min(minTop, p.y);
+    rows.push(p);
+  }
+  return { width: Math.max(1, prevEnd), top: minTop, bottom: maxBottom };
+}
+
+function fitView() {
+  const b = layoutInfo();
+  const W = Math.max(1, b.width), H = Math.max(1, b.bottom - Math.min(0, b.top));
+  const availW = stage.clientWidth - 40, availH = stage.clientHeight - 40;
+  cam.scale = Math.min(availW / W, availH / H);
+  if (!isFinite(cam.scale) || cam.scale <= 0) cam.scale = 0.02;
+  cam.scale = Math.min(cam.scale, 2);
+  cam.ox = (stage.clientWidth - W * cam.scale) / 2;
+  cam.oy = (stage.clientHeight - H * cam.scale) / 2 - Math.min(0, b.top) * cam.scale;
+  draw(); updateZoomLabel();
+}
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.floor(stage.clientWidth * dpr));
+  canvas.height = Math.max(1, Math.floor(stage.clientHeight * dpr));
+  canvas.style.width = stage.clientWidth + 'px';
+  canvas.style.height = stage.clientHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+function draw() {
+  const W = stage.clientWidth, H = stage.clientHeight;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#eef1f6';
+  ctx.fillRect(0, 0, W, H);
+  const s = cam.scale;
+  // 背景（画布范围）
+  const b = layoutInfo();
+  const x0 = cam.ox, y0 = cam.oy - Math.min(0, b.top) * s;
+  ctx.fillStyle = $('bgColor').value || '#ffffff';
+  ctx.fillRect(x0, y0, b.width * s, (b.bottom - Math.min(0, b.top)) * s);
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p.enabled === false) continue;
+    if (!p.loaded) continue;
+    const rw = p._rw, rh = p._rh;
+    const px = cam.ox + p._place * s;
+    const py = cam.oy + (p.y - Math.min(0, b.top)) * s;
+    const pw = p._tw * s;
+    const ph = rh * s;
+    try {
+      const ang = Number(p.angle || 0);
+      if (Math.abs(ang) < 1e-6) {
+        ctx.drawImage(p.img, px, py, pw, ph);
+      } else {
+        const trimPx = (p._trim || 0) * s;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(px, py, pw, ph);
+        ctx.clip();
+        ctx.translate(px - trimPx + (rw * s) / 2, py + ph / 2);
+        ctx.rotate(ang * Math.PI / 180);
+        ctx.drawImage(p.img, -(p.w * s) / 2, -(p.h * s) / 2, p.w * s, p.h * s);
+        ctx.restore();
+      }
+    } catch (e) {}
+    if (i === selected) {
+      ctx.strokeStyle = 'rgba(79,124,255,.95)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px + 1, py + 1, Math.max(1, pw - 2), Math.max(1, ph - 2));
+    }
+    if (showSeams && i < pieces.length - 1) {
+      ctx.strokeStyle = 'rgba(255,80,80,.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px + pw + 0.5, py);
+      ctx.lineTo(px + pw + 0.5, py + ph);
+      ctx.stroke();
+    }
+  }
+}
+
+function screenToWorld(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const b = layoutInfo();
+  const x = (clientX - rect.left - cam.ox) / cam.scale;
+  const y = (clientY - rect.top - cam.oy) / cam.scale + Math.min(0, b.top);
+  return { x, y };
+}
+
+function hitTest(wx, wy) {
+  const b = layoutInfo();
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    const p = pieces[i];
+    if (p.enabled === false) continue;
+    if (wx >= p._place && wx <= p._end && wy >= p.y && wy <= p.y + (p._rh || p.h)) return i;
+  }
+  return -1;
+}
+
+function renderPanel() {
+  $('pieceCount').textContent = pieces.length;
+  const list = $('pieceList');
+  list.innerHTML = '';
+  pieces.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'st-piece' + (i === selected ? ' active' : '') + (p.enabled === false ? ' disabled' : '');
+    div.innerHTML = `
+      <div class="st-piece-head">
+        <input type="checkbox" data-field="enabled" ${p.enabled === false ? '' : 'checked'} title="参与拼接" style="margin:0 2px 0 0">
+        <span style="color:var(--ink-3)">${i + 1}.</span>
+        <span class="st-piece-name" title="${p.name}">${p.name}</span>
+        <span class="st-order">
+          <button data-act="up" title="上移">↑</button>
+          <button data-act="down" title="下移">↓</button>
+        </span>
+      </div>
+      <div class="st-fields">
+        <label>X <input data-field="x" type="number" value="${Math.round(p.x)}"></label>
+        <label>Y <input data-field="y" type="number" value="${Math.round(p.y)}"></label>
+        <label>旋转° <input data-field="angle" type="number" step="0.1" value="${Number(p.angle || 0)}" style="width:62px"></label>
+        <label>右裁 <input data-field="trimr" type="number" value="${Math.round(p.trimr || 0)}" style="width:56px"></label>
+        <button class="st-mini" data-act="align" title="与上一张中心对齐">≡</button>
+        <button class="st-mini" data-act="rotl" title="逆时针 0.5°">↺</button>
+        <button class="st-mini" data-act="rotr" title="顺时针 0.5°">↻</button>
+      </div>
+      <div class="st-ov">${i === 0 ? '第一片' : `与左侧重叠：<b>${Math.max(0, Math.round(p._trim || 0))}</b> px（自动裁掉） · 间隙：${Math.round(p._gap || 0)} px`}</div>`;
+    div.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+      selected = i; renderPanel(); draw();
+    });
+    div.querySelectorAll('[data-field]').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const f = inp.dataset.field;
+        if (f === 'enabled') {
+          p.enabled = !!inp.checked;
+          packEnabled();
+          dirty = true; layoutInfo(); renderPanel(); draw(); return;
+        }
+        if (f === 'angle') {
+          p.angle = Math.max(-45, Math.min(45, parseFloat(inp.value) || 0));
+        } else if (f === 'trimr') {
+          p[f] = Math.max(0, parseInt(inp.value) || 0);
+        } else {
+          p[f] = parseInt(inp.value) || 0;
+        }
+        dirty = true; selected = i; layoutInfo(); renderPanel(); draw();
+      });
+    });
+    div.querySelectorAll('[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        selected = i;
+        if (act === 'up' && i > 0) { [pieces[i - 1], pieces[i]] = [pieces[i], pieces[i - 1]]; }
+        if (act === 'down' && i < pieces.length - 1) { [pieces[i + 1], pieces[i]] = [pieces[i], pieces[i + 1]]; }
+        if (act === 'align' && i > 0) {
+          const prev = pieces[i - 1];
+          const dm = dimsOf(p);
+          p.y = Math.round(prev.y + ((prev._rh || prev.h) - dm.h) / 2);
+        }
+        if (act === 'rotl') p.angle = Math.round(((p.angle || 0) - 0.5) * 10) / 10;
+        if (act === 'rotr') p.angle = Math.round(((p.angle || 0) + 0.5) * 10) / 10;
+        dirty = true; layoutInfo(); renderPanel(); draw();
+      });
+    });
+    list.appendChild(div);
+  });
+}
+
+function currentPlan() {
+  const b = layoutInfo();
+  return {
+    version: 1,
+    bg: $('bgColor').value || '#ffffff',
+    canvas: { width: b.width, top: Math.min(0, b.top), bottom: b.bottom },
+    pieces: pieces.map(p => ({
+      id: p.id, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
+      angle: Number(p.angle || 0), trimr: Math.round(p.trimr || 0),
+      enabled: p.enabled !== false, width: p.w, height: p.h,
+    })),
+  };
+}
+
+async function savePlan(showToast = true) {
+  const r = await fetch('/api/stitch/' + encodeURIComponent(itemId) + '/plan', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(currentPlan()),
+  });
+  if (!r.ok) throw new Error('保存失败 HTTP ' + r.status);
+  dirty = false;
+  if (showToast) setStatus('方案已保存 ✓', true);
+  setTimeout(() => setStatus('', false), 1800);
+}
+
+async function autoSuggest() {
+  // 对相邻分片在预览图上做灰度归一化互相关，估计重叠像素
+  const grays = pieces.map(p => pieceGray(p));
+  for (let i = 1; i < pieces.length; i++) {
+    const a = grays[i - 1], b = grays[i];
+    if (!a || !b) continue;
+    const overlapPx = estimateOverlap(a, b);
+    if (overlapPx > 0 && overlapPx < Math.min(a.w, b.w) * 0.8) {
+      pieces[i].x = Math.round(pieces[i - 1]._end - overlapPx);
+      pieces[i].y = pieces[i - 1].y;
+    }
+  }
+  dirty = true; layoutInfo(); renderPanel(); draw();
+  setStatus('已给出初始重叠建议，可继续手动微调', true);
+  setTimeout(() => setStatus('', false), 2400);
+}
+
+function pieceGray(p) {
+  if (!p.loaded) return null;
+  if (p._gray) return p._gray;
+  const tw = 180, th = Math.max(20, Math.round(p.h * tw / p.w));
+  const c = document.createElement('canvas');
+  c.width = tw; c.height = th;
+  const cx = c.getContext('2d');
+  cx.drawImage(p.img, 0, 0, tw, th);
+  const d = cx.getImageData(0, 0, tw, th).data;
+  const g = new Float32Array(tw * th);
+  for (let i = 0; i < g.length; i++) g[i] = (d[i*4] + d[i*4+1] + d[i*4+2]) / 3;
+  p._gray = { w: tw, h: th, data: g, actualW: p.w };
+  return p._gray;
+}
+
+function estimateOverlap(a, b) {
+  const minH = Math.min(a.h, b.h);
+  const W = 90; // 搜索步长下的宽度
+  const scaleA = a.actualW / a.w;
+  let best = { score: -2, overlap: 0 };
+  const maxOverlap = Math.min(a.actualW, b.actualW) * 0.6;
+  const stepPxA = Math.max(1, Math.round(scaleA * 4));
+  for (let overlap = 0; overlap < maxOverlap; overlap += stepPxA) {
+    // a 的尾部 overlap 与 b 的首部比较（各取若干列降采样）
+    const colsA = Math.min(a.w, 120);
+    const colsB = Math.min(b.w, 120);
+    const n = 40; // 采样列数
+    const ys = 12;
+    let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0, cnt = 0;
+    for (let k = 0; k < n; k++) {
+      const fa = k / (n - 1);
+      const ca = Math.floor((a.w - colsA) + fa * (colsA - 1));
+      const cb = Math.floor(fa * (colsB - 1));
+      for (let q = 0; q < ys; q++) {
+        const y = Math.floor(q / (ys - 1) * (minH - 1));
+        const va = a.data[y * a.w + ca];
+        const vb = b.data[y * b.w + cb];
+        sa += va; sb += vb; saa += va * va; sbb += vb * vb; sab += va * vb; cnt++;
+      }
+    }
+    const cov = sab / cnt - (sa / cnt) * (sb / cnt);
+    const vara = saa / cnt - (sa / cnt) ** 2;
+    const varb = sbb / cnt - (sb / cnt) ** 2;
+    const score = cov / Math.sqrt((vara + 1e-6) * (varb + 1e-6));
+    if (score > best.score) best = { score, overlap };
+  }
+  return best.overlap;
+}
+
+async function build() {
+  const p = currentPlan();
+  if (!p.pieces.length) { alert('没有分片'); return; }
+  if (!confirm('将按当前方案生成整卷，覆盖本卷目录下的「合并长卷.tif」，并重建图块。确定？')) return;
+  $('btnBuild').disabled = true;
+  setStatus('正在生成整卷…', true);
+  const r = await fetch('/api/stitch/' + encodeURIComponent(itemId) + '/build', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p),
+  });
+  const j = await r.json();
+  if (!r.ok) { setStatus('生成失败：' + (j.detail || r.status)); $('btnBuild').disabled = false; return; }
+  if (!j.ok) { setStatus(j.message || '正在生成中'); }
+  pollBuild();
+}
+
+function pollBuild() {
+  clearInterval(buildTimer);
+  buildTimer = setInterval(async () => {
+    const r = await fetch('/api/stitch/' + encodeURIComponent(itemId) + '/build/status', { cache: 'no-store' });
+    const s = await r.json();
+    const el = $('status');
+    el.classList.add('show');
+    el.innerHTML = `${s.message || ''} ${s.percent ? '（' + s.percent + '%）' : ''}<div class="st-progress"><div class="st-progress-bar" style="width:${s.percent || 0}%"></div></div>`;
+    if (s.state === 'done') {
+      clearInterval(buildTimer);
+      $('btnBuild').disabled = false;
+      setStatus('✅ 整卷已生成！图块后台生成中，稍后刷新查看器即可（' + (s.output || '') + '）', true);
+    } else if (s.state === 'error') {
+      clearInterval(buildTimer);
+      $('btnBuild').disabled = false;
+      setStatus('❌ 生成失败：' + (s.error || ''), true);
+    }
+  }, 2000);
+}
+
+function packEnabled() {
+  let x = 0;
+  for (const p of pieces) {
+    if (p.enabled === false) continue;
+    p.x = Math.round(x);
+    const dm = dimsOf(p);
+    x += dm.w;
+  }
+}
+
+function resetOrder() {
+  layoutInfo();
+  let x = 0;
+  const maxH = Math.max(...pieces.map(p => p.h), 1);
+  pieces.sort((a, b) => (a.orderIdx ?? 0) - (b.orderIdx ?? 0));
+  pieces.forEach((p, i) => {
+    p.angle = 0;
+    p.x = Math.round(x);
+    p.y = Math.round((maxH - p.h) / 2);
+    p.trimr = 0;
+    x += p.w; // 重置时先按无重叠排列（x 为绝对位置）
+  });
+  dirty = true; layoutInfo(); renderPanel(); draw();
+}
+
+async function load() {
+  const r = await fetch('/api/stitch/' + encodeURIComponent(itemId) + '/info', { cache: 'no-store' });
+  if (!r.ok) { setStatus('加载失败 HTTP ' + r.status); return; }
+  info = await r.json();
+  document.title = info.title + ' · 手动拼接';
+  $('title').textContent = info.title;
+  $('backLink').href = '/view/' + encodeURIComponent(itemId);
+  $('foot').textContent = info.category + ' · ' + info.files.length + ' 个分片 · 手动拼接工作台';
+  pieces = info.files.map((f, i) => ({
+    id: f.id, name: f.name, w: f.width, h: f.height,
+    x: 0, y: 0, angle: 0, trimr: 0, enabled: true, loaded: false, img: null, orderIdx: i,
+  }));
+  // 先按原始顺序排一遍（无重叠），后续用方案覆盖
+  let x = 0;
+  const maxH = Math.max(...pieces.map(p => p.h), 1);
+  pieces.forEach(p => { p.x = x; p.y = Math.round((maxH - p.h) / 2); x += p.w; });
+  // 载入已保存方案
+  if (info.plan && info.plan.pieces && info.plan.pieces.length === pieces.length) {
+    const byId = new Map(pieces.map(p => [p.id, p]));
+    const reordered = [];
+    for (const sp of info.plan.pieces) {
+      const p = byId.get(sp.id);
+      if (!p) continue;
+      p.x = sp.x ?? p.x; p.y = sp.y ?? p.y; p.angle = sp.angle ?? 0;
+      p.trimr = sp.trimr ?? 0; p.enabled = sp.enabled !== false;
+      reordered.push(p);
+    }
+    if (reordered.length === pieces.length) pieces = reordered;
+    if (info.plan.bg) $('bgColor').value = info.plan.bg;
+  }
+  layoutInfo();
+  resizeCanvas();
+  renderPanel();
+  fitView();
+  // 载入预览图
+  let remaining = pieces.length;
+  pieces.forEach(p => {
+    const img = new Image();
+    img.onload = () => { p.img = img; p.loaded = true; remaining--; draw(); };
+    img.onerror = () => { remaining--; };
+    img.src = p.id ? ('/api/stitch/piece/' + p.id + '?w=1600') : '';
+  });
+  setTimeout(() => { layoutInfo(); draw(); }, 3000);
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const w = screenToWorld(e.clientX, e.clientY);
+  const idx = hitTest(w.x, w.y);
+  if (idx >= 0) {
+    selected = idx;
+    dragging = { idx, lastX: e.clientX, lastY: e.clientY };
+    stage.classList.add('dragging');
+    renderPanel(); draw();
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const scale = e.shiftKey ? 0.2 : 1;
+  const dx = (e.clientX - dragging.lastX) / cam.scale * scale;
+  const dy = (e.clientY - dragging.lastY) / cam.scale * scale;
+  dragging.lastX = e.clientX; dragging.lastY = e.clientY;
+  const p = pieces[dragging.idx];
+  p.x = Math.round(p.x + dx);
+  p.y = Math.round(p.y + dy);
+  dirty = true;
+  layoutInfo(); renderPanel(); draw();
+});
+window.addEventListener('mouseup', () => {
+  if (dragging) { dragging = null; stage.classList.remove('dragging'); }
+});
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const ns = Math.max(0.001, Math.min(4, cam.scale * factor));
+  const wx = (mx - cam.ox) / cam.scale;
+  const wy = (my - cam.oy) / cam.scale;
+  cam.scale = ns;
+  cam.ox = mx - wx * ns;
+  cam.oy = my - wy * ns;
+  draw(); updateZoomLabel();
+}, { passive: false });
+
+function updateZoomLabel() {
+  const el = $('zoomLabel');
+  if (el) el.textContent = Math.round(cam.scale * 100) + '%';
+}
+function zoomBy(factor) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const ns = Math.max(0.0005, Math.min(8, cam.scale * factor));
+  const wx = (mx - cam.ox) / cam.scale;
+  const wy = (my - cam.oy) / cam.scale;
+  cam.scale = ns;
+  cam.ox = mx - wx * ns;
+  cam.oy = my - wy * ns;
+  draw(); updateZoomLabel();
+}
+$('btnZoomIn').onclick = () => zoomBy(1.25);
+$('btnZoomOut').onclick = () => zoomBy(1 / 1.25);
+$('btnFit').onclick = fitView;
+$('btnSeam').onclick = () => { showSeams = !showSeams; draw(); };
+$('btnAuto').onclick = autoSuggest;
+$('btnReset').onclick = () => { if (confirm('重置排列（不改变已保存方案）？')) resetOrder(); };
+$('btnSave').onclick = () => savePlan().catch(e => setStatus('保存失败：' + e.message, true));
+$('btnBuild').onclick = () => build().catch(e => setStatus('生成失败：' + e.message, true));
+$('bgColor').onchange = () => draw();
+document.addEventListener('keydown', (e) => {
+  if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(1.25); }
+  if (e.key === '-') { e.preventDefault(); zoomBy(1 / 1.25); }
+  if (e.key === 'f') { e.preventDefault(); fitView(); }
+});
+
+// 面板宽度拖拽
+(function initPanelResizer() {
+  const main = $('stMain'), resizer = $('resizer'), panel = $('panel');
+  let drag = false, startX = 0, startW = 340;
+  resizer.addEventListener('mousedown', (e) => {
+    drag = true; startX = e.clientX;
+    startW = panel.getBoundingClientRect().width;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const w = Math.max(240, Math.min(620, startW - (e.clientX - startX)));
+    main.style.setProperty('--st-panel-w', w + 'px');
+    $('panelW').value = w;
+  });
+  window.addEventListener('mouseup', () => { drag = false; });
+})();
+function applyPanelWidth(w) { $('stMain').style.setProperty('--st-panel-w', w + 'px'); }
+
+window.addEventListener('resize', () => { resizeCanvas(); });
+setInterval(() => { if (dirty) { /* 自动保存草稿到 localStorage */ localStorage.setItem('stitch_draft_' + itemId, JSON.stringify(currentPlan())); } }, 5000);
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+load();
+</script>
+</body>
+</html>

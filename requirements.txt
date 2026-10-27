@@ -1,0 +1,7 @@
+fastapi>=0.110,<1
+uvicorn>=0.29,<1
+tifffile>=2024.1
+imagecodecs>=2024.1
+pillow>=10.0
+numpy>=1.26
+pyvips>=2.2

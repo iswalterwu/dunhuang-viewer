@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>敦煌画卷 · 高清查看</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="gallery-header">
+  <div class="gallery-title-row">
+    <h1 class="gallery-title">敦煌画卷 · 高清查看</h1>
+    <span class="gallery-stats" id="stats">正在连接 NAS…</span>
+    <a class="logout" href="/admin" id="adminLink" style="display:none;margin-left:8px">用户管理</a>
+    <a class="logout" href="/logout">退出</a>
+  </div>
+  <div class="gallery-controls">
+    <div class="gallery-search">
+      <input type="search" id="search" placeholder="搜索：法藏编号 / 经名 / 分类（如 P2800、涅槃、敦煌003）" autocomplete="off">
+    </div>
+    <button id="rescan" title="重新扫描 NAS 目录">重新扫描</button>
+    <button id="loadAll" title="一次性显示全部卷（默认分批加载）">显示全部</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div class="status-bar" id="statusBar"></div>
+<main class="gallery-main">
+  <div class="grid" id="grid"></div>
+  <div class="loading" id="loading" style="display:none">加载中…</div>
+  <div class="empty" id="empty" style="display:none">没有找到匹配的卷子</div>
+  <div id="sentinel" style="height:1px"></div>
+</main>
+
+<script>
+const state = {
+  items: [], filtered: [], shown: 0, pageSize: 60,
+  category: '全部', query: '', categories: [], ready: false,
+  sizeText: '', totalFiles: 0,
+};
+
+const el = {
+  stats: document.getElementById('stats'),
+  statusBar: document.getElementById('statusBar'),
+  grid: document.getElementById('grid'),
+  chips: document.getElementById('chips'),
+  search: document.getElementById('search'),
+  loading: document.getElementById('loading'),
+  empty: document.getElementById('empty'),
+  rescan: document.getElementById('rescan'),
+  loadAll: document.getElementById('loadAll'),
+  sentinel: document.getElementById('sentinel'),
+};
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function fmtSize(bytes) {
+  let n = Number(bytes || 0);
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  for (const u of units) {
+    if (n < 1024 || u === 'TB') return u === 'B' ? `${Math.round(n)} B` : `${n.toFixed(1)} ${u}`;
+    n /= 1024;
+  }
+  return '';
+}
+
+async function loadIndex() {
+  try {
+    const resp = await fetch('/api/index', { cache: 'no-store' });
+    if (resp.status === 401) {
+      location.href = '/login?next=' + encodeURIComponent(location.pathname);
+      return;
+    }
+    const data = await resp.json();
+    state.items = data.items || [];
+    state.categories = data.categories || [];
+    if (data.status === 'scanning') {
+      el.statusBar.textContent = '正在扫描 NAS 目录…（' + (state.items.length || 0) + ' 卷已就绪）';
+      setTimeout(loadIndex, 1500);
+    } else if (data.status === 'error') {
+      el.statusBar.textContent = '扫描出错：' + (data.error || '未知错误');
+    } else {
+      state.ready = true;
+      el.statusBar.textContent = `共 ${data.total_files} 个文件 · ${data.total_size} · ${state.items.length} 卷`
+        + (data.scan_seconds != null ? ` · 扫描用时 ${data.scan_seconds} 秒` : '');
+    }
+    state.sizeText = fmtSize(data.total_bytes);
+    state.totalFiles = data.total_files;
+    renderChips();
+    applyFilter();
+  } catch (err) {
+    el.statusBar.textContent = '连接服务失败：' + err;
+    setTimeout(loadIndex, 3000);
+  }
+}
+
+function updateCounters() {
+  const len = state.filtered.length;
+  const shown = Math.min(state.shown, len);
+  el.stats.textContent =
+    `${state.items.length} 卷（当前显示 ${shown}/${len}）` +
+    (state.sizeText ? ` · ${state.sizeText}` : '') +
+    (state.totalFiles ? ` · ${state.totalFiles} 个 TIF` : '');
+  if (el.loadAll) {
+    el.loadAll.textContent = shown >= len ? '已全部显示' : `显示全部（${len}）`;
+  }
+}
+
+function renderChips() {
+  if (el.chips.dataset.count === String(state.categories.length)) return;
+  el.chips.dataset.count = String(state.categories.length);
+  const countMap = {};
+  state.items.forEach(it => { countMap[it.category] = (countMap[it.category] || 0) + 1; });
+  const all = ['全部', ...state.categories];
+  el.chips.innerHTML = all.map(c => {
+    const n = c === '全部' ? state.items.length : (countMap[c] || 0);
+    return `<span class="chip${c === state.category ? ' active' : ''}" data-cat="${esc(c)}">${esc(c)}（${n}）</span>`;
+  }).join('');
+  el.chips.querySelectorAll('.chip').forEach(ch => {
+    ch.addEventListener('click', () => {
+      state.category = ch.dataset.cat;
+      el.chips.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === ch));
+      applyFilter();
+    });
+  });
+}
+
+function applyFilter() {
+  const q = state.query.trim().toLowerCase();
+  state.filtered = state.items.filter(it => {
+    if (state.category !== '全部' && it.category !== state.category) return false;
+    if (!q) return true;
+    return (it.title + ' ' + it.category).toLowerCase().includes(q);
+  });
+  state.shown = 0;
+  el.grid.innerHTML = '';
+  renderMore();
+  el.empty.style.display = state.filtered.length ? 'none' : 'block';
+  updateCounters();
+}
+
+function renderMore() {
+  const next = state.filtered.slice(state.shown, state.shown + state.pageSize);
+  if (!next.length) return;
+  const frag = document.createDocumentFragment();
+  for (const it of next) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-thumb" data-cover="${esc(it.cover)}">
+        <span class="ph">${esc((it.title || '?').slice(0, 2))}</span>
+      </div>
+      <div class="card-body">
+        <p class="card-title">${esc(it.title)}</p>
+        <div class="card-meta">
+          <span class="cat">${esc(it.category)}</span>
+          <span>${it.file_count} 段</span>
+          <span>${esc(it.size)}</span>
+        </div>
+      </div>`;
+    card.addEventListener('click', () => { location.href = '/view/' + encodeURIComponent(it.id); });
+    frag.appendChild(card);
+  }
+  el.grid.appendChild(frag);
+  state.shown += next.length;
+  observeThumbs();
+  updateCounters();
+}
+
+const thumbObserver = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const box = e.target;
+    thumbObserver.unobserve(box);
+    const fid = box.dataset.cover;
+    if (!fid) continue;
+    const img = new Image();
+    img.alt = '';
+    img.onload = () => { box.innerHTML = ''; box.appendChild(img); };
+    let tries = 0;
+    img.onerror = () => {
+      tries += 1;
+      if (tries <= 2) {
+        setTimeout(() => {
+          img.src = '/thumb/' + encodeURIComponent(fid) + '?retry=' + tries;
+        }, tries * 3000);
+      }
+    };
+    img.src = '/thumb/' + encodeURIComponent(fid);
+  }
+}, { rootMargin: '400px' });
+
+function observeThumbs() {
+  el.grid.querySelectorAll('.card-thumb').forEach(box => thumbObserver.observe(box));
+}
+
+let loadingMore = false;
+const sentinelObserver = new IntersectionObserver(async entries => {
+  if (!entries[0].isIntersecting || loadingMore) return;
+  if (state.shown >= state.filtered.length) return;
+  loadingMore = true;
+  el.loading.style.display = 'block';
+  await new Promise(r => setTimeout(r, 60));
+  renderMore();
+  el.loading.style.display = 'none';
+  loadingMore = false;
+}, { rootMargin: '1200px' });
+sentinelObserver.observe(el.sentinel);
+
+el.search.addEventListener('input', () => {
+  state.query = el.search.value;
+  applyFilter();
+});
+el.loadAll.addEventListener('click', () => {
+  if (state.shown >= state.filtered.length) return;
+  state.pageSize = Math.max(state.pageSize, state.filtered.length);
+  renderMore();
+});
+
+el.rescan.addEventListener('click', async () => {
+  await fetch('/api/rescan', { method: 'POST' });
+  el.statusBar.textContent = '已请求重新扫描…';
+  setTimeout(loadIndex, 800);
+});
+
+loadIndex();
+
+// 管理员才显示「用户管理」入口
+fetch('/api/me', { cache: 'no-store' })
+  .then(r => (r.ok ? r.json() : null))
+  .then(me => {
+    if (me && me.is_admin) {
+      const link = document.getElementById('adminLink');
+      if (link) link.style.display = '';
+    }
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

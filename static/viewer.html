@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>敦煌画卷 · 查看</title>
+<style>
+  /* 极简兜底样式：万一主样式表加载失败，页面也不至于完全错乱 */
+  body { margin: 0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2937; background: #eef2f7; }
+  .v-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; box-shadow: 0 2px 8px rgba(23,37,63,.08); }
+  .v-tools { display: flex; gap: 4px; flex-wrap: wrap; }
+  .v-main { display: flex; height: calc(100vh - 70px); }
+  .v-stage { position: relative; flex: 1 1 auto; min-width: 0; }
+  #osd { width: 100%; height: 100%; }
+  .v-panel { flex: 0 0 320px; overflow: auto; padding: 14px; background: #fff; }
+  .v-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(244,247,251,.9); }
+  .v-overlay.hidden { display: none; }
+  .icon-btn { min-width: 34px; height: 34px; margin: 2px; padding: 2px 8px; border: 1px solid #dbe3ee; border-radius: 8px; background: #fff; cursor: pointer; }
+  .v-foot { padding: 6px 14px; font-size: 12px; color: #5b6675; }
+  .v-toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); background: rgba(255,255,255,.95); padding: 8px 16px; border-radius: 999px; box-shadow: 0 4px 16px rgba(23,37,63,.12); opacity: 0; transition: opacity .2s; }
+  .v-toast.show { opacity: 1; }
+</style>
+<script>
+  (function () {
+    var cssTries = 0, jsTries = 0;
+    window.__retryCss = function (link) {
+      if (cssTries >= 6) return;
+      cssTries += 1;
+      setTimeout(function () { link.href = '/static/style.css?v=' + Date.now(); }, 700 * cssTries);
+    };
+    window.__retryOsd = function (scriptEl) {
+      if (jsTries >= 6) return;
+      jsTries += 1;
+      setTimeout(function () {
+        var s = document.createElement('script');
+        s.src = '/static/openseadragon.min.js?v=' + Date.now();
+        s.onerror = function () { window.__retryOsd(s); };
+        document.head.appendChild(s);
+      }, 700 * jsTries);
+    };
+  })();
+</script>
+<link rel="stylesheet" href="/static/style.css?v=20261021b" onerror="__retryCss(this)">
+</head>
+<body class="viewer-page">
+
+<header class="v-top">
+  <div class="v-left">
+    <a class="icon-btn back" href="/" title="返回画卷目录" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <span class="v-title" id="title">载入中…</span>
+  </div>
+  <div class="v-tools">
+    <div class="tool-group">
+      <button class="icon-btn" id="prevSeg" title="上一段（←）" aria-label="上一段">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="seg-badge" id="segLabel">1 / 1</span>
+      <button class="icon-btn" id="nextSeg" title="下一段（→）" aria-label="下一段">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="tool-group">
+      <button class="icon-btn" id="fit" title="适应窗口（F）" aria-label="适应窗口">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9V5.5A1.5 1.5 0 015.5 4H9M15 4h3.5A1.5 1.5 0 0120 5.5V9M20 15v3.5A1.5 1.5 0 0118.5 20H15M9 20H5.5A1.5 1.5 0 014 18.5V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn text" id="oneToOne" title="原始像素 1:1">1:1</button>
+      <button class="icon-btn" id="zoomOut" title="缩小（-）" aria-label="缩小">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" id="zoomIn" title="放大（+）" aria-label="放大">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="tool-group">
+      <button class="icon-btn accent" id="lensBtn" title="就地放大：点击画面在当前位置放大；Esc 或「还原」返回" aria-label="就地放大">
+        <svg viewBox="0 0 24 24" width="17" height="17"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 16l4.5 4.5M8.5 11h5M11 8.5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" id="lensBack" title="还原视野（Esc）" aria-label="还原视野" disabled>
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M4 10a8 8 0 111.8 6.4M4 4v6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="fullscreen" title="全屏" aria-label="全屏">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="togglePanel" title="隐藏/显示侧栏（I）" aria-label="侧栏开关">
+        <svg viewBox="0 0 24 24" width="17" height="17"><rect x="3.5" y="4.5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14.5 4.5v15" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      </button>
+      <a class="icon-btn" id="stitchLink" href="#" title="手动拼接工作台（调整重叠/高度后生成整卷）" aria-label="手动拼接" style="display:none">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M6 4l12 16M18 4L6 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="6" cy="4" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="20" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="v-main" id="vMain">
+  <div class="v-stage" id="canvasWrap">
+    <div id="osd"></div>
+    <div class="v-overlay" id="overlay">
+      <div class="v-overlay-inner">
+        <div class="v-overlay-title" id="overlayTitle">正在准备高清图块…</div>
+        <div class="v-overlay-desc" id="overlayDesc">
+          首次打开需要在 NAS 本地生成缩放图块：普通卷子约 2～5 秒，超长卷约 10～40 秒，之后打开秒开。
+        </div>
+        <div class="v-progress"><div class="v-progress-bar" id="progressBar"></div></div>
+        <div class="v-progress-text" id="progressText"></div>
+      </div>
+    </div>
+    <div class="v-toast" id="toast"></div>
+  </div>
+
+  <div class="v-resizer" id="resizer" title="拖动调整侧栏宽度（双击恢复默认）"></div>
+
+  <aside class="v-panel" id="panel">
+    <div class="v-panel-inner">
+      <section class="p-card">
+        <h4 class="p-title">
+          <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5M12 8.2v.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          本卷信息
+        </h4>
+        <table class="meta-table" id="metaTable"></table>
+      </section>
+      <section class="p-card">
+        <h4 class="p-title">
+          <svg viewBox="0 0 24 24" width="15" height="15"><path d="M5 7h14M5 12h14M5 17h9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          分段 <span class="count" id="segCount">0</span>
+        </h4>
+        <ul class="seg-list" id="segList"></ul>
+      </section>
+      <section class="p-card" id="notesWrap" style="display:none">
+        <h4 class="p-title">
+          <svg viewBox="0 0 24 24" width="15" height="15"><path d="M6 4h9l4 4v12H6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 12h7M9 15.5h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          说明文字
+        </h4>
+        <pre class="note-text" id="noteText"></pre>
+      </section>
+    </div>
+  </aside>
+</main>
+
+<div class="v-foot" id="foot"></div>
+
+<script src="/static/openseadragon.min.js?v=20261021b" onerror="__retryOsd(this)"></script>
+<script>
+const itemId = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+const $ = id => document.getElementById(id);
+const MAX_PIXEL_RATIO = 1.0;   // 与 OpenSeadragon 的 maxZoomPixelRatio 保持一致
+
+
+let item = null;
+let viewer = null;
+let current = null;
+let currentHash = null;
+let pollTimer = null;
+let overlayError = false;
+let stateLostRetried = false;
+let pollErrors = 0;
+
+/* ---------------- 工具函数 ---------------- */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function fmtSize(bytes) {
+  let n = Number(bytes || 0);
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  for (const u of units) {
+    if (n < 1024 || u === 'TB') return u === 'B' ? `${Math.round(n)} B` : `${n.toFixed(1)} ${u}`;
+    n /= 1024;
+  }
+  return '';
+}
+
+let toastTimer = null;
+function toast(msg, ms = 2200) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/* ---------------- 加载遮罩 ---------------- */
+function showOverlay(title, desc) {
+  overlayError = false;
+  $('overlayTitle').textContent = title;
+  $('overlayTitle').classList.remove('error');
+  $('overlayDesc').textContent = desc || '';
+  $('overlay').classList.remove('hidden');
+  $('progressBar').style.width = '0%';
+  $('progressText').textContent = '';
+}
+
+function showOverlayError(msg) {
+  overlayError = true;
+  $('overlayTitle').textContent = '生成失败';
+  $('overlayTitle').classList.add('error');
+  $('overlayDesc').textContent = msg;
+  $('progressText').textContent = '可点「重新生成」重试；若反复失败，回到目录换一个分段试试。';
+  $('progressBar').style.width = '0%';
+  $('overlay').classList.remove('hidden');
+  if (!document.getElementById('retryBtn')) {
+    const btn = document.createElement('button');
+    btn.id = 'retryBtn';
+    btn.className = 'pill-btn';
+    btn.textContent = '重新生成';
+    btn.onclick = () => { btn.remove(); startPyramid(current); };
+    $('overlayDesc').after(btn);
+  }
+}
+
+function hideOverlay() {
+  $('overlay').classList.add('hidden');
+}
+
+/* ---------------- 加载数据 ---------------- */
+async function loadItem() {
+  try {
+    const resp = await fetch('/api/item/' + encodeURIComponent(itemId), { cache: 'no-store' });
+    if (resp.status === 401) {
+      location.href = '/login?next=' + encodeURIComponent(location.pathname);
+      return;
+    }
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      $('title').textContent = '打开失败';
+      showOverlay('索引还没准备好', (err.detail || '服务正在扫描 NAS 目录，请稍等几秒后刷新。'));
+      setTimeout(() => { location.reload(); }, 4000);
+      return;
+    }
+    item = await resp.json();
+    document.title = item.title + ' · 敦煌画卷';
+    $('title').textContent = item.title;
+    $('title').title = item.title;
+    $('foot').textContent = `${item.category} · ${item.files.length} 段 · 数据直接读取自 NAS`;
+    const st = $('stitchLink');
+    if (st) {
+      st.href = '/stitch/' + encodeURIComponent(itemId);
+      st.style.display = item.files.length > 1 ? 'inline-flex' : 'none';
+    }
+    renderSegments();
+    renderNotes();
+    const start = item.files[0];
+    if (start) selectFile(start);
+  } catch (err) {
+    $('title').textContent = '连接失败';
+    showOverlay('无法连接服务', String(err));
+  }
+}
+
+function renderSegments() {
+  $('segCount').textContent = item.files.length;
+  const list = $('segList');
+  list.innerHTML = item.files.map((f, i) =>
+    `<li data-idx="${i}" id="seg-${i}">
+       <span class="seg-name">${esc(f.name)}</span>
+       <span class="seg-size">${esc(f.size_text || fmtSize(f.size))}</span>
+     </li>`
+  ).join('');
+  list.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', () => {
+      const f = item.files[Number(li.dataset.idx)];
+      if (f && (!current || f.id !== current.id)) selectFile(f);
+    });
+  });
+}
+
+function renderMeta(f) {
+  const rows = [
+    ['文件名', f.name],
+    ['像素尺寸', f.width ? `${f.width} × ${f.height}` : '—'],
+    ['总像素', f.width ? `${(f.width * f.height / 1e6).toFixed(2)} 百万` : '—'],
+    ['分辨率', f.dpi ? `${f.dpi} DPI` : '未标注'],
+    ['位深/色彩', f.dtype ? `${f.dtype} · ${f.compression || ''}` : '—'],
+    ['文件大小', f.size_text || fmtSize(f.size)],
+    ['页数', f.pages != null ? f.pages : '—'],
+    ['操作', `<a class="dl" href="/file/${encodeURIComponent(f.id)}" download>下载原图</a>`],
+  ];
+  $('metaTable').innerHTML = rows.map(([k, v]) =>
+    `<tr><td>${esc(k)}</td><td>${k === '操作' ? v : esc(v)}</td></tr>`
+  ).join('') + (f.error ? `<tr><td>读取错误</td><td class="err">${esc(f.error)}</td></tr>` : '');
+}
+
+function renderNotes() {
+  const notes = item.notes || [];
+  if (!notes.length) { $('notesWrap').style.display = 'none'; return; }
+  $('notesWrap').style.display = 'block';
+  $('noteText').textContent = notes.map(n => n.text).join('\n\n');
+}
+
+function updateSegmentHighlight() {
+  const idx = item.files.findIndex(f => current && f.id === current.id);
+  item.files.forEach((_, i) => {
+    const li = $('seg-' + i);
+    if (li) li.classList.toggle('active', i === idx);
+  });
+  $('segLabel').textContent = idx >= 0 ? `${idx + 1} / ${item.files.length}` : '1 / 1';
+  $('prevSeg').disabled = idx <= 0;
+  $('nextSeg').disabled = idx < 0 || idx >= item.files.length - 1;
+}
+
+function pickNeighbor(delta) {
+  const idx = item.files.findIndex(f => current && f.id === current.id);
+  const target = item.files[idx + delta];
+  if (target) selectFile(target);
+}
+
+async function selectFile(f) {
+  current = f;
+  stateLostRetried = false;
+  pollErrors = 0;
+  clearLensHistory();
+  renderMeta(f);
+  updateSegmentHighlight();
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  startPyramid(f);
+}
+
+async function startPyramid(f) {
+  showOverlay('正在准备高清图块…',
+    '首次打开需要在 NAS 本地生成缩放图块：普通卷子约 2～5 秒，超长卷约 10～40 秒，之后打开秒开。');
+  try {
+    const resp = await fetch('/api/pyramid/' + encodeURIComponent(f.id), { method: 'POST' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    pollStatus();
+  } catch (err) {
+    showOverlayError(String(err));
+  }
+}
+
+async function pollStatus() {
+  if (!current) return;
+  try {
+    const resp = await fetch('/api/pyramid/' + encodeURIComponent(current.id) + '/status', { cache: 'no-store' });
+    const st = await resp.json();
+    if (st.state === 'missing') {
+      if (!stateLostRetried) {
+        stateLostRetried = true;
+        $('progressText').textContent = '服务刚重启，正在自动重试…';
+        fetch('/api/pyramid/' + encodeURIComponent(current.id), { method: 'POST' });
+      }
+      pollTimer = setTimeout(pollStatus, 1500);
+      return;
+    }
+    if (st.state === 'ready') {
+      currentHash = st.hash;
+      $('progressBar').style.width = '100%';
+      openViewer();
+      hideOverlay();
+      if (st.preview_only) {
+        const mp = (current && current.width) ? (current.width * current.height / 1e6).toFixed(0) : '?';
+        $('foot').textContent = `${item.category} · 此卷 ${mp} 百万像素（超大）· 可下载原图`;
+      }
+      return;
+    }
+    if (st.state === 'error') {
+      showOverlayError(st.error || '未知错误');
+      return;
+    }
+    const pct = Math.max(0, Math.min(100, Number(st.percent) || 0));
+    $('progressBar').style.width = pct + '%';
+    $('progressText').textContent = `${pct}% · 正在 NAS 本地解码（无需下载原图）`;
+    pollTimer = setTimeout(pollStatus, 900);
+  } catch (err) {
+    pollErrors += 1;
+    if (pollErrors >= 15) {
+      showOverlayError('连接服务失败：' + err + '（请刷新页面，或确认 NAS 服务在运行）');
+      return;
+    }
+    $('progressText').textContent = `连接不稳定，正在重试…（${pollErrors}/15）`;
+    pollTimer = setTimeout(pollStatus, 2000);
+  }
+}
+
+function dziUrl() {
+  return `/tiles/${currentHash}/${currentHash}.dzi`;
+}
+
+function openViewer() {
+  if (typeof OpenSeadragon === 'undefined') {
+    showOverlayError('查看器脚本加载失败（可能网络抖动），请刷新页面重试。');
+    return;
+  }
+  const url = dziUrl();
+  if (viewer) {
+    viewer.open(url);
+    clearLensHistory();
+    return;
+  }
+  viewer = OpenSeadragon({
+    id: 'osd',
+    showNavigationControl: false,
+    showNavigator: true,
+    navigatorPosition: 'BOTTOM_RIGHT',
+    navigatorHeight: 84,
+    navigatorWidth: 128,
+    navigatorBackground: 'rgba(255,255,255,0.72)',
+    navigatorBorderColor: 'rgba(148,163,184,0.35)',
+    navigatorDisplayRegionColor: 'rgba(59,130,246,0.55)',
+    tileSources: url,
+    maxZoomPixelRatio: 1.0,
+    minZoomImageRatio: 0.5,
+    visibilityRatio: 0.35,
+    constrainDuringPan: true,
+    animationTime: 0.55,
+    blendTime: 0.08,
+    gestureSettingsMouse: { dragToPan: true, scrollToZoom: true, clickToZoom: false, dblClickToZoom: false, zoomToRefPoint: true },
+    gestureSettingsTouch: { pinchToZoom: true, pinchRotate: false },
+    showRotationControl: false,
+  });
+  viewer.addHandler('canvas-click', onCanvasClick);
+}
+
+/* ---------------- 就地放大（替代原来的浮窗放大镜） ---------------- */
+let lensOn = false;
+let lensHistory = [];
+
+function setLens(on) {
+  lensOn = on;
+  document.body.classList.toggle('lens-on', on);
+  const btn = $('lensBtn');
+  if (btn) btn.classList.toggle('active', on);
+  if (on) {
+    toast('就地放大已开启：点击画面放大，Esc 或 ↺ 还原');
+    $('foot').textContent = '就地放大：点击任意位置放大查看，Esc/↺ 逐渐还原';
+  } else {
+    $('foot').textContent = `${item ? item.category : ''} · ${item ? item.files.length : ''} 段 · 数据直接读取自 NAS`;
+  }
+  updateLensBack();
+}
+
+function updateLensBack() {
+  const btn = $('lensBack');
+  if (btn) btn.disabled = lensHistory.length === 0;
+}
+
+function clearLensHistory() {
+  lensHistory = [];
+  updateLensBack();
+}
+
+function lensPushHistory() {
+  if (!viewer) return;
+  lensHistory.push({
+    zoom: viewer.viewport.getZoom(true),
+    center: viewer.viewport.getCenter(true),
+  });
+  if (lensHistory.length > 30) lensHistory.shift();
+  updateLensBack();
+}
+
+function lensRestore() {
+  if (!viewer || !lensHistory.length) return;
+  const state = lensHistory.pop();
+  viewer.viewport.zoomTo(state.zoom, state.center, false);
+  updateLensBack();
+}
+
+let lastZoomAt = 0;
+async function onCanvasClick(event) {
+  if (!lensOn || !viewer || !current || !event.position) return;
+  const now = Date.now();
+  if (now - lastZoomAt < 350) return;   // 防止一次点击被重复触发
+  const viewportPoint = viewer.viewport.pointFromPixel(event.position);
+  const curZoom = viewer.viewport.getZoom();
+  const maxZoom = viewer.viewport.getMaxZoom();
+  const targetZoom = Math.min(maxZoom, curZoom * 3);
+  if (targetZoom <= curZoom * 1.02) {
+    toast('已经是原图 1:1（最清晰），可拖动查看细节');
+    return;
+  }
+  lastZoomAt = now;
+  lensPushHistory();
+  viewer.viewport.zoomTo(targetZoom, viewportPoint, false);
+  const pct = Math.round(Math.min(1, targetZoom / maxZoom) * 100);
+  if (targetZoom >= maxZoom * 0.999) {
+    toast('已放大到原图 1:1（100% 原生像素）· Esc 或 ↺ 还原');
+  } else {
+    toast(`已就地放大 ×3 · 当前清晰度 ${pct}%（再点继续，最高 100%）`);
+  }
+}
+
+/* ---------------- 工具栏 ---------------- */
+$('prevSeg').onclick = () => pickNeighbor(-1);
+$('nextSeg').onclick = () => pickNeighbor(1);
+$('fit').onclick = () => { if (viewer) viewer.viewport.goHome(); };
+$('oneToOne').onclick = () => {
+  if (!viewer) return;
+  lensPushHistory();
+  viewer.viewport.zoomTo(viewer.viewport.getMaxZoom(), null, false);
+  toast('已到原图 1:1（100% 原生像素）');
+};
+$('zoomIn').onclick = () => { if (viewer) viewer.viewport.zoomBy(1.5); };
+$('zoomOut').onclick = () => { if (viewer) viewer.viewport.zoomBy(0.67); };
+$('fullscreen').onclick = () => {
+  const el = $('canvasWrap');
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+  }
+};
+$('lensBtn').onclick = () => {
+  if (!viewer || !current) return;
+  setLens(!lensOn);
+};
+$('lensBack').onclick = () => { lensRestore(); };
+
+/* 侧栏隐藏/显示 */
+const vMain = $('vMain');
+const panel = $('panel');
+const PANEL_DEFAULT = 320;
+const PANEL_MIN = 240;
+function panelMax() {
+  return Math.max(PANEL_MIN, Math.min(680, Math.round(window.innerWidth * 0.5)));
+}
+function applyPanelWidth(w, save = true) {
+  const width = Math.max(PANEL_MIN, Math.min(panelMax(), Math.round(w || PANEL_DEFAULT)));
+  vMain.style.setProperty('--panel-w', width + 'px');
+  if (save) localStorage.setItem('dhPanelW', String(width));
+  setTimeout(() => { if (viewer && viewer.viewport && viewer.viewport.update) viewer.viewport.update(); }, 60);
+}
+function setPanelHidden(hidden, save = true) {
+  vMain.classList.toggle('panel-hidden', hidden);
+  $('togglePanel').classList.toggle('active', !hidden);
+  if (save) localStorage.setItem('dhPanelHidden', hidden ? '1' : '0');
+  setTimeout(() => { if (viewer && viewer.viewport && viewer.viewport.update) viewer.viewport.update(); }, 220);
+}
+$('togglePanel').onclick = () => {
+  setPanelHidden(!vMain.classList.contains('panel-hidden'));
+  toast(vMain.classList.contains('panel-hidden') ? '侧栏已隐藏（点 ☰ 或按 I 恢复）' : '侧栏已显示');
+};
+
+/* 侧栏宽度拖拽 */
+(function initResizer() {
+  const resizer = $('resizer');
+  let dragging = false;
+  let startX = 0;
+  let startW = 320;
+  resizer.addEventListener('pointerdown', e => {
+    if (vMain.classList.contains('panel-hidden')) return;
+    dragging = true;
+    startX = e.clientX;
+    startW = parseInt(getComputedStyle(vMain).getPropertyValue('--panel-w'), 10) || PANEL_DEFAULT;
+    try { resizer.setPointerCapture(e.pointerId); } catch (err) {}
+    document.body.classList.add('resizing');
+    e.preventDefault();
+  });
+  resizer.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    applyPanelWidth(startW - (e.clientX - startX), false);
+  });
+  const stop = e => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('resizing');
+    try { resizer.releasePointerCapture(e.pointerId); } catch (err) {}
+    const w = parseInt(getComputedStyle(vMain).getPropertyValue('--panel-w'), 10);
+    if (w) localStorage.setItem('dhPanelW', String(w));
+  };
+  resizer.addEventListener('pointerup', stop);
+  resizer.addEventListener('pointercancel', stop);
+  resizer.addEventListener('dblclick', () => { applyPanelWidth(PANEL_DEFAULT); toast('侧栏宽度已恢复默认'); });
+})();
+
+(function restorePanelState() {
+  const savedW = parseInt(localStorage.getItem('dhPanelW') || '', 10);
+  applyPanelWidth(Number.isFinite(savedW) ? savedW : PANEL_DEFAULT, false);
+  const hidden = localStorage.getItem('dhPanelHidden') === '1';
+  if (hidden) setPanelHidden(true, false);
+  else $('togglePanel').classList.add('active');
+  window.addEventListener('resize', () => {
+    const w = parseInt(getComputedStyle(vMain).getPropertyValue('--panel-w'), 10);
+    applyPanelWidth(w || PANEL_DEFAULT, false);
+  });
+  // 手机上默认收起侧栏，点 ☰ 以抽屉形式打开
+  if (window.innerWidth <= 900 && localStorage.getItem('dhPanelHidden') === null) {
+    setPanelHidden(true, false);
+  }
+})();
+
+/* ---------------- 键盘 ---------------- */
+document.addEventListener('keydown', e => {
+  if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  if (e.key === 'Escape') {
+    if (lensHistory.length) { lensRestore(); e.preventDefault(); return; }
+    if (lensOn) { setLens(false); e.preventDefault(); return; }
+  }
+  if (e.key === 'ArrowLeft') pickNeighbor(-1);
+  if (e.key === 'ArrowRight') pickNeighbor(1);
+  if (e.key === '+' || e.key === '=') $('zoomIn').click();
+  if (e.key === '-') $('zoomOut').click();
+  if (e.key === 'f') $('fit').click();
+  if (e.key === 'i') $('togglePanel').click();
+  if (e.key === 'l') $('lensBtn').click();
+});
+
+loadItem();
+</script>
+</body>
+</html>

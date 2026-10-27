@@ -1,0 +1,109 @@
+# 敦煌画卷 · NAS 高清查看器
+#
+# 历史路径记录所用系统版本 DSM 7.3.2；私人设备实例与现场布局非公开：
+#   - 敦煌画卷：/srv/example/data
+#   - 部署目录：/srv/example/viewer
+# 部署后访问：局域网 http://192.0.2.10:8503
+#             Tailscale http://192.0.2.20:8503
+#
+# 内存安全设计（2026-10-18 事故后加固）：
+#   - 容器硬上限 768MB 且禁用额外 swap：超限由 cgroup 直接杀容器，绝不会拖垮 NAS
+#   - VIPS_CONCURRENCY=1：单线程解码
+#   - MEM_GUARD_MB=900：可用内存低于 900MB 直接拒绝解码并提示
+#   - FULL_DZI_MAX_PIXELS=3.5 亿：超过只生成"安全预览分辨率"，不整卷解码
+#   - 同一时间只允许一个图块生成任务
+
+services:
+
+  # ---------------- 全量 DZI 图块后台生成器 ----------------
+  # 独立容器：内存硬上限 640MB，单独限 2 核；失败自动重启且断点续跑。
+  # 暂停：docker stop dunhuang-pyramid-builder
+  # 继续：docker start dunhuang-pyramid-builder
+  # 看进度：docker logs -f dunhuang-pyramid-builder
+  pyramid-builder:
+    build: .
+    image: dunhuang-viewer:latest
+    container_name: dunhuang-pyramid-builder
+    restart: on-failure
+    volumes:
+      - /srv/example/data:/data:ro
+      - /srv/example/cache:/cache
+    environment:
+      - TZ=Asia/Shanghai
+      - DATA_DIR=/data
+      - CACHE_DIR=/cache
+      - TILE_QUALITY=82
+      - VIPS_CONCURRENCY=1
+      - BUILD_MEM_FLOOR_MB=1200
+      - BUILD_STRIP_MB=96
+      - HUGE_PIXELS=400000000
+      - HUGE_WIDTH=100000
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    command: ["python", "-u", "pyramid_worker.py"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # ---------------- 超巨卷专用生成器（主任务完成后运行） ----------------
+  pyramid-huge:
+    build: .
+    image: dunhuang-viewer:latest
+    container_name: dunhuang-pyramid-huge
+    restart: on-failure
+    volumes:
+      - /srv/example/data:/data:ro
+      - /srv/example/cache:/cache
+    environment:
+      - TZ=Asia/Shanghai
+      - DATA_DIR=/data
+      - CACHE_DIR=/cache
+      - TILE_QUALITY=82
+      - VIPS_CONCURRENCY=1
+      - BUILD_MEM_FLOOR_MB=1000
+      - BUILD_STRIP_MB=96
+      - PROCESS_DEFERRED=1
+    mem_limit: 2304m
+    memswap_limit: 2304m
+    command: ["python", "-u", "pyramid_worker.py"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  dunhuang-viewer:
+    build: .
+    image: dunhuang-viewer:latest
+    container_name: dunhuang-viewer
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8503:8000"
+    volumes:
+      - /srv/example/data:/data:rw
+      - /srv/example/cache:/cache
+      - /srv/example/static:/app/static:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - CACHE_MAX_GB=600
+      - TILE_SIZE=512
+      - TILE_QUALITY=82
+      - VIPS_CONCURRENCY=1
+      - MEM_GUARD_MB=900
+      - FULL_DZI_MAX_PIXELS=350000000
+      - PREVIEW_LONG_EDGE=10000
+      - PREVIEW_MAX_PIXELS=20000000
+      - THUMB_WORKERS=2
+      - THUMB_VIPS_MAX_PIXELS=30000000
+      - PREVIEW_VIPS_MAX_PIXELS=30000000
+    mem_limit: 2048m
+    memswap_limit: 2048m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

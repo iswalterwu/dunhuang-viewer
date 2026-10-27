@@ -1,0 +1,21 @@
+# 运行凭据（AUTH_USER / AUTH_PASS / AUTH_SECRET），绝不提交
+.env
+
+# 运行时生成的数据（容器写入，体积大）
+cache/
+pyramids/
+thumbs/
+build.log
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 群晖 / 系统元数据
+@eaDir/
+\#recycle/
+\#snapshot/
+.DS_Store
+Thumbs.db
+desktop.ini
