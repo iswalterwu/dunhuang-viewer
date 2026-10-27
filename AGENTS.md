@@ -15,7 +15,7 @@ dunhuang-viewer：敦煌画卷 · NAS 高清查看器（自托管 Web 应用）�
 
 | 文档 | 内容 | 何时读 |
 |---|---|---|
-| `docs/plan.md` | 总方案：目标、决策记录、文档体系、目录结构、路线图、扩展点、风险与已知问题 | 任何任务前先读 |
+| `docs/plan.md` | 总方案：目标、数据现状与沿革、决策记录、文档体系、目录结构、路线图、待确认决策（PD）、风险（RK）与已知问题（KI） | 任何任务前先读 |
 | `docs/architecture.md` | 系统架构：组件职责、ID 与缓存布局、图块管线、拼接工作台、认证、部署拓扑、内存安全红线 | 动后端/容器/部署相关代码前必读 |
 | `docs/designUI.md` | 全局设计理念：配色令牌、页面形态（画廊/查看器/拼接/登录/管理）、查看器交互约定 | 动前端/样式前必读 |
 | `docs/decisions/` | ADR 决策记录（编号、日期、背景、取舍） | 新决策先登记再实现 |
@@ -96,9 +96,9 @@ specs/<feature>/          # 每个功能性 feature 一个独立规格目录（�
 - **图像管线**：libvips（pyvips）流式解码 + DZI 图块（`dzsave`，JPEG）；tifffile 读元数据并对未压缩 TIFF 做按行/按区域流式读取；Pillow 只作无 libvips 时的兜底（D-003）
 - **图块生成**：在线按需（单并发）+ 后台全量生成器 `pyramid-builder` + 超巨卷专用 `pyramid-huge`，断点续跑状态在 `cache/pyramid_build_state.json`（D-006）
 - **内存安全红线**（2026-10-18 事故后）：容器硬上限且禁用额外 swap、`VIPS_CONCURRENCY=1`、`MEM_GUARD_MB` 内存守卫、超大卷降级为预览分辨率；只许收紧，放宽须先登记 ADR（D-005）
-- **原始数据只读**：`/srv/example/data` 是唯一权威原图；唯一写入例外是拼接工作台写回卷目录的 `合并长卷.tif`（临时文件 + 原子替换）（D-008）
+- **原图目录写入**：本仓库代码对 `/srv/example/data` 的唯一写入是拼接工作台写回卷目录的 `合并长卷.tif`（临时文件 + 原子替换）（D-008）；原图目录另有外部写入方（2026-10-21 批量整理脚本、IDP 下载器，plan.md §1.4），治理规则待定（plan.md PD-02）
 - **ID 与缓存映射**：卷/文件 ID = 相对路径的 base64url，缓存键 = `sha1(file_id)[:16]`；`app.py`、`pyramid_worker.py`、`stitch_apply.py` 三处必须保持同一映射（architecture.md §3）
-- **访问与认证**：局域网 + Tailscale + 可选公网入口（私人拓扑非公开）；因公网可达，登录墙必须开启（`.env` 的 `AUTH_USER`/`AUTH_PASS`/`AUTH_SECRET` 三项齐全，缺一项即全站匿名可访问）；用户表 `cache/users.json`（pbkdf2）（D-007）
+- **访问与认证**：局域网 + Tailscale + 可选公网入口（私人地址及网关拓扑非公开）；因公网可达，登录墙必须开启（`.env` 的 `AUTH_USER`/`AUTH_PASS`/`AUTH_SECRET` 三项齐全，缺一项即全站匿名可访问）；用户表 `cache/users.json`（pbkdf2）（D-007）
 - **代码与部署通道**：GitHub 私有仓库 `contributor/dunhuang-viewer` 是代码权威；NAS 部署目录是 git 仓库（`receive.denyCurrentBranch=updateInstead`），只接收本机工作副本的推送（D-009）
 
 ## 4. 工作约定

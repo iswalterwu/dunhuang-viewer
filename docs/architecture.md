@@ -8,8 +8,9 @@
 ```
 浏览器（电脑 / 手机 / 平板）
   │  局域网 http://192.0.2.10:8503 · Tailscale http://192.0.2.20:8503
-  │  公网：部署方配置受控入口，私人网关组件链与端口非公开
-  │       （私人入口实例与配置不属于本仓库，不公开）
+  │  如开放公网：部署方负责 HTTPS、可信代理头与登录墙
+  │       私人网关组件链、实例与端口非公开
+  │       （可选入口配置由部署方非公开管理，见 §9）
   ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ dunhuang-viewer 容器（FastAPI + uvicorn :8000 → 宿主 :8503）       │
@@ -61,7 +62,8 @@
         └── *.txt            # 可选：说明文字（依次尝试 utf-8-sig / gb18030 / utf-16 / latin-1，最多 8000 字）
 ```
 
-卷封面取该卷体积最小的文件。
+卷封面取该卷体积最小的文件。只过滤目录：以 `.` 开头的 TIFF 文件照常索引。`中国国博馆藏` 的卷目录另含下载器写入的
+`manifest.json`、`report.json`、`index.json`、`pages/`，查看器只读取其中的 TIFF（数据现状见 plan.md §1.3）。
 
 ### 3.2 ID 与缓存键
 
@@ -97,7 +99,7 @@ cache/
 - `POST /api/pyramid/{fid}` 幂等：`.dzi` 已存在 → 直接 `ready`；否则起后台线程，状态 `queued → generating → ready | error`
 - 全局信号量 `PYR_GENERATE_LOCK` 保证同一时间只生成一个；入队前、开始解码前、预览底图生成后各检查一次内存守卫
 - libvips 不回报进度，用平滑的假进度（最高 90%）；前端轮询 `GET /api/pyramid/{fid}/status`
-- 状态只在内存（`PYR_STATE`），进程重启后以磁盘上的 `.dzi` 为准；成功后触发 `evict_cache`（超过 `CACHE_MAX_GB` 时按目录修改时间删到 80%）
+- 状态只在内存（`PYR_STATE`），进程重启后以磁盘上的 `.dzi` 为准；成功后触发 `evict_cache`（超过 `CACHE_MAX_GB` 时按目录修改时间删到 80%；每次都会全量遍历统计体积，见 plan.md KI-01）
 
 ### 4.2 降级规则（`_build_pyramid_vips`）
 
@@ -111,7 +113,7 @@ cache/
 
 ### 4.3 后台全量与超巨卷（`pyramid_worker.py`）
 
-- 扫描全部 TIFF，跳过已有全分辨率 DZI 的文件（DZI 宽高 = 原图宽高）
+- 扫描全部 TIFF（不跳过 `#` / `@` / `.` 开头的目录，与查看器索引规则不一致，见 plan.md KI-07），跳过已有全分辨率 DZI 的文件（DZI 宽高 = 原图宽高）
 - 超巨卷（像素 > `HUGE_PIXELS`，或宽/高 > `HUGE_WIDTH`）写入 `deferred` 队列，留给 `pyramid-huge`
 - 每文件最多 3 轮、每轮重试 2 次；可用内存低于 `BUILD_MEM_FLOOR_MB` 时每 60 秒等待
 - 图块尺寸自适应：从 512 起降，直到「宽 × 通道 × 图块高」≤ `BUILD_STRIP_MB`；16 位按 /257 转 8 位，CMYK 转 sRGB
@@ -137,7 +139,7 @@ cache/
 1. 单并发（`STITCH_SEMAPHORE`）；校验分片都属于本卷
 2. 横向排列：与左侧重叠的部分自动裁掉，留出的间隙填白；按 `y` 计算高度差后补边；旋转用 `bg` 作背景
 3. 先写 `<卷目录>/.合并长卷_building_<ts>.tif`（BigTIFF、不压缩），再原子替换为 `<卷目录>/合并长卷.tif`（D-008）
-4. 删除旧图块，写入 `deferred` 队列 → 等待 `pyramid-huge` 完成（最多 40 分钟）→ 重扫索引
+4. 删除旧图块，写入 `deferred` 队列 → 等待 `pyramid-huge` 完成（最多 40 分钟）→ 重扫索引（状态文件并发与缓存失效问题见 plan.md KI-02、KI-03）
 5. 进度经 `GET /api/stitch/{卷ID}/build/status` 查询
 
 ### 6.3 旧通道（疑似遗留）
@@ -150,9 +152,9 @@ cache/
 - **启用条件**：`AUTH_USER`、`AUTH_PASS`、`AUTH_SECRET` 三项均非空；**任一缺失即关闭登录墙，全站匿名可访问**
 - **初始管理员**：启动时若用户表里没有 `AUTH_USER`，用 `AUTH_PASS` 创建（admin、bootstrap）；之后 `.env` 的密码不再覆盖已存在账号，改密走后台
 - **密码**：pbkdf2_sha256，20 万次迭代，16 字节随机盐；用户名不存在时也做一次等价哈希（防枚举）
-- **会话**：cookie `dh_session` = base64url(`用户|过期时间|HMAC-SHA256(AUTH_SECRET)`)，有效期 `AUTH_SESSION_HOURS`；httponly、samesite=lax，`secure` 取决于 `X-Forwarded-Proto`；每次校验都确认用户仍在用户表里（删除用户即刻失效）
+- **会话**：cookie `dh_session` = base64url(`用户|过期时间|HMAC-SHA256(AUTH_SECRET)`)，有效期 `AUTH_SESSION_HOURS`；httponly、samesite=lax，`secure` 取决于 `X-Forwarded-Proto`（公网链路由 nginx 设为 https）；每次校验都确认用户仍在用户表里（删除用户即刻失效）
 - **未登录**：页面 303 跳 `/login?next=…`；`/api/`、`/tiles/`、`/thumb/`、`/file/` 返回 401 JSON；`/static/`、`/login`、`/logout` 放行
-- **限流**：同一 IP 10 分钟内失败 10 次 → 429；IP 依次取 `X-Real-IP`、`X-Forwarded-For` 最后一段、连接地址
+- **限流**：同一 IP 10 分钟内失败 10 次 → 429；IP 依次取 `X-Real-IP`、`X-Forwarded-For` 最后一段、连接地址。公网链路上 nginx 用 `$remote_addr` 覆盖 `X-Real-IP`，取值可信；直连 8503（局域网 / Tailscale）时客户端可自行设置这两个头
 - **管理后台** `/admin`：新增用户（用户名 2～32 位字母数字 `_.-`，密码 ≥ 8 位）、设/取消管理员（至少保留一个）、删除、重置密码；表单带 CSRF（`HMAC(AUTH_SECRET, "csrf|"+会话)`）
 
 ## 8. 接口清单
@@ -190,7 +192,12 @@ cache/
 - **代码同步**（D-009）：本机工作副本 → `git push origin main`（GitHub）→ `git push nas main`（NAS 部署目录，updateInstead 直接更新工作区）
 - **生效方式**：`static/` 推送即生效；`app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 需在 NAS 上
   `cd /srv/example/viewer && /usr/local/bin/docker-compose up -d --build dunhuang-viewer`（经用户确认；不带服务名会同时拉起两个生成器）
-- **运维入口**：`ssh nas`（operator，文件）、`ssh nasroot`（root，`/usr/local/bin/docker`、`/usr/local/bin/docker-compose`）
+- **运维入口**：文件操作角色与容器管理角色由部署方配置；可选公网入口配置非公开
+- **不在本仓库的运行配置**（改动不经 git，需手动同步，plan.md RK-07）：
+  - NAS `.env`：`AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` / `AUTH_SESSION_HOURS`（权限 600）
+  - 开机钩子：`auto_huge_boot.sh` 的拷贝，安装位置由部署方非公开配置
+  - 可选公网入口：部署方负责访问控制；私人网关实例、组件链及端口不公开
+  - 可选 HTTPS 入口：部署方负责 TLS 与可信 `Host`、`X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`；具体网关配置非公开
 
 ## 10. 内存安全红线（D-005）
 
@@ -209,7 +216,7 @@ cache/
 
 ## 11. 隔离与安全
 
-- **原图**：两个生成器只读挂载；查看器读写挂载，唯一写入路径是拼接输出（D-008）
+- **原图**：两个生成器只读挂载；查看器读写挂载，本仓库代码的唯一写入路径是拼接输出（D-008）；外部写入方见 plan.md §1.4
 - **凭证**：`.env`（权限 600，不入库）；用户表 `cache/users.json`（权限 600）
-- **公网**：入口拓扑非公开，本仓库内没有 TLS 配置；登录墙 fail-open（§7）；限流信任 `X-Real-IP` / `X-Forwarded-For`（风险见 plan.md §10）
+- **公网**：开放公网须配置受控 HTTPS 入口；私人拓扑与端口现场非公开；登录墙 fail-open（§7）；请求头的信任前提见 §7 与 plan.md RK-03
 - **下载**：任何已登录用户都可经 `/file/{fid}` 下载 GB 级原图
