@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-27）：第 4 版，对应 spec 第 4 版（待 Gate 1 再批准）。各轮 Checklist 的结果与修订对照见 `checklist.md`。
+> 状态（2026-10-27）：第 5 版，对应 spec 第 5 版（待 Gate 1 再批准）。各轮 Checklist 的结果与修订对照见 `checklist.md`。
 
 ## 1. 技术方案
 
@@ -46,7 +46,7 @@ catalog/
 │   ├── report.py              # 导入报告、异常清单、基线对照
 │   ├── auth.py                # 校验 v0 会话 cookie 与用户表、Origin 校验
 │   ├── api.py                 # FastAPI：只读接口 + 管理员触发导入
-│   └── __main__.py            # 命令行：migrate / import / report / health
+│   └── __main__.py            # 命令行：migrate / report / health（不提供导入，导入只经接口触发）
 ├── acceptance/                # NAS 验收脚本 A1–A7（§6.3）与基线 baseline-2026-10-27.json
 └── tests/                     # pytest；fixtures/ 生成合成目录树、合成文件与文件条目
 ```
@@ -65,8 +65,8 @@ catalog/
 | GET | `/api/v1/images/{id}/history?run=` | 影像在指定导入批次时的取值及其字段依据 | 登录 |
 | GET | `/api/v1/attachments/{id}` | 附件原文，原样字节 | 登录 |
 | GET | `/api/v1/anomalies` | 异常清单（含「未导入的文件」类别）；筛选 `run`、`category`；分页 | 登录 |
-| GET | `/api/v1/imports`、`/api/v1/imports/{id}` | 导入记录与报告（含 v0 索引快照状态与 v0 健康采样） | 登录 |
-| POST | `/api/v1/imports` | 触发一次导入，后台执行，返回 202 与批次 ID；已有导入在跑时返回 409；`Origin` 校验见 §4.7 | 管理员 |
+| GET | `/api/v1/imports`、`/api/v1/imports/{id}` | 导入记录与报告（含 v0 索引快照状态、v0 健康采样、不关联写卷的附件） | 登录 |
+| POST | `/api/v1/imports` | 触发一次导入，后台执行，返回 202 与批次 ID；已有导入在跑时返回 409；登录状态剩余有效期不足 90 分钟时返回 400 并提示重新登录；`Origin` 校验见 §4.7 | 管理员 |
 
 接口文档（OpenAPI）在 `/api/v1/docs`，同样需要登录；管理员可在该页面触发导入。
 
@@ -76,14 +76,14 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 | 表 | 主要字段 | 说明 |
 |---|---|---|
-| `import_run` | id、起止时间、状态、触发方式（`api:<账号>` / `cli`）、规则版本、代码版本、v0 索引快照状态（有效 / 不可用及原因）、v0 健康采样汇总（jsonb）、各类数量（jsonb）、基线对照（jsonb）、错误 | 每次导入一条（AC-009-4）；触发者只记在这里，不作为字段作者 |
+| `import_run` | id、起止时间、状态、触发方式（`api:<账号>`）、规则版本、代码版本、v0 索引快照状态（有效 / 不可用及原因）、v0 健康采样汇总（jsonb）、各类数量（jsonb）、基线对照（jsonb）、错误 | 每次导入一条（AC-009-4）；触发者只记在这里，不作为字段作者 |
 | `item` | id（UUIDv4）、serial（登记顺序）、grouping_key、parent_id、原始位置、展示策略、出处认定（状态、依据、判定者、时间、建议、建议依据）、线索（jsonb）、字段依据（jsonb） | 写卷；`grouping_key` 只给持有合规馆藏号的写卷（如 `pelliot:2504:1`、`nlc:BD00023a`），非空值唯一（spec R-003 写卷第 4 条：已有写卷之间不自动合并，同号不会写入）；「较早登记」按 serial 比较 |
 | `identifier` | item_id、体系、原文、规范写法、母号、分件、出处、出处位置、主编号、合规 / 存疑、状态（现行 / 历史 / 待确认）、起止批次、字段依据 | 编号、编号历史与待确认的编号（规则要求拆分、同号未生效；AC-003-4～AC-003-6、R-004）；规范写法与母号建索引（不区分大小写） |
 | `image` | id（UUIDv4）、根（data / backup）、相对路径、原始文件名、是否隐藏、种类（tiff / psb / jpg）、大小、mtime_ns、inode、指纹、事实（jsonb：7 个字段各为有值 / 不适用 / 缺失）、谱系、来源与许可五字段、对外策略、IIIF 画布序号与 ID、状态（present / missing）、首见 / 末见批次、缺失时间、字段依据 | 影像（R-005、R-006）；根与相对路径是影像最后一次被发现时的位置（missing 影像保留）；present 影像的（根，相对路径）唯一 |
 | `image_path_history` | image_id、根、相对路径、起止批次 | 路径历史（AC-003-2） |
 | `item_image` | item_id、image_id、角色、来源目录（set_key）、写卷单元、字段依据 | 写卷与影像的多对多：多编号单元的影像关联多件（AC-002-4），一件写卷可有多套影像（AC-005-5） |
 | `item_attachment` | item_id、attachment_id | 附件与写卷的多对多（AC-001-3） |
-| `attachment` | id、根、相对路径、种类（说明 / manifest / report / index）、原始字节、sha256、解码文本、编码 | 原始附件（AC-008-2） |
+| `attachment` | id、根、相对路径、种类（说明 / manifest / report / index）、原始字节、sha256、解码文本、编码 | 原始附件（AC-008-2）；不属于任何写卷单元的附件同样导入，`item_attachment` 中没有它的关联，导入报告列出（AC-001-3） |
 | `derivation` | 派生影像、源影像、方式（拼接 / PSB 转换）、证据（日志文件与行号） | 合并长卷的来源（AC-005-3） |
 | `provenance_history` | item_id、状态、依据、判定者、时间、批次 | 判定者以 `rule:` 或 `user:` 开头（AC-007-4） |
 | `history` | 对象种类、对象 ID、批次、快照（jsonb）、字段依据（jsonb） | 写卷、影像、编号、关系的派生字段每次变化时记一条快照（含字段依据），按批次可查任一时刻的取值及其来源与作者（AC-009-3、AC-013-3）；影像的缺失与重新出现也记入（AC-009-2、AC-009-5） |
@@ -101,12 +101,12 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 ### 4.1 一次导入
 
 1. 取得咨询锁，没取到就返回「已有导入在跑」；写入 `import_run`（running，记触发方式）
-2. **v0 索引快照**（§4.7）：经接口触发时，用触发者自己的 `dh_session` 调用 v0 `/api/index`；HTTP 200 且 `status` 为 `ready` 时快照有效，写入 `v0_volume`；否则（调用失败、`status` 为 empty / scanning / error、命令行触发没有登录状态）记「v0 索引不可用」异常及原因，报告标明「v0 覆盖对照不可验证」，导入照常进行。随后启动 v0 健康采样（§4.7）
-3. **扫描**（只读）：遍历原图目录的 5 个分类与备份目录，跳过以 `@`、`#`、`.` 开头的目录并记入 `excluded`（`#recycle`、`@eaDir`、国图 `BD00081/.pages` 等）。按种类分类文件：`.tif` / `.tiff` / `.btf` / `.psb` 为影像，国图 `pages/*.jpg` 为页图，`*_preview.jpg` 为预览图，`.txt` 与国图三种 JSON 为附件；国图 `tiles/`、`.npy` 及其他文件记入 `excluded`。每个文件取得 大小、mtime_ns、inode
-4. **事实与指纹**：（根，相对路径，大小，mtime_ns，inode）与库中记录相同的，沿用已有事实与指纹；否则读取事实（§4.4），计算指纹 = 文件大小 + sha256（头、25%、50%、75%、尾 5 段各 64 KiB）。读不了的记「读不了的文件」，继续下一个。结果流式写入 `stage_file`
+2. **v0 索引快照**（§4.7）：用触发者自己的 `dh_session` 调用 v0 `/api/index`；HTTP 200 且 `status` 为 `ready` 时快照有效，写入 `v0_volume`；否则（调用失败、`status` 为 empty / scanning / error）记「v0 索引不可用」异常及原因，报告标明「v0 覆盖对照不可验证」，导入照常进行。随后启动 v0 健康采样（§4.7）
+3. **扫描**（只读）：遍历原图目录的各分类（一级子目录）与备份目录，跳过以 `@`、`#`、`.` 开头的目录并记入 `excluded`（`#recycle`、`@eaDir`、国图 `BD00081/.pages` 等）。按种类分类文件：`.tif` / `.tiff` / `.btf` / `.psb` 为影像，国图 `pages/*.jpg` 为页图，`*_preview.jpg` 为预览图，`.txt` 与国图三种 JSON 为附件；国图 `tiles/`、`.npy` 及其他文件（PDF、PNG、下载中的临时文件等）记入 `excluded`。每个文件取得 大小、mtime_ns、inode
+4. **事实与指纹**：（根，相对路径，大小，mtime_ns，inode）与库中记录相同的，沿用已有事实与指纹；否则读取事实（§4.4），计算指纹 = 文件大小 + sha256（头、25%、50%、75%、尾 5 段各 64 KiB）。读不了的记「读不了的文件」，仍建影像记录（7 个事实字段都记为缺失，没有指纹），继续下一个。结果流式写入 `stage_file`
 5. **国图清单与 10-21 执行记录**：解析 `manifest.json` / `report.json` / `index.json`（§4.6），解析白名单内的执行记录（§4.5）
 6. **影像身份**（§4.2.1）、**写卷单元**（§4.2.2）、**归并与写卷身份**（§4.2.3）、**规则**（§4.4）：写卷、编号、影像关系、谱系、许可、出处认定初值、合并建议、异常
-7. **应用**：以上结果在一个事务中写入正式表，派生字段有变化的写入 `history`；任何一步失败则整批回滚，`import_run` 记为 failed，正式表保持上一次的状态。写卷的 grouping_key 有变化的，先在同一事务中清空，再写入新值，编号互换时不违反唯一约束（AC-003-9）
+7. **应用**：以上结果在一个事务中写入正式表，派生字段有变化的写入 `history`；任何一步失败则整批回滚，`import_run` 记为 failed，正式表保持上一次的状态。写卷的 grouping_key、影像的（根，相对路径）有变化的，先在同一事务中改为临时值（grouping_key 置空，影像位置加临时前缀），再写入新值，编号或位置互换时不违反唯一约束（AC-003-9）
 8. 停止健康采样；生成报告与基线对照（`report.py`），写回 `import_run`；成功后执行 `pg_dump` 备份；释放锁，丢弃内存中的登录状态
 
 ### 4.2 身份与归并（R-002、R-003）
@@ -125,7 +125,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 第 1～3 行认领到 missing 影像时，状态改为 present，记「重新出现」（spec 第 4 条）。
 
-与 spec 的对应：第 1、2 行即 spec 第 1 条（可确认是同一文件）。第 1 行是增量导入的快速路径：inode、大小、mtime_ns 都不变时视为内容未变，沿用已有指纹（AC-012-4）；硬链接使对应不唯一时，spec 第 2 条按位置得出同一结果，所以第 1 行不另查一一对应。第 3 行即 spec 第 2 条：位置上原有的影像已被第 1、2 行认到别处（移走了）时，该位置上的文件按第 4 行作新影像。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 与指纹对不上任何影像，落到第 3 行（AC-009-3）。两个目录整名互换时，同名文件在第 2 行各自认到对方原来的影像（AC-003-9）。
+与 spec 的对应：第 1、2 行即 spec 的「可确认是同一文件」，合起来是 spec 第 1 条：第 1 行是第一步（按位置认定，视为内容未变，沿用已有事实与指纹，spec §5 Q-047），第 2 行是第二步（在未被认领的文件与影像之间判定一一对应）；一对已登记的硬链接只改名其一时，不动的一个在第 1 行认领，改名的一个在第 2 行认到另一条影像。读不了的文件没有指纹，不参与第 2 行。第 3 行即 spec 第 2 条：位置上原有的影像已被第 1、2 行认到别处（移走了）时，该位置上的文件按第 4 行作新影像。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 与指纹对不上任何影像，落到第 3 行（AC-009-3）。两个目录整名互换时，同名文件在第 2 行各自认到对方原来的影像（AC-003-9）。
 
 依据：
 
@@ -133,18 +133,19 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 - 设计说明（未在 NAS 上实测）：btrfs 按递增分配 inode 号、不复用已删除的号（只有重新挂载后，最近删除的最高号可能被再用）；同一子卷内改名或移动保留 inode 与 mtime_ns（POSIX rename）
 - 复用 inode 的新文件通常 mtime_ns 不同；以保留时间戳的方式复制时可能相同，这时仍要求大小与 5 段指纹都相同才延续
 - 大小、mtime_ns 与 5 段内容都相同、只有未采样部分不同的替换文件无法区分，按 spec §5 Q-030 接受
+- 第 1 行不重读内容：原地改写而大小不变、mtime_ns 又被还原的文件不会被发现，按 spec §5 Q-047 接受
 
 **4.2.2 写卷单元**（spec §1 术语；AC-001-3、AC-002-2、AC-002-3、AC-002-7）
 
 1. 批次层按 `rules.py` 的登记表判定；未登记的分类按「没有批次层」处理，并在报告中提示
-2. 写卷目录 = 批次目录（没有批次层时为分类目录）下的一级子目录。不在任何写卷目录中的影像文件（直接放在批次目录或分类目录里）各成一个单元，编号取自文件名（2026-10-27：`2018年` 中 7 个 TIFF、1 个 PSB）；直接放在原图根目录的文件记入 `excluded`
+2. 写卷目录 = 批次目录（没有批次层时为分类目录）下的一级子目录。不在任何写卷目录中的影像文件（直接放在批次目录或分类目录里）各成一个单元，编号取自文件名（2026-10-27：`2018年` 中 7 个 TIFF、1 个 PSB）；直接放在原图根目录的文件记入 `excluded`；直接放在分类或批次目录中的附件作为不关联写卷的附件导入（2026-10-27 晚出现 1 个：`A077-敦煌文献目录/目录.txt`）
 3. 写卷目录之下逐层判定子目录（名称精确匹配词表）：
    - 分段类、版本类、国图 `pages/`：并入所在单元，沿用该单元的编号；其下的子目录继续按本条判定
    - 词表外且含可导入影像（直接或更深层）：自成单元，编号取自它自己的名称（不继承父目录）；记「词表外子目录」；其下的子目录相对于它继续按本条判定
-   - 不含可导入影像：整体记入 `excluded`（原因「不含影像」，如国图 `tiles/`）；其中的附件归入所在单元
-4. 写卷目录（连同词表内子目录）没有可导入影像、只有附件时：不建单元，附件不导入，记「缺少影像」；什么都没有时记入 `excluded`
+   - 不含可导入影像：整体记入 `excluded`（原因「不含影像」，如国图 `tiles/`）；其中的附件归入所在单元，没有所在单元时作为不关联写卷的附件导入
+4. 写卷目录（连同词表内子目录）没有可导入影像、只有附件时：不建单元，附件作为不关联写卷的附件导入，记「缺少影像」；没有附件时整个目录记入 `excluded`，其中的文件逐一列出原因
 5. 隐藏影像照常归入所在单元；一个目录中同时有隐藏与非隐藏影像时，对每个隐藏影像记「隐藏文件与非隐藏影像同目录（待确认）」（2026-10-27 为 10 个）
-6. 备份目录：把相对路径映射为原图目录中的同一路径，按第 1～3 条确定所属单元（映射路径上已不存在的子目录按名称照常判定，706 个分片属于这种情况），角色「已迁出的分片」，记录原位置；写卷目录在原图目录中也不存在时，按备份目录中的写卷目录自成单元，并记「备份分片对不上」
+6. 备份目录：把相对路径映射为原图目录中的同一路径，按第 1～3 条确定所属单元（映射路径上已不存在的子目录按名称照常判定，706 个分片属于这种情况），角色「已迁出的分片」，记录原位置；写卷目录在原图目录中也不存在时，按备份目录中的写卷目录自成单元，并记「备份分片对不上」。原图目录中的写卷目录改名后，按旧名映射的分片落到这一分支，该写卷会因几个单元结果不同而记「规则要求拆分」（spec R-002 规则 7）
 7. 每个单元按 §4.3 解析编号，得到合规馆藏号集合 K(U) 与其余编号；国图另取清单 Pressmark（§4.6）。K(U) 为空的单元记「无馆藏号的写卷单元」，并参与合并建议：名称只差「上部 / 下部」「上卷 / 下卷」「紙背」、使用同一分享者自编号、使用同一《开宝藏》帙号的单元，成对记「合并建议」（AC-002-6）
 
 **4.2.3 归并与写卷身份**（spec R-002，R-003 写卷第 1～7 条；AC-002-1、AC-002-4～AC-002-6、AC-002-8、AC-003-4～AC-003-6、AC-003-8～AC-003-11）
@@ -154,15 +155,15 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 - **A. 单元判定**（第 1、2 条），对每个 P(U) 非空的单元：
   - 持有：held(U) = P(U) 中 key0 属于 K(U) 的写卷，结果为「保持」
   - H(U) = K(U) 中不被 held(U) 持有的编号；L(U) = P(U) 中不持有 K(U) 任何编号的写卷
-  - K(U) 为空：L(U) 中每件结果为「去掉主编号」
+  - K(U) 为空：P(U) 只有一件时，结果为「去掉主编号」；有几件时，其中有主编号的结果为「待确认」，没有主编号的为「保持」（spec 写卷第 2 条）
   - H(U) 与 L(U) 各恰有一个：该写卷结果为「改用 h」
   - L(U) 为空：H(U) 是新增编号，留到 D
   - 其余：L(U) 中每件结果为「待确认」
 - **B. 写卷判定**（第 3 条），对 S0 中每件写卷 X：
   - 本次没有在磁盘上的影像：key1 = key0（AC-009-2）
-  - X 所在全部单元的结果给出同一个 key：采用为 key1（「保持」「改用 h」「去掉主编号」）
-  - 有「待确认」：key1 = key0，记「身份待确认」
-  - 结果不同：key1 = key0，记「规则要求拆分」，各单元给出的编号作为待确认编号记在 X 上（AC-003-6）
+  - 有单元给出「待确认」：key1 = key0，记「身份待确认」；各单元的结果不止一种时，同时记「规则要求拆分」（spec 写卷第 3 条）
+  - 否则，X 所在全部单元的结果给出同一个 key：采用为 key1（「保持」「改用 h」「去掉主编号」）
+  - 否则（结果不同）：key1 = key0，记「规则要求拆分」，各单元给出的编号作为待确认编号记在 X 上（AC-003-6）
 - **C. 同号处理**（第 4 条，不合并；AC-003-5）：只看非空的 key1，没有主编号的写卷不参与。重复执行，直到没有两件写卷的 key1 相同：找出 key1 相同的各组，组内凡是 key1 ≠ key0（本次改用了编号）的写卷都退回 key1 = key0，记「身份待确认」并注明同号的写卷，被拒的编号作为待确认编号记在该写卷上。S0 中非空的 key0 互不相同，所以每组至少有一件可退回，退回的写卷不再变化；每轮按组整体处理，结果与顺序无关，至多执行写卷件数轮。C 结束后 key1 即最终的主编号，改用生效的写卷把旧编号转入编号历史（AC-003-4）
 - 含有被记「身份待确认」或「规则要求拆分」的写卷（含 C 退回的）的单元都是待确认单元，其余为正常单元
 - **D. 关联与新建**（第 5～7 条），owner(k) = C 之后持有 k 的写卷：
@@ -266,9 +267,10 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 - cookie 不区分端口，在 8503 登录 v0 后即可访问 8504
 - **防跨站请求**：v0 的 cookie 为 `SameSite=Lax`，跨站的 POST 不会带上它；`POST /api/v1/imports` 另校验请求头 `Origin`：存在时必须属于 `DH_ALLOWED_ORIGINS`（默认 `http://192.0.2.10:8504`、`http://192.0.2.20:8504`），否则 403；服务不返回任何 CORS 头
 - **调用 v0**（经 NAS 局域网地址，配置项 `DH_V0_URL`，默认 `http://192.0.2.10:8503`）：
-  - 经接口触发的导入，使用该请求自带的 `dh_session`（即触发者自己的登录状态），只保存在导入线程的内存中，不写日志、不落库，导入结束即丢弃；目录服务不签发会话
+  - 导入只经接口触发，使用该请求自带的 `dh_session`（即触发者自己的登录状态），只保存在导入线程的内存中，不写日志、不落库，导入结束即丢弃；目录服务不签发会话，也不提供命令行导入（没有登录状态就无法按 AC-012-3 判定 v0 健康）
+  - 触发前检查登录状态的剩余有效期（cookie 中的过期时间）不少于 90 分钟（全量导入上限 1 小时 + 让路上限 10 分钟 + 余量），不足时拒绝并提示重新登录；导入中健康采样返回 401（如账号被删）按失败计
   - 索引快照：`GET /api/index`，有效条件见 §4.1 第 2 步
-  - 健康采样：导入期间每 5 秒 `GET /api/health`，2 秒内返回 200 且 `ok` 为 true 记为正常；采样汇总（次数、失败数、最大耗时）写入 `import_run`（AC-012-3）。命令行触发时没有登录状态，只探测 v0 是否在 2 秒内响应（任何状态码），报告注明
+  - 健康采样：导入期间每 5 秒 `GET /api/health`，2 秒内返回 200 且 `ok` 为 true 记为正常；采样汇总（次数、失败数、最大耗时）写入 `import_run`（AC-012-3）
   - 让路（spec AC-012-3）：连续 3 次采样失败即暂停读文件，连续 3 次正常后继续；暂停累计超过 10 分钟则中止导入（failed，回滚，正式表保持上一次的状态）
 - **v0 链接**（AC-011-4）：取最近一次快照有效的导入的 `v0_volume`，只为其中有、且本次导入时磁盘上仍存在的影像目录中的 TIFF 影像生成 `<DH_V0_PUBLIC_URL>/view/<base64url(相对目录)>`；散放文件附带 `?file=<文件名>`（v0 忽略该参数，仅供人看）；其余写明不给链接的原因（备份分片、JPG、PSB、不在 v0 索引中、从未取得有效索引）。`DH_V0_PUBLIC_URL` 默认同 `DH_V0_URL`
 
@@ -280,7 +282,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | `catalog-api` | 本仓库 `catalog/Dockerfile` | 512m | `/srv/example/data:/data:ro`、`/srv/example/backup:/backup:ro`、`/srv/example/cache:/v0cache:ro`、`/srv/example/viewer/.env:/run/v0.env:ro`、`/srv/example/catalog-backups:/backups` | 端口 8504→8000；`env_file: ./.env`（数据库密码、`DH_ALLOWED_ORIGINS` 等）；以 root 运行（`users.json` 为 root 600）；导入在本容器的后台线程中执行，受 512m 上限约束；`pg_dump` 用镜像内的 postgresql-client |
 
 - 启动：`cd /srv/example/viewer/catalog && /usr/local/bin/docker-compose -p dunhuang-catalog up -d --build`（只作用于本项目，不影响 v0）
-- 首次导入：管理员登录 v0 后打开 `http://192.0.2.10:8504/api/v1/docs`，执行 `POST /api/v1/imports`（这样才有 v0 索引快照与健康采样）；命令行 `docker-compose -p dunhuang-catalog exec catalog-api python -m dh_catalog import` 只用于测试与恢复
+- 首次导入：管理员登录 v0 后打开 `http://192.0.2.10:8504/api/v1/docs`，执行 `POST /api/v1/imports`；导入只经接口触发（也可用带管理员 cookie 的 HTTP 请求调用）
 - 备份：每次导入成功后 `pg_dump` 到 `/backups`，保留最近 7 份
 - 上线前置：NAS `MemAvailable` ≥ 2 GB；首次全量导入放在低峰时段
 
@@ -288,10 +290,10 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 | AC | 实现位置 | 验证方式 |
 |---|---|---|
-| AC-001-1 | `v0.py` 索引快照、`report.py` | `tests/test_import.py::test_v0_index_coverage`（模拟 v0：索引落后于磁盘、索引中有已删除目录）、`test_import.py::test_v0_index_unavailable`（调用失败、`status` 不是 ready、命令行触发）；NAS A1 |
+| AC-001-1 | `v0.py` 索引快照、`report.py` | `tests/test_import.py::test_v0_index_coverage`（模拟 v0：索引落后于磁盘、索引中有已删除目录）、`test_import.py::test_v0_index_unavailable`（调用失败、`status` 不是 ready）；NAS A1 |
 | AC-001-2 | `scan.py`、`importer.py` | `test_scan.py::test_image_inventory_complete`；NAS A2 |
-| AC-001-3 | `scan.py`、`units.py` §4.2.2 第 3、4 条、`nlc.py`、`item_attachment` | `test_import.py::test_attachments_imported_and_shared`（含子目录中的附件、只有附件的写卷目录） |
-| AC-001-4 | `scan.py`、`units.py`、`excluded` | `test_scan.py::test_excluded_listed_with_reason` |
+| AC-001-3 | `scan.py`、`units.py` §4.2.2 第 3、4 条、`nlc.py`、`item_attachment` | `test_import.py::test_attachments_imported_and_shared`（含子目录中的附件；只有附件的写卷目录中的附件、直接放在分类目录中的说明作为不关联写卷的附件导入，导入报告列出） |
+| AC-001-4 | `scan.py`、`units.py`、`excluded` | `test_scan.py::test_excluded_listed_with_reason`（含 PDF、PNG 与下载中的临时文件） |
 | AC-002-1 | `grouping.py` §4.2.3 D | `test_grouping.py::test_catalog_number_merged_across_lineages`；NAS A2（P.2002 的两套影像） |
 | AC-002-2 | `units.py` §4.2.2 第 3 条、角色规则 | `test_units.py::test_subdir_vocabulary_and_unknown_subdir`（含父 P.2002 / 子 P.2003、`tiles/`）；NAS A2 |
 | AC-002-3 | `units.py` §4.2.2 第 2 条 | `test_units.py::test_loose_files_are_units`；NAS A2（8 个） |
@@ -305,12 +307,12 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | AC-003-3 | UUIDv4 生成 | `test_identity.py::test_ids_not_path_derived` |
 | AC-003-4 | `grouping.py` §4.2.3 A、B | `test_grouping_identity.py::test_number_change_keeps_item_id` |
 | AC-003-5 | `grouping.py` §4.2.3 C | `test_grouping_identity.py::test_number_collision_not_merged`（改名为另一件写卷持有的编号、两件同时改用同一个新编号、退回引起的连锁同号：ID 与主编号不变，记「身份待确认」并注明同号的写卷；目录名改回后下一次导入不再列入） |
-| AC-003-6 | `grouping.py` §4.2.3 B | `test_grouping_identity.py::test_split_not_automatic` |
-| AC-003-7 | `identity.py` §4.2.1、`facts.py` 指纹 | `test_identity.py::test_uncertain_identity_not_continued`：用真实文件算真实指纹（同大小、5 段相同、未采样部分不同的两个文件），再与文件条目组合出 inode 复用且 mtime_ns 不同、重复副本、跨根同内容、一对多与多对一、硬链接 |
+| AC-003-6 | `grouping.py` §4.2.3 B | `test_grouping_identity.py::test_split_not_automatic`（一件写卷两个目录中的一个改名为别的编号；部分影像移入另一个有编号的目录：目录原有影像仍在时两类都记，已全部删除时只记「规则要求拆分」） |
+| AC-003-7 | `identity.py` §4.2.1、`facts.py` 指纹 | `test_identity.py::test_uncertain_identity_not_continued`：用真实文件算真实指纹（同大小、5 段相同、未采样部分不同的两个文件），再与文件条目组合出 inode 复用且 mtime_ns 不同、重复副本、跨根同内容、一对多与多对一、新建的硬链接（文件都放在没有影像记录的位置）；另测一对已登记的硬链接一个不动、一个改名：不动的按位置认定，改名的延续另一条影像（spec Q-047） |
 | AC-003-8 | `grouping.py` §4.2.3 D | `test_grouping_identity.py::test_new_images_assignment` |
-| AC-003-9 | `identity.py` §4.2.1、`grouping.py` §4.2.3（A～D 只读 S0）、`importer.py` §4.1 第 7 步 | `test_grouping_identity.py::test_swap_and_chain_order_independent`（纯函数：同一输入打乱单元顺序 20 次，结果含 serial 完全相同）；`test_identity.py::test_whole_name_swap_follows_files`（临时目录中经中转名真实互换两个目录的整个名称，目录中的 TIFF 同名；互换过程中导入与不导入，结果相同）；`test_import.py::test_number_swap_end_to_end`（数据库上从扫描起完整导入，不预先给出影像 ID：名称其余部分不同的互换、整名互换、三目录连续变号；不违反唯一约束，写卷 ID 不变、编号分别更新） |
+| AC-003-9 | `identity.py` §4.2.1、`grouping.py` §4.2.3（A～D 只读 S0）、`importer.py` §4.1 第 7 步 | `test_grouping_identity.py::test_swap_and_chain_order_independent`（纯函数：同一输入打乱单元顺序 20 次，结果含 serial 完全相同）；`test_identity.py::test_whole_name_swap_follows_files`（临时目录中经中转名真实互换两个目录的整个名称，目录中的 TIFF 同名；互换过程中导入与不导入，结果相同）；`test_import.py::test_number_swap_end_to_end`（数据库上从扫描起完整导入，不预先给出影像 ID：名称其余部分不同的互换、整名互换、三目录编号轮换、整体顺移到没有被持有的编号；不违反写卷编号与影像位置的唯一约束，写卷 ID 不变、编号分别更新） |
 | AC-003-10 | `grouping.py` §4.2.3 A、D | `test_grouping_identity.py::test_multi_number_stable_add_and_rewrite` |
-| AC-003-11 | `grouping.py` §4.2.3 A～D | `test_grouping_identity.py::test_unmatched_cases_kept_pending`（多编号单元两号同改；另一件写卷的影像移入有编号的目录，目录原有影像仍在、已全部删除两种） |
+| AC-003-11 | `grouping.py` §4.2.3 A～D | `test_grouping_identity.py::test_unmatched_cases_kept_pending`（多编号单元两号同改；另一件写卷的全部影像移入有编号的目录，目录原有影像仍在、已全部删除两种；有编号写卷的全部影像移入已有其他写卷影像的无号目录） |
 | AC-004-1 | `identifiers.py` | `test_identifiers.py::test_pelliot_variants_and_doubtful_numbers`（含 2026-10-27 的 2 处命中、尺寸与年份（含数字后隔空格接 `cm`）、多号写法，以及不解析的 `2660-1.tif`） |
 | AC-004-2 | `identifiers.py`、`rules.py` 号段 | `test_identifiers.py::test_pelliot_ranges_and_doubtful_usage` |
 | AC-004-3 | `nlc.py`、`identifiers.py` | `test_nlc.py::test_pressmark_authority_and_missing_manifest`（含 Pressmark 写法不合规、与目录名只差大小写） |
@@ -329,22 +331,22 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | AC-007-3 | `provenance.py`、`rules.py` 线索 | `test_provenance.py::test_non_dunhuang_suggestions_and_conflicts`；NAS A2（18 + 6 个目录） |
 | AC-007-4 | `provenance.py` 第 1 条 | `test_provenance.py::test_human_conclusion_survives_reimport` |
 | AC-008-1 | `scan.py`（原样保存名称） | `test_import.py::test_raw_names_verbatim` |
-| AC-008-2 | `attachment` | `test_import.py::test_attachment_raw_roundtrip` |
+| AC-008-2 | `attachment` | `test_import.py::test_attachment_raw_roundtrip`（含不关联写卷的附件） |
 | AC-009-1 | `importer.py` | `test_changes.py::test_new_files_appear` |
 | AC-009-2 | `identity.py` §4.2.1 最后一行 | `test_changes.py::test_missing_marked_not_deleted` |
-| AC-009-3 | `identity.py` §4.2.1 第 1 行、`history` | `test_changes.py::test_changed_file_history` |
+| AC-009-3 | `identity.py` §4.2.1 第 3 行、`history` | `test_changes.py::test_changed_file_history` |
 | AC-009-4 | `importer.py`、`import_run` | `test_changes.py::test_import_run_record`（含重新出现数） |
-| AC-009-5 | `identity.py` §4.2.1 第 1～3 行 | `test_changes.py::test_reappearance_keeps_ids`（三次导入：删除后原样还原到原位置、原位置换成内容不同的文件、原样还原到同根另一位置；影像 ID 与写卷关联不变，记「重新出现」，不记「身份待确认」） |
+| AC-009-5 | `identity.py` §4.2.1 第 1～3 行 | `test_changes.py::test_reappearance_keeps_ids`（三次导入：删除后原样还原到原位置、原位置换成不属于任何已登记影像的新文件、原样还原到同一写卷单元中的另一位置；影像 ID 与写卷关联不变，记「重新出现」，不记「身份待确认」；另测原位置放入另一条已登记影像的文件：随文件延续那条影像，原影像仍缺失） |
 | AC-010-1 | `report.py`；产生点：§4.1（v0 索引不可用、读不了的文件、未导入的文件）、§4.2.1（身份待确认）、§4.2.2（词表外子目录、缺少影像、隐藏文件与非隐藏影像同目录、备份分片对不上、无馆藏号的写卷单元、合并建议）、§4.2.3（身份待确认、规则要求拆分）、§4.3（编号存疑、疑似编号、编号与清单不一致、缺少清单）、§4.4（谱系未判定、出处证据冲突）、§4.5（派生来源不明）、§4.6（画布对不上） | `test_report.py::test_anomaly_categories_complete`（每个类别用一份合成数据触发，逐一断言） |
 | AC-010-2 | `report.py`、`acceptance/baseline-2026-10-27.json` | NAS A2（基线全部条目对照，差异逐项说明写入 review.md） |
 | AC-011-1 | `auth.py`、`api.py` | `test_api.py::test_auth_required_and_admin_import`（含 `Origin` 校验） |
-| AC-011-2 | `api.py` `/resolve`、`identifiers.py` | `test_api.py::test_resolve_returns_all_matches`；NAS A2（`P.2504` → 5 件） |
+| AC-011-2 | `api.py` `/resolve`、`identifiers.py` | `test_api.py::test_resolve_returns_all_matches`（编号历史与待确认编号不返回）；NAS A2（`P.2504` → 5 件） |
 | AC-011-3 | `api.py`、索引 | `test_api.py::test_filters_and_pagination`；NAS A6（列表与详情分别统计 P95） |
 | AC-011-4 | `v0.py` 链接 | `test_api.py::test_v0_links_from_latest_valid_snapshot`；NAS A7 |
 | AC-011-5 | `api.py` | `test_api.py::test_no_mutating_routes`（检查路由表） |
 | AC-012-1 | 只读挂载、`scan.py` | NAS A5：三个挂载均为只读（`docker inspect`）；原图与备份目录前后快照，变化逐项归因 |
 | AC-012-2 | `derivation.py` 统一打开函数、`auth.py` | `test_scan.py::test_v0_cache_only_whitelist_opened`（记录导入期间全部被打开的路径：只有白名单文件，没有 `users.json`，没有列目录） |
-| AC-012-3 | 容器 512m 上限、流式处理、`v0.py` 健康采样与让路（§4.7） | `test_v0.py::test_yield_pause_resume_abort`（模拟健康检查连续失败：暂停读文件、恢复后继续；累计超过时限即中止，正式表保持上一次的状态，导入记录为 failed）；NAS A5：经接口触发的全量导入完成，容器未被 OOM 终止；导入记录中的 v0 健康采样全部正常 |
+| AC-012-3 | 容器 512m 上限、流式处理、`v0.py` 健康采样与让路（§4.7） | `test_v0.py::test_yield_pause_resume_abort`（模拟健康检查连续失败：暂停读文件、恢复后继续；累计超过时限即中止，正式表保持上一次的状态，导入记录为 failed）；`test_v0.py::test_session_lifetime_and_401`（剩余有效期不足 90 分钟时拒绝触发；导入中返回 401 按失败计）；`test_api.py::test_no_cli_import`（命令行不提供导入）；NAS A5：经接口触发的全量导入完成，容器未被 OOM 终止；导入记录中的 v0 健康采样全部正常 |
 | AC-012-4 | 增量事实与指纹 | NAS A5：全量 ≤ 1 小时、无变化重跑 ≤ 10 分钟 |
 | AC-013-1 | `trace.py`、各表的字段依据 | `test_trace.py::test_every_field_has_basis_and_author`（规则字段的作者为规则名与版本，不是触发者） |
 | AC-013-2 | `trace.py` | `test_trace.py::test_confidence_labels` |
@@ -380,7 +382,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | 首次全量导入与 v0 争用磁盘 | 指纹只读 5 段各 64 KiB；增量跳过未变文件；健康采样失败即暂停读文件（§4.7） |
 | 2026-10-21 执行记录格式不规整 | 解析不到的记异常（AC-005-3 允许），不臆测 |
 | v0 会话格式变化导致认证失效 | 测试锁定 v0 的签名格式；v0 修改 cookie 时同步（D-018） |
-| 导入期间持有管理员的登录状态 | 只用触发者自己的会话调用 v0 的两个只读接口；只在内存中、导入结束即丢弃；不签发会话 |
+| 导入期间持有管理员的登录状态 | 只用触发者自己的会话调用 v0 的两个只读接口；只在内存中、导入结束即丢弃；不签发会话；不提供命令行导入 |
 | 跨站请求触发导入 | `SameSite=Lax` + `Origin` 校验 + 不返回 CORS 头（§4.7） |
 | 规则误判（谱系、出处、归并） | 规则带名称与版本写入依据；人工结论不被覆盖；对不上的保持原样并列异常；已有写卷之间不自动拆分，也不自动合并 |
 | 影像身份的残余误判（spec §5 Q-030） | 按文件延续只在同根、inode、大小、mtime_ns、5 段指纹全部相同且一一对应时成立；其余按位置延续或作新影像（§4.2.1） |
