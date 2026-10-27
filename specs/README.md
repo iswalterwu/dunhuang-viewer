@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-27 | Gate 1 已批准第 1 版 → Plan 与 Checklist 第 1 轮（共识 8 通过 / 13 未通过）共发现 16 处需求问题 → spec 第 2 版（13 条需求 / 56 条验收规则）与 plan 第 2 版；Checklist 第 2 轮进行中；之后待 Gate 1 再批准 |
+| catalog-foundation | in-progress | 无 | 2026-10-27 | Gate 1 已批准第 1 版 → Plan 与 Checklist 第 1 轮（共识 8 通过 / 13 未通过）、第 2 轮（13 通过 / 9 未通过）共发现 27 处需求问题 → spec 第 3 版（13 条需求 / 60 条验收规则）与 plan 第 3 版；Checklist 第 3 轮进行中；之后待 Gate 1 再批准 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。
