@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-27 | Spec 与 Clarify 完成（12 条需求 / 48 条验收规则，10 项歧义已依据数据与 ADR 闭环）→ 待 Gate 1 |
+| catalog-foundation | in-progress | 无 | 2026-10-27 | Gate 1 已批准（第 1 版）→ Plan 第 1 版完成；Plan 发现 4 处需求问题，spec Clarify 第二轮（Q-011～Q-014）待 Gate 1 再批准；Checklist 第 1 轮进行中 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。
