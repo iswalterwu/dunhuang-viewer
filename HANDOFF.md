@@ -1,7 +1,7 @@
 # 会话交接 — catalog-foundation
 
-> **状态：Converge 的 C1/T-27 已由 P7 Astra 最小修复并本机复验362通过/42 db跳过；58条AC核对见 converge.md，待新候选真库复验后收敛并独立 Review。** 原 T-24 为 402 passed / 0 skipped，资源已清理；原测试数不能替代新增缺口验证。
-> 更新日期：2026-10-28。这是会话恢复入口，不代表工作流已到 Handoff 阶段；尚未过 Gate 2、未合并 main、未正式部署或全量导入。
+> **状态：Converge 软件实现/自动化验证范围已收敛；C1/T-27 修复后新候选 NAS 全套404 passed / 0 failed / 0 skipped / 1 warning，临时资源已清理，现准备独立 Review。** 58条AC映射见 converge.md，部署后AC仍待验；没有Gate 2或全量收敛结论。
+> 更新日期：2026-10-29。这是会话恢复入口，不代表工作流已到 Handoff 阶段；尚未过 Gate 2、未合并 main、未正式部署或全量导入。
 
 ## 1. 当前任务与闸门
 
@@ -10,7 +10,7 @@
 - spec 第 7 版已获 Gate 1 批准并冻结（13 条需求、58 条 AC、25 条最终决策），feature plan 第 8 版；不重复申请 Gate 1，不修改冻结规格或 checklist。
 - Checklist / Analyze 第 11 轮由独立审核员 A 判定 12 项全部通过，**只是设计质量结论，不是实际实现 Review**。
 - T-01～T-24 的实现及对应自动化验证已完成。最新真实 PostgreSQL/Python 3.12 测试包括原来跳过的全部 42 个 db 项，均已执行通过；T-22 隔离构建及合成 Compose 配置校验亦通过。
-- 当前为 Converge。主会话已完整核对主要源码，利用 631 字节合成 JPEG（头声明400M像素、未解码）复现 DecompressionBombError 逃出 read_facts 导致 compute_import 中断，违反 AC-005-1；已登记 T-27。P7 已只增加具体异常处理并补两条真实文件回归，主会话本机复验通过；新候选 T-24 后再最终收敛/Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
+- Converge 已核对58条AC、主要源码与实际测试，发现的C1/T-27已修复并关闭：P7保留Pillow保护，仅捕获具体异常并补两条真实文件回归；新候选private-candidate-038在Python3.12/PG17.4全404项通过、0跳过。软件范围收敛报告在 `specs/catalog-foundation/converge.md`；**独立Review尚待执行，Gate2及真实全量AC仍未完成**。
 - T-25 正式部署、T-26 用户触发真实全量导入与 A1～A7 仍未执行、未获许可；合并也不等于 feature 全量验收完成。
 
 ## 2. 本机、GitHub 与候选身份
@@ -18,7 +18,7 @@
 - 唯一本机工作副本：**`/srv/example/project`**；分支 `feat/catalog-foundation`，跟踪 `origin/feat/catalog-foundation`。
 - 2026-10-28 已按用户要求从 `/srv/example/project` 迁移；原样复制阶段对含 .git/忽略的本地环境共 6,049 个文件逐一 SHA-256 验证一致，重生虚拟环境激活/17 个入口后移除旧目录。依赖未在本机下载或升级；后续命令只用 D 盘路径。
 - 用户已批准后续已验证阶段及时同步 GitHub 功能分支，不需重复询问普通分支 push。GitHub：`origin 的 feat/catalog-foundation 分支（项目角色描述，非网址）`。不擅自 merge main、push nas 或部署。
-- 上一安全提交 **`private-candidate-035`**：Astra 两处 CLI 测试最小修复及首轮失败/清理证据，已 push；**它也是最新实际通过 NAS 全套测试的候选 SHA**。
+- 最新实际通过NAS全套测试的候选为 **`private-candidate-038`**（P7/C1修复及58条AC核对，已push）：A3共404项全部通过。旧private-candidate-035的402通过保留为A2历史证据，不冒充新代码。
 - 本轮其后的完成状态/证据文档提交，不改变被测生产源码、迁移、运行配置或测试。实际最新 HEAD 用 `git log -1 --oneline` / `git rev-parse HEAD` 查看，不把未知的自引用 SHA 写入本文。未来部署镜像仍须用实际获准/合并提交 SHA 构建，不能冒用旧候选版本。
 - 本地 main 与 origin/main 记录仍为 `private-candidate-023`；本轮没有合并或推送 NAS。
 
@@ -32,8 +32,10 @@
 |---|---|---|---|
 | A1 | `private-candidate-034` | **400 passed / 2 failed / 0 skipped / 1 warning，47.10 秒** | report/health 两个 CLI 子进程测试使用不含口令的 connection.info.dsn；诊断确认原始测试 URL 能连、info.dsn 无口令重连失败 |
 | A2 | `private-candidate-035` | **402 passed / 0 failed / 0 skipped / 1 warning，47.62 秒** | P6 最小修复后，两处 CLI 与全部数据库/HTTP测试通过；Docker die 事件 exitCode=0 |
-| 本机修复复验 | P6 后相同测试源码 | **360 passed / 42 db skipped / 1 warning** | Python 3.14.2，本机无数据库，不将 skip 算 pass |
+| A3 | `private-candidate-038` | **404 passed / 0 failed / 0 skipped / 1 warning，48.27秒** | P7/C1及全部42个db项实际通过；资源清理完成 |
+| 本机最新复验 | P7 后相同测试源码 | **362 passed / 42 db skipped / 1 warning** | Python 3.14.2，本机无数据库，不将 skip 算 pass |
 
+- A3快照SHA-256：`f30ca2c849ef9f359f3664c3023c9177a6933b7d081eb61746d3e42f8413ae30`，镜像ID `sha256:0b898cad5b78312eb48a8572238933d8d081e28e98326b716ea86bf379030b98`（已删除）；运行cgroup再次读到memory=memsw=536870912，合成Compose静默校验通过。
 - A2 快照 SHA-256：`d2c9f1c845747c4c2fdec1ed49afe765e7a5f04b9816ce8f24f6103ea3877c5d`；传输到 NAS 后核对一致。
 - A2 镜像 ID：`sha256:b849fc8b9af3e4c386e3864d0677981f6ce1a5cccd9d1e564dc19f780dd35777`（测试后已删除）。镜像包含真实 tests、acceptance、pytest.ini、migrations 与固定直接依赖，pip check 通过。
 - legacy builder 使用 `--memory 512m --memory-swap 512m --rm --force-rm`；A1 构建探针在真实 cgroup 读取 memory/memsw 均为 **536870912**。未删限额、未换无上限构建。
@@ -43,7 +45,7 @@
 
 ## 4. 修复范围与清理结果
 
-P7 同为 **openai/gpt-6-astra**，已自然结束。仅 scan.py、test_scan.py、test_import.py：保留 Pillow 安全限制，具体捕获 DecompressionBombError 并增加直接读取/完整计算流水线两条回归。本机新增两项后362 passed/42 db skipped，新候选真实库待验，不能用旧402代替。
+P7 同为 **openai/gpt-6-astra**，已自然结束。仅 scan.py、test_scan.py、test_import.py：保留 Pillow 安全限制，具体捕获 DecompressionBombError 并增加直接读取/完整计算流水线两条回归。本机新增两项后362 passed/42 db skipped，随后A3新候选真实库404 passed/0 skipped；不能把旧402当新版本证据。
 
 P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，22:26:19～22:28:04 自然结束，exit=0、stderr 为空。仅修改：
 
@@ -52,16 +54,16 @@ P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，2
 
 两测试各增加 `test_database_url` 夹具参数并传给子进程，共替换四行。保留真实 subprocess 与全部原断言，不 mock、不 skip/xfail、不改生产 API/CLI、不增加隐式凭证 fallback、不放宽 PG 认证。主会话本机复核后形成 A2，真实库全部通过。
 
-两轮资源已确认清理：临时数据库（显式 DROP）、API/DB/诊断容器、两匿名 PG 卷、两临时网络、三测试/探针镜像标签、两隔离目录、远端 raw 输出及临时合成 .env。**没有本轮遗留运行资源或需重启命令**；P1～P6 子 agent 均已结束。未全局 prune，原有 Python/PG 基础镜像 ID 未变。
+三轮资源均已确认清理：临时数据库（显式DROP）、API/DB/诊断容器、三匿名PG卷、三临时网络、四测试/探针镜像标签、三隔离目录、远端raw与临时合成.env。**没有本轮遗留运行资源或需重启命令**；P1～P7子agent均已结束。未全局 prune，原有 Python/PG 基础镜像 ID 未变。
 
-- 已删除 `/tmp/dh-catalog-t24-20261028-221119-private-candidate-034` 与 `/tmp/dh-catalog-t24-20261028-223110-private-candidate-035`。
+- 已删除 `/tmp/dh-catalog-t24-20261028-221119-private-candidate-034`、`/tmp/dh-catalog-t24-20261028-223110-private-candidate-035`、`/tmp/dh-catalog-t24-20261029-000948-private-candidate-038`。
 - v0 容器始终为同一 ID `cb29d6cf59e9694ce1a35ecdb2f52a8f25a3164d8fcc46e037d93a295e254ac2`、启动时间 `2026-10-24T23:21:23.021250776Z`、restarts=0、running=true；未停/重启。**这不代替 T-26 全量期间 v0 健康连续采样**。
 - 没有访问原材料、备份、v0 .env/users.json/cache，也未遍历 cache；没有真实登录/正式导入、NAS git push 或正式服务启动。
 
 ## 5. 下一步（Converge / 独立 Review，不是部署）
 
 1. 在 D 盘仓库核对 git 状态/HEAD，重读 AGENTS、docs、spec/plan/tasks。T-24 已完成且已清理，不重复申请既有测试许可或重放旧快照。
-2. **Converge**：继续逐条对照 58 条 AC/实际测试，先修 T-27/C1。保留 Pillow 安全限制，不能关闭 MAX_IMAGE_PIXELS 或宽泛吞异常。主会话只协调/复验；业务代码和回归由新 Astra 子 agent 修改。因生产代码改变，需新候选 T-24 隔离复验；不把旧 402 通过写成新版本证据。
+2. **Converge软件范围已完成**，见converge.md的58条AC与7处plan测试名/实际综合用例别名映射。C1已由P7修复并A3真库复验。进入独立Review，不自行把主会话核对当审核员结论；真实材料/性能AC继续待T25/T26。
 3. **独立 Review**：审核员 A 为独立 Claude 会话，与实施隔离；审查相对 main 的实际代码差异，按 bug/架构风险/测试缺口/目标对齐给结论，不以 Astra 自测或主会话代审。目前尚未启动本次实际实现 Review。
 4. Review 产物明列 T-25/T-26 待验项，交用户 **Gate 2** 确认。未批准不得合并 main。之后正式部署、真实全量导入/重跑分别另获许可；全量导入由用户在受保护 OpenAPI 触发，不代签会话。
 5. 部署后任何代码修复仍须 Review → Gate 2 → merge → 获准部署。真实材料/性能未验前 feature 保持 in-progress，不宣称全量收敛或验收完成。
@@ -85,7 +87,8 @@ P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，2
 
 仓库 历史归档（非公开历史记录）：
 
-- `logs/T24-A1/`：首轮失败、诊断、构建/cgroup/Compose/清理；`logs/T24-A2/`：新候选完整通过、限额/状态/清理与最终所有权检查。A2 `commands.txt` 是主会话的实际命令记录（无凭证值）。
+- `logs/T24-A1/`：首轮失败/诊断/清理；`logs/T24-A2/`：402通过与清理；`logs/T24-A3/`：C1新候选404通过、限额/状态/清理。commands.txt 是主会话命令记录（无凭证值）。
+- `logs/P7-C1-header-fix.*`、`prompts/prompt-P7-C1-header-fix.txt` 与 `logs/Converge-C1-header-read.txt`：复现、实际Astra、修复/本机证据；Converge矩阵在feature目录。独立Review新批次预计CodeReview-R1，实际进程/通道/状态检查 `/srv/example/private-audit/review/code-review-R1*`，不要重放设计阶段r1～r11。
 - 归档文本由源输出自动转 LF、去 ANSI 显示控制符/行尾空白，`archive-manifest.json` 记录源/归档 SHA-256；未改测试结果。临时口令先脱敏再导出；不提交快照 tar、远端 raw 或任何 .env。
 - 外部原输出仍在 `/srv/example/private-audit/t24/20261028-221119-private-candidate-034/` 与 `20261028-223110-private-candidate-035/`；只含本轮合成测试/运维证据。早先原始 NAS 抽查私有材料未复制入库。
 - `prompts/prompt-P6-T24-cli-fix.txt`、`logs/P6-T24-cli-fix.{meta,status}` / `.out.txt` / `-main-local.txt`：实际 Astra 分工与本机复验。P1～P5/迁移证据保留，不重放历史 HEAD/路径提示词。

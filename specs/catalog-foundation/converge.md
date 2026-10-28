@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准 spec 第 7 版、plan 第 8 版、tasks、实际源码/测试及 T-24 证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：发现的 C1/T-27 已由 P7 Astra 最小修复并经主会话本机复验，**待新候选 Python 3.12/真实 PostgreSQL 全套复验后进入独立 Review**。没有修改冻结 spec/plan/checklist。
+> 当前结论：C1/T-27 已由 P7 Astra 最小修复，新候选 `private-candidate-038` 已在 Python 3.12.15 / PostgreSQL 17.4 **404 passed / 0 failed / 0 skipped / 1 warning（48.27秒）**，资源清理完成。**软件实现与自动化验证范围已收敛，可进入独立 Review；部署后 AC 仍待验，不称全量收敛。** 没有修改冻结 spec/plan/checklist。
 
 ## 1. 范围与证据边界
 
@@ -9,7 +9,8 @@
 
 - 旧候选 `private-candidate-035`：T-24 A2 真库/Python 3.12.15 为 402 passed / 0 skipped / 1 原有警告，证据在 T24-A2（非公开历史记录）。该结果不覆盖本次新增 C1 回归。
 - P7 修复后主会话本机：362 passed / 42 db skipped / 1 原有警告（404 collected）；本机 Python 3.14.2，不能冒充 Python 3.12/SQL 新证据。源输出归档随 P7 记录。
-- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。所有 S 的当前新版本数据库证据仍须新候选全套复验。
+- 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 T24-A3（非公开历史记录），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
+- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由A3全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
 - S 不表示学术认定、生产配置或全部 AC 已验收。T-25/T-26 未获许可；没有因此启动正式服务或扫描真实材料。
 
 ## 2. 58 条 AC 的实际映射
@@ -43,7 +44,7 @@
 | AC-004-3 | nlc._resolve_identifiers 权威仅一级国图单元；test_nlc::test_pressmark_authority、test_import::test_nlc_authority_does_not_override_outside_vocabulary_child | S；大小写/冲突/缺清单/不合规及IDP来源 |
 | AC-004-4 | sharer/zhihao 非主号；test_identifiers::test_sharer_and_zhihao_systems、test_import::test_share_numbers_and_zhihao_are_not_doubtful_collection_numbers | S；帙号需开宝藏上下文 |
 | AC-004-5 | _identifier_rows 单一现行主号与SQL索引/检查；test_identifiers::test_primary_only_compliant、test_db::test_one_current_primary_but_history_kept | S；共享号/存疑号不能主号 |
-| AC-005-1 | scan.read_facts/7字段三态/失败重读；test_scan::test_facts_by_kind；P7新增JPEG安全异常与compute流水线恢复回归 | S；C1已本机修复，新候选真库复验待完成 |
+| AC-005-1 | scan.read_facts/7字段三态/失败重读；test_scan::test_facts_by_kind；P7新增JPEG安全异常与compute流水线恢复回归 | S；C1已在A3/Python3.12/真库全套复验通过 |
 | AC-005-2 | rules.detect_lineage/summarize_lineages；test_rules::test_lineage、test_directory_summary_only_direct_tiffs | S+N；A3 447/499/12/5138目录汇总待实料 |
 | AC-005-3 | derivation 白名单、最后成功操作/证据行号、缺证据异常；test_derivation::test_stitch_and_psb_logs、test_api::test_derivation_details | S+N；A2 12个输出须逐对象有派生或异常 |
 | AC-005-4 | nlc._map_canvases，索引从0起，strips列表或文件名回退；test_nlc::test_canvas_mapping | S+N；A4 真实TIFF对应率/异常 |
@@ -93,12 +94,12 @@
 
 ## 4. Converge 缺口与当前处置
 
-**C1 / T-27，AC-005-1/AC-010-1**：Pillow 的 DecompressionBombError 不是现有捕获父类，造成单个文件头问题中断整批。主会话合成复现后，P7 Astra 只在 scan.read_facts 明确捕获此已知库异常，沿用 missing/error 流程；新增两条真实文件回归验证三态、失败重读、有效头恢复、其他影像继续、对象身份不变与异常清单。没有关闭 Pillow 防护、提高资源限制、解码大图或宽泛吞异常。主会话本机复验通过；新候选NAS全套仍待执行，软件收敛暂不作最终结论。
+**C1 / T-27，AC-005-1/AC-010-1**：Pillow 的 DecompressionBombError 不是现有捕获父类，造成单个文件头问题中断整批。主会话合成复现后，P7 Astra 只在 scan.read_facts 明确捕获此已知库异常，沿用 missing/error 流程；新增两条真实文件回归验证三态、失败重读、有效头恢复、其他影像继续、对象身份不变与异常清单。没有关闭 Pillow 防护、提高资源限制、解码大图或宽泛吞异常。主会话本机362项通过/42个db跳过；新候选A3/NAS完整404项实际通过且资源清理完成。C1已关闭，不据此声称其他未知bug不存在或真实材料验收完成。
 
 其他核对：正式读查询用只读 repeatable-read事务、外部值参数绑定；咨询锁/连接跨后台生命周期；有效空/失败快照不错误回退；附件原文逐单元消费；原有/缺失关联与人工出处保留；派生只信最终成功证据；许可取最严格；无新的原图写入或v0改动。没有因为猜测罕见情形引入Q-025已删机制。
 
 ## 5. 进入 Review / Gate 2 的边界
 
-待 C1 新候选全套与资源清理通过后，主会话将实际差异和本表交给独立审核员 A（Claude，不是 Astra）复核。402/404等测试数不自动推出无bug；Reviewer仍须查具体代码/断言/测试缺口。若再发现缺口，继续登记任务、Astra修复并复验。
+C1 新候选全套与资源清理已通过，现将实际差异和本表交给独立审核员 A（Claude，不是 Astra）复核。402/404等测试数不自动推出无bug；Reviewer仍须查具体代码/断言/测试缺口。若再发现缺口，继续登记任务、Astra修复并复验。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。
