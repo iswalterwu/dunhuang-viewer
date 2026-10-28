@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过；T-01～T-24 的实现与对应自动化验证已完成，T-24 修复重验为 402 passed / 0 skipped。当前待 Converge / 独立 Review，未过 Gate 2；T-25/T-26 仍待单独许可，不能宣称全量验收或全量收敛。
+> 状态：T-24 隔离重验 402 passed / 0 skipped 已完成；现进入 Converge，主会话发现 AC-005-1 的 JPEG 头异常逃逸缺口（C1，T-27），尚未收敛或启动独立 Review。未过 Gate 2；T-25/T-26 仍待单独许可，不能用原有全套测试通过代替新增缺口验证或全量验收。
 
 ## 执行约定
 
@@ -251,6 +251,14 @@
 - **修改范围**：`specs/catalog-foundation/tasks.md` 的证据；缺口先记任务，不改基线凑数。
 - **完成标准**：满足 AC-001-1、AC-001-2、AC-002-1、AC-002-2、AC-002-3、AC-002-4、AC-002-5、AC-002-7、AC-002-8、AC-005-2、AC-005-3、AC-005-4、AC-006-3、AC-007-3、AC-010-2、AC-011-2、AC-011-3、AC-011-4、AC-012-1、AC-012-2、AC-012-3、AC-012-4；按 plan §6.3 A1～A7 执行，差异逐项解释；全量 <=1小时，无变化重跑 <=10分钟，API 各100次 P95 <=1秒；原图 / 备份变化归因，cache 只核对访问记录和只读挂载，不遍历缓存；20个链接抽查无错卷。
 - **验证命令**：按 `catalog/README.md` 的 A1～A7，用户在 OpenAPI 触发全量和重跑；agent 只读取导入报告、基线对照、只读挂载与资源采样、性能与链接检查结果。把每项实际输出摘要写回本任务，异常不掩盖；任何代码修复都须新提交并重新 Converge / Review → Gate 2 → merge → 部署，不在 NAS 直接修代码。
+
+### T-27 Converge C1：JPEG 头安全异常不中断整批（0.5 小时）
+
+- **状态**：Converge 已复现，待 Astra 修复。631 字节合成 JPEG 文件头声明 20000×20000，真实 compute_import 抛 Pillow DecompressionBombError；它不属于现有 read_facts 捕获的 OSError/ValueError，整批意外中断。只读取头、无像素解码或大内存分配；证据见 Converge-C1-header-read.txt（非公开历史记录）。旧 402 项未覆盖此异常类型，不改写旧通过证据。
+- **上下文/依赖**：T-24 后 Converge，修复既有 AC-005-1/AC-010-1，不新增需求或恢复 Q-025 规则；不依赖 T-25/T-26，不部署。
+- **修改范围**：仅 `catalog/src/dh_catalog/scan.py`、`catalog/tests/test_scan.py`、`catalog/tests/test_import.py`。
+- **完成标准**：保留 Pillow 的安全限制，不设置 MAX_IMAGE_PIXELS=None、不关闭保护、不做像素解码或宽泛吞异常；在文件读取边界按具体库异常返回显式缺失事实与读错误。真实合成文件验证 R-005 要求的失败后继续、下次重读与有效头恢复；通过 compute_import/build_report 证明其他材料仍导入并产生对应异常。不得复制生产规则进测试或 mock 文件头解析。
+- **验证命令**：本机 `catalog/.venv/Scripts/python.exe -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_scan.py catalog/tests/test_import.py`；随后显式包含 acceptance 的完整回归、AST/UTF-8 LF/差异检查；因生产读取代码变化，形成新候选重跑已获准范围内的 T-24 隔离全套，旧 402 不能替代。
 
 ## 子 agent 实施记录
 

@@ -1,6 +1,6 @@
 # 会话交接 — catalog-foundation
 
-> **状态：T-24 NAS 隔离测试已完成，修复重验 402 passed / 0 failed / 0 skipped / 1 warning；两轮临时资源均已清理。下一步 Converge → 独立 Review。**
+> **状态：已进入 Converge；发现 JPEG 头安全异常会意外中断整批（C1/T-27），待 Astra 修复，尚未收敛或启动独立 Review。** 原 T-24 为 402 passed / 0 skipped，资源已清理；原测试数不能替代新增缺口验证。
 > 更新日期：2026-10-28。这是会话恢复入口，不代表工作流已到 Handoff 阶段；尚未过 Gate 2、未合并 main、未正式部署或全量导入。
 
 ## 1. 当前任务与闸门
@@ -10,7 +10,7 @@
 - spec 第 7 版已获 Gate 1 批准并冻结（13 条需求、58 条 AC、25 条最终决策），feature plan 第 8 版；不重复申请 Gate 1，不修改冻结规格或 checklist。
 - Checklist / Analyze 第 11 轮由独立审核员 A 判定 12 项全部通过，**只是设计质量结论，不是实际实现 Review**。
 - T-01～T-24 的实现及对应自动化验证已完成。最新真实 PostgreSQL/Python 3.12 测试包括原来跳过的全部 42 个 db 项，均已执行通过；T-22 隔离构建及合成 Compose 配置校验亦通过。
-- 当前在 Implement 收尾、待进入 Converge / 独立 Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
+- 当前为 Converge。主会话已完整核对主要源码，利用 631 字节合成 JPEG（头声明400M像素、未解码）复现 DecompressionBombError 逃出 read_facts 导致 compute_import 中断，违反 AC-005-1；已登记 T-27。需 Astra 最小修复并补回归、新候选 T-24 后再收敛/Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
 - T-25 正式部署、T-26 用户触发真实全量导入与 A1～A7 仍未执行、未获许可；合并也不等于 feature 全量验收完成。
 
 ## 2. 本机、GitHub 与候选身份
@@ -59,7 +59,7 @@ P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，2
 ## 5. 下一步（Converge / 独立 Review，不是部署）
 
 1. 在 D 盘仓库核对 git 状态/HEAD，重读 AGENTS、docs、spec/plan/tasks。T-24 已完成且已清理，不重复申请既有测试许可或重放旧快照。
-2. **Converge**：逐条对照 58 条 AC、实现与真实测试证据；显式区分已验证软件行为与部署后才能证明的事项。若发现实现/测试缺口，登记任务，由新的 Astra 子 agent 修复；涉及语义变更按工作流重新验证，不靠文档掩盖缺口。
+2. **Converge**：继续逐条对照 58 条 AC/实际测试，先修 T-27/C1。保留 Pillow 安全限制，不能关闭 MAX_IMAGE_PIXELS 或宽泛吞异常。主会话只协调/复验；业务代码和回归由新 Astra 子 agent 修改。因生产代码改变，需新候选 T-24 隔离复验；不把旧 402 通过写成新版本证据。
 3. **独立 Review**：审核员 A 为独立 Claude 会话，与实施隔离；审查相对 main 的实际代码差异，按 bug/架构风险/测试缺口/目标对齐给结论，不以 Astra 自测或主会话代审。目前尚未启动本次实际实现 Review。
 4. Review 产物明列 T-25/T-26 待验项，交用户 **Gate 2** 确认。未批准不得合并 main。之后正式部署、真实全量导入/重跑分别另获许可；全量导入由用户在受保护 OpenAPI 触发，不代签会话。
 5. 部署后任何代码修复仍须 Review → Gate 2 → merge → 获准部署。真实材料/性能未验前 feature 保持 in-progress，不宣称全量收敛或验收完成。
