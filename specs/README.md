@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准并冻结 spec 第 7 版（13 条需求 / 58 条验收规则，含第 9 轮措辞澄清）；plan 第 8 版；Checklist 第 8、9 轮均无阻断；26 项 tasks；第 11 轮 Analyze 由 A 判定全部 12 项通过，进入 Implement；NAS 测试与部署待另获许可 |
+| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准并冻结 spec 第 7 版（13 条需求 / 58 条验收规则，含第 9 轮措辞澄清）；plan 第 8 版；Checklist 第 8、9 轮均无阻断；第 11 轮 Analyze 由 A 判定全部 12 项通过；Implement 分支 feat/catalog-foundation：已完成 T-01、04～09 的本机模块与测试，具体证据见 tasks.md；写卷归并、数据库与接口未完成，NAS 测试与部署待另获许可 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。

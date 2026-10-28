@@ -1,0 +1,13 @@
+# 与 v0 共有的运行库取 docs/plan.md RK-05 的版本；不改 v0 依赖。
+fastapi==0.144.0
+starlette==1.8.0
+pydantic==2.14.1
+uvicorn==0.54.0
+tifffile==2026.10.15
+Pillow==13.0.0
+numpy==2.5.4
+psycopg[binary,pool]==3.3.6
+psycopg-pool==3.3.3
+python-dotenv==1.2.4
+httpx==0.28.1
+pytest==9.0.3
