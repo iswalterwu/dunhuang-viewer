@@ -1,137 +1,102 @@
 # 会话交接 — catalog-foundation
 
-> **状态：T-24 首轮隔离实测 400 通过 / 2 失败；P6 Astra 已修复 CLI 测试连接配置并经本机复验，待新候选 NAS 重验。首轮 NAS 资源已全部清理。** T-25/T-26 正式部署与全量验收未获许可。这只是会话恢复入口，不代表工作流已到 Handoff 阶段。
-> 更新日期：2026-10-28。恢复时以本文件、`AGENTS.md`、feature 规范与当前 git 工作区为准；prior-handoff.txt（非公开历史记录） 及旧暂停日志仅作历史参考。
+> **状态：T-24 NAS 隔离测试已完成，修复重验 402 passed / 0 failed / 0 skipped / 1 warning；两轮临时资源均已清理。下一步 Converge → 独立 Review。**
+> 更新日期：2026-10-28。这是会话恢复入口，不代表工作流已到 Handoff 阶段；尚未过 Gate 2、未合并 main、未正式部署或全量导入。
 
 ## 1. 当前任务与闸门
 
 目录底座 `specs/catalog-foundation/`：只读导入 NAS 写卷影像、编号、来源与许可，提供稳定身份、变化历史、报告和授权只读 API；不改运行中的 v0。
 
-- 当前阶段仍为 **Implement**。spec 第 7 版已获 Gate 1 批准并冻结（13 条需求、58 条 AC、25 条最终决策），plan 第 8 版。
-- Checklist / Analyze 第 11 轮由审核员 A 判定 12 项全部通过；**只是设计质量通过，尚未独立 Review 实际实现，也未过 Gate 2**。实施期间不改 checklist，不重复请求 Gate 1。
-- T-01、T-04～T-16 原有本机模块已完成；T-02/03、T-17～T-21 的代码已写成，真实数据库路径未验，不能标全部完成。
-- T-22 运行配置已恢复复核：源码与静态契约通过；Compose 语法、镜像与真实运行仍待 T-24 / T-25。不要重跑 P4 生成过程。
-- **T-23 本机完成**：Astra 提供真实 `catalog/acceptance/` 基线、compare、测试及 README A1～A7 入口，主会话已复验。Dockerfile 的 COPY acceptance 前置已具备，**不等于镜像已成功构建**。
-- 用户在明确 T-24 隔离测试范围后回复 **「开始」**，已批准隔离快照、受限构建、一次性 PostgreSQL/API 测试及清理；仅合成材料/认证，禁真实材料/v0/正式 pgdata 挂载，禁正式 Compose。首轮候选 `private-candidate-034` 已在 Docker 24.0.2、Python 3.12.15、PG 17.4 运行全部 402 项：**400 passed / 2 failed / 0 skipped / 1 条原有警告**。构建/运行限额实测与合成 Compose config -q 通过；两处失败均为 CLI 测试用 connection.info.dsn 丢失口令导致子进程不能连接，不削弱生产认证。P6 Astra 已只修 test_api.py / test_import.py 的四行夹具/环境传值，主会话本机完整复验 360 passed / 42 db skipped / 1 warning；随后需新候选真实库复验。T-25/T-26 继续待单独许可。
+- spec 第 7 版已获 Gate 1 批准并冻结（13 条需求、58 条 AC、25 条最终决策），feature plan 第 8 版；不重复申请 Gate 1，不修改冻结规格或 checklist。
+- Checklist / Analyze 第 11 轮由独立审核员 A 判定 12 项全部通过，**只是设计质量结论，不是实际实现 Review**。
+- T-01～T-24 的实现及对应自动化验证已完成。最新真实 PostgreSQL/Python 3.12 测试包括原来跳过的全部 42 个 db 项，均已执行通过；T-22 隔离构建及合成 Compose 配置校验亦通过。
+- 当前在 Implement 收尾、待进入 Converge / 独立 Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
+- T-25 正式部署、T-26 用户触发真实全量导入与 A1～A7 仍未执行、未获许可；合并也不等于 feature 全量验收完成。
 
-## 2. git 安全点与未做的操作
+## 2. 本机、GitHub 与候选身份
 
-- 仓库：**`/srv/example/project`**；分支：`feat/catalog-foundation`。2026-10-28 按用户要求从 `/srv/example/project` 迁移，旧目录已在完整校验与新路径回归后移除；后续命令只使用新目录。
-- 迁移原样复制阶段对包含 `.git` 与本地忽略环境的 6,049 个文件逐一核对 SHA-256，一致后才继续。保留已安装依赖，使用标准 venv 与已安装包元数据重新生成激活脚本、17 个命令入口；清除可再生的旧字节码缓存，未下载/升级依赖。旧路径移除后 pip/pytest/模块入口与完整回归均在 D 盘验证，Git fsck 通过。
-- 本轮起点为暂停 WIP `private-candidate-030`；恢复复核 T-22 的记录已本地提交为 `private-candidate-031`。
-- T-23 实现、任务状态、本文件及非敏感证据随本轮安全提交保存；**实际最新 SHA 用 `git log -1 --oneline` / `git rev-parse HEAD` 查看**，不把未知的自引用 SHA 写入本文。T-24 必须记录最终候选完整 SHA，不能拿子 agent 派发时的旧 HEAD 代替。
-- 用户于 2026-10-28 批准 GitHub 同步后，已将截至 `private-candidate-032` 的 9 个实施提交推送至 `origin/feat/catalog-foundation`，并建立 upstream；已用 `git ls-remote` 核对远端 SHA 与本机一致。此同步状态修订也随文档提交推送同一功能分支；最新 SHA 以分支 HEAD 为准。
-- GitHub 分支：`origin 的 feat/catalog-foundation 分支（项目角色描述，非网址）`。后续已验证阶段及时同步此功能分支；本机编辑 → commit → push，不要求在 GitHub 网页直接编辑。推送功能分支不代表批准合并或部署。
-- 已只读核实 GitHub `main` 仍为 `private-candidate-023`，未 merge、未推送 NAS、未部署。
-- 已核对 v0 源码、根 Dockerfile / compose / requirements、冻结 spec / feature plan / checklist 与批准的 main 无差异。
-- 本机未安装 Docker。T-24 首轮已在 NAS 创建并清理一次性资源：临时库、API/DB 容器、匿名 PG 卷、网络、候选/探针两镜像标签、隔离目录与三份临时合成 .env 均已移除；没有本轮遗留运行服务。v0 容器 ID/启动时间/restart 数与测试前相同，未停止或重启，不等于正式全量验收的连续健康证据。未执行正式部署。
+- 唯一本机工作副本：**`/srv/example/project`**；分支 `feat/catalog-foundation`，跟踪 `origin/feat/catalog-foundation`。
+- 2026-10-28 已按用户要求从 `/srv/example/project` 迁移；原样复制阶段对含 .git/忽略的本地环境共 6,049 个文件逐一 SHA-256 验证一致，重生虚拟环境激活/17 个入口后移除旧目录。依赖未在本机下载或升级；后续命令只用 D 盘路径。
+- 用户已批准后续已验证阶段及时同步 GitHub 功能分支，不需重复询问普通分支 push。GitHub：`origin 的 feat/catalog-foundation 分支（项目角色描述，非网址）`。不擅自 merge main、push nas 或部署。
+- 上一安全提交 **`private-candidate-035`**：Astra 两处 CLI 测试最小修复及首轮失败/清理证据，已 push；**它也是最新实际通过 NAS 全套测试的候选 SHA**。
+- 本轮其后的完成状态/证据文档提交，不改变被测生产源码、迁移、运行配置或测试。实际最新 HEAD 用 `git log -1 --oneline` / `git rev-parse HEAD` 查看，不把未知的自引用 SHA 写入本文。未来部署镜像仍须用实际获准/合并提交 SHA 构建，不能冒用旧候选版本。
+- 本地 main 与 origin/main 记录仍为 `private-candidate-023`；本轮没有合并或推送 NAS。
 
-## 3. 本轮验证与证据
+## 3. T-24 两轮真实证据
 
-| 范围 | 主会话实际结果 | 限制 |
-|---|---|---|
-| 恢复后 T-22 全套本机回归 | **318 passed / 42 db skipped / 1 条原有警告**，其中 test_runtime.py 7 项通过 | 源码契约，不是 Compose / 构建 / 挂载证据 |
-| T-23 完整非 DB 回归 | **360 passed / 42 deselected / 1 条原有警告** | db 被排除，绝非通过 |
-| T-23 显式包含 acceptance 的完整回归 | **360 passed / 42 db skipped / 1 条原有警告** | 未配置 DH_TEST_DATABASE_URL，SQL 未运行 |
-| 验收比较测试独立执行 | **42 passed** | 合成报告与真实 compute_import → build_report 流水线，不是 NAS 基线结果 |
-| 编译与语法 | v0 三文件 py_compile；31 个 catalog Python 文件的 Python 3.12 AST；README 12 段 Bash、9 段 JavaScript、3 段 Python 均通过语法检查 | 本机 Python 3.14.2；未运行 Python 3.12、浏览器或 NAS 操作片段 |
-| 机械检查 | UTF-8 LF / 无 BOM、文档一致性、差异空白检查通过；pip check 无依赖冲突 | 未升级依赖或屏蔽警告 |
-| 迁移到 D 盘后（旧目录已移除） | **360 passed / 42 db skipped / 1 条原有警告**；虚拟环境激活、pip/pytest 启动、模块 help 与 Git 完整性通过 | 仅本机目录迁移验证，不是 T-24 / NAS 验证 |
-| T-24 首轮真实库 / Python 3.12 | **400 passed / 2 failed / 0 skipped / 1 条原有警告**（47.10 秒）；构建 cgroup、镜像与 Compose 合成配置通过 | report/health 两处子进程测试待修复重验，不能标 T-24 完成 |
+用户在明确隔离测试范围后回复「开始」，批准候选快照、受限构建、一次性 PG/API 测试与本轮清理；仅合成材料/认证，禁真实材料、v0 文件、正式 pgdata 挂载，禁正式 Compose。该批准不包含 T-25/T-26。
 
-42 个数据库跳过项仍为：`test_db.py` 15、`test_import.py` 15、`test_api.py` 12。唯一已知警告仍是 Starlette TestClient 对固定版本 httpx 的弃用提示。
+共同环境：NAS Docker **24.0.2**、Compose **v2.20.1-6047-g6817716**；候选镜像 Python **3.12.15**，一次性 PostgreSQL **17.4**。主会话预检通过（门槛 ≥2GB）；宿主即时内存与交换状态非公开，仍严格保持硬限额且不增加 swap，不放宽红线。
 
-最新完整回归须显式包含 acceptance：默认 `catalog/pytest.ini` 的 testpaths 仍只有 tests，不要只跑默认命令后误报涵盖了比较器。
+| 轮次 | 候选 | 完整测试结果 | 结果/限制 |
+|---|---|---|---|
+| A1 | `private-candidate-034` | **400 passed / 2 failed / 0 skipped / 1 warning，47.10 秒** | report/health 两个 CLI 子进程测试使用不含口令的 connection.info.dsn；诊断确认原始测试 URL 能连、info.dsn 无口令重连失败 |
+| A2 | `private-candidate-035` | **402 passed / 0 failed / 0 skipped / 1 warning，47.62 秒** | P6 最小修复后，两处 CLI 与全部数据库/HTTP测试通过；Docker die 事件 exitCode=0 |
+| 本机修复复验 | P6 后相同测试源码 | **360 passed / 42 db skipped / 1 warning** | Python 3.14.2，本机无数据库，不将 skip 算 pass |
+
+- A2 快照 SHA-256：`d2c9f1c845747c4c2fdec1ed49afe765e7a5f04b9816ce8f24f6103ea3877c5d`；传输到 NAS 后核对一致。
+- A2 镜像 ID：`sha256:b849fc8b9af3e4c386e3864d0677981f6ce1a5cccd9d1e564dc19f780dd35777`（测试后已删除）。镜像包含真实 tests、acceptance、pytest.ini、migrations 与固定直接依赖，pip check 通过。
+- legacy builder 使用 `--memory 512m --memory-swap 512m --rm --force-rm`；A1 构建探针在真实 cgroup 读取 memory/memsw 均为 **536870912**。未删限额、未换无上限构建。
+- API 测试容器 **512m**、PG **384m**，memswap 分别相等；实际 inspect 与 cgroup 核对留证。测试 API 没有挂载，PG 只有自身匿名临时卷；无宿主绑定目录、无发布端口，临时网络互通。不是正式 Compose 或 HTTP 服务部署。
+- 两候选均用合成 .env 做 `docker-compose -p dunhuang-catalog config -q`，只静默检查、不执行 up。正式挂载、端口、默认启动与生产凭证仍待 T-25。
+- pytest 唯一警告是原有 Starlette/httpx 弃用提示，未升级依赖或屏蔽。构建/SSH 原输出还保留 legacy builder 弃用、pip root、SSH 非后量子密钥交换提示；没有改 NAS/SSH/Docker 版本或安全配置来消除提示。
+
+## 4. 修复范围与清理结果
+
+P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，22:26:19～22:28:04 自然结束，exit=0、stderr 为空。仅修改：
+
+- `catalog/tests/test_api.py::test_health_cli_readonly_and_migration_check`
+- `catalog/tests/test_import.py::test_report_cli_readonly_without_auth_files`
+
+两测试各增加 `test_database_url` 夹具参数并传给子进程，共替换四行。保留真实 subprocess 与全部原断言，不 mock、不 skip/xfail、不改生产 API/CLI、不增加隐式凭证 fallback、不放宽 PG 认证。主会话本机复核后形成 A2，真实库全部通过。
+
+两轮资源已确认清理：临时数据库（显式 DROP）、API/DB/诊断容器、两匿名 PG 卷、两临时网络、三测试/探针镜像标签、两隔离目录、远端 raw 输出及临时合成 .env。**没有本轮遗留运行资源或需重启命令**；P1～P6 子 agent 均已结束。未全局 prune，原有 Python/PG 基础镜像 ID 未变。
+
+- 已删除 `/tmp/dh-catalog-t24-20261028-221119-private-candidate-034` 与 `/tmp/dh-catalog-t24-20261028-223110-private-candidate-035`。
+- v0 容器始终为同一 ID `cb29d6cf59e9694ce1a35ecdb2f52a8f25a3164d8fcc46e037d93a295e254ac2`、启动时间 `2026-10-24T23:21:23.021250776Z`、restarts=0、running=true；未停/重启。**这不代替 T-26 全量期间 v0 健康连续采样**。
+- 没有访问原材料、备份、v0 .env/users.json/cache，也未遍历 cache；没有真实登录/正式导入、NAS git push 或正式服务启动。
+
+## 5. 下一步（Converge / 独立 Review，不是部署）
+
+1. 在 D 盘仓库核对 git 状态/HEAD，重读 AGENTS、docs、spec/plan/tasks。T-24 已完成且已清理，不重复申请既有测试许可或重放旧快照。
+2. **Converge**：逐条对照 58 条 AC、实现与真实测试证据；显式区分已验证软件行为与部署后才能证明的事项。若发现实现/测试缺口，登记任务，由新的 Astra 子 agent 修复；涉及语义变更按工作流重新验证，不靠文档掩盖缺口。
+3. **独立 Review**：审核员 A 为独立 Claude 会话，与实施隔离；审查相对 main 的实际代码差异，按 bug/架构风险/测试缺口/目标对齐给结论，不以 Astra 自测或主会话代审。目前尚未启动本次实际实现 Review。
+4. Review 产物明列 T-25/T-26 待验项，交用户 **Gate 2** 确认。未批准不得合并 main。之后正式部署、真实全量导入/重跑分别另获许可；全量导入由用户在受保护 OpenAPI 触发，不代签会话。
+5. 部署后任何代码修复仍须 Review → Gate 2 → merge → 获准部署。真实材料/性能未验前 feature 保持 in-progress，不宣称全量收敛或验收完成。
+
+后续仍待证明：真实材料完整覆盖/基线/谱系/画布/对象关系，四项 ro 挂载与外部 pgdata/端口绑定，原图/备份前后元数据归因、cache 访问审计，512 MB 全量完成与 v0 连续健康，全量 ≤1小时、无变化重跑 ≤10分钟，列表/详情各100次 P95 ≤1秒，20个真实 v0 链接抽查。详见 README A1～A7 与 T-25/T-26。
+
+## 6. 关键接口与不可回退的实现约定
+
+- `prepare_import(pool, triggered_by=..., code_version=..., session_cookie=..., v0_url=...)` 同步持连接/咨询锁并创建批次；API 先准备再 202，ImportBusy 同步 409，不能提前归还连接。
+- `PreparedImport.execute(roots, cache_dir)` 后台执行，只有派发失败才 `cancel()`；不是用户取消 API。`compute_import` 走真实扫描/规则计算，CatalogState 不模拟数据库；附件读取即消费，不保存全量原文。
+- `latest_valid_snapshot` 按 valid 状态取最近批次，正确处理有效空快照与失败批次的有效快照；A1 覆盖必须本批索引有效，不用旧快照冒充。
+- `preserved_items` 只冻结编号/线索/出处；新影像严格策略、位置追加、新附件关联继续更新；待确认不丢原主号。
+- NLC 权威只覆盖一级国图卷，不清除词表外子单元自己的号；画布序号从 0 起。派生只信最终成功记录，不把 raw 完成/退出码0当最终 TIFF 成功。
+- 合并建议每对参与端各一条结构化异常，不改变归并、不只关联左端、不重新解析自然语言猜对象。
+- 只读路径/参数以 feature plan 与实际受保护 OpenAPI 为准；无目录写操作、CLI 导入、用户取消/回滚 API。AUTH_SECRET 缺失 fail-closed。
+- `import_run.counts` 存完整报告；CLI 整行统计 `counts.counts`，API 单批次统计 `report.counts`，直接报告为 `counts` 但无批次成功状态。
+- compare 只读已有报告，不扫描材料/复制算法；固定34项基线，txt477不因 Q-024 的六个新增附件改483。三项（图块JPG性质、P.2504返回5件、12个长卷逐条派生/异常覆盖）固定人工留证，不删指标凑0退出码。
+- `report.health` 为 count/failures/max_seconds/samples；`report.cache_access` 为白名单打开记录。镜像/运行注入真实 DH_CODE_VERSION，不在容器内运行 git。
+
+## 7. 证据、调度与恢复命令
+
+仓库 历史归档（非公开历史记录）：
+
+- `logs/T24-A1/`：首轮失败、诊断、构建/cgroup/Compose/清理；`logs/T24-A2/`：新候选完整通过、限额/状态/清理与最终所有权检查。A2 `commands.txt` 是主会话的实际命令记录（无凭证值）。
+- 归档文本由源输出自动转 LF、去 ANSI 显示控制符/行尾空白，`archive-manifest.json` 记录源/归档 SHA-256；未改测试结果。临时口令先脱敏再导出；不提交快照 tar、远端 raw 或任何 .env。
+- 外部原输出仍在 `/srv/example/private-audit/t24/20261028-221119-private-candidate-034/` 与 `20261028-223110-private-candidate-035/`；只含本轮合成测试/运维证据。早先原始 NAS 抽查私有材料未复制入库。
+- `prompts/prompt-P6-T24-cli-fix.txt`、`logs/P6-T24-cli-fix.{meta,status}` / `.out.txt` / `-main-local.txt`：实际 Astra 分工与本机复验。P1～P5/迁移证据保留，不重放历史 HEAD/路径提示词。
+- 调度仍用 `/srv/example/private-audit/implement/run_task.sh`（备份在 private-audit-record（tools；非公开历史记录，不是可执行入口））：cwd 已为 D 盘、固定 Astra、独立 pi --no-session、read/bash/edit/write、2400秒。审核原目录 `/srv/example/private-audit/review/`；A 优先 claude-bridge，不可用才 anthropic/claude-fable-5-1，记录实际通道/原因。使用旧审核脚本前核对当前 CLI 工具参数及新 HEAD，不覆盖旧轮次日志，不另建框架。
 
 ```bash
 cd /srv/example/project
+git status --short
+git log --oneline -8
+git branch -vv
 catalog/.venv/Scripts/python.exe -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests catalog/acceptance/test_compare.py
 # 历史命令（非公开历史记录，不可执行）：python -I -X utf8 private-audit-record .
 git diff --check
 ```
 
-测试前若环境意外存在 `DH_TEST_DATABASE_URL`，先核实目标与许可，不能误连真实库。本机 venv 可用但不入库；Python 3.14 通过不能代替容器验证。
-
-## 4. T-23 文件与比较器边界
-
-Astra 本轮只写四个分配文件，主会话只复核、验证和记录：
-
-- `catalog/acceptance/baseline-2026-10-27.json`：34 项，固定为 2026-10-27。6,096 是影像目录数，不是写卷总数；TIFF 导入基线 32,058，不含隐藏目录 .pages 中的 63 个；txt 仍为 477。
-- `catalog/acceptance/compare.py`：仅标准库、只读已导出报告与基线，不扫描材料、不连接网络/数据库、不复制归并或规则算法。
-- `catalog/acceptance/test_compare.py`：42 项，含实际合成文件流水线、CLI/API 包裹形状、Q-024 六个 txt 的真实附件流水线、错误输入、退出码、只读审计、稀疏 Counter 与缺失容器的区别。
-- `catalog/README.md`：A1～A7 可执行步骤、对象级人工核查、证据位置、资源采样、真实用户登录态及同源浏览器 GET、T-24/T-25 受限构建和许可边界。**这些 NAS/浏览器步骤尚未执行。**
-
-报告形状：
-
-| 输入 | 实际统计位置 |
-|---|---|
-| report CLI 导出的 import_run 整行 | `counts.counts`（数据库 counts 列保存完整报告） |
-| GET `/api/v1/imports/{id}` | `report.counts` |
-| build_report 直接报告 | `counts`，没有批次成功状态，不能据此验收 |
-
-比较器退出码：0 所选计数相同且无缺证据；1 存在差异；2 缺证据；3 输入无效；4 批次 running/failed。0 也不代表完整 AC / A1～A7 通过。完整默认基线有三项固定 `unverified`，因此不能只凭比较器获得全项通过：
-
-1. 排除的 JPG 98 是否全部为图块缓存（已有 excluded_jpg 是全部排除 JPG）。
-2. P.2504 母号查询实际是否返回 5 件。
-3. 12 个合并长卷逐条是否有派生来源或对应异常（不能把派生总数与异常总数相加抵数）。
-
-README 已给这些事项的 API / 报告逐对象核查入口；P.2002 两套影像、P.0901 三件独立对象、出处建议等亦须对象级证据。Q-024 新 A077 资料六个 txt 只记录 477 → 483 差异及原因，不改变旧基线，不靠删指标或填零凑通过。真实报告、元数据与 cookie 不入库；后续验收证据放在工作区、pgdata、原材料和 cache 之外。
-
-## 5. 下一步顺序（先取得许可）
-
-1. 重读本文件、`AGENTS.md`、`docs/plan.md`、`docs/architecture.md` 与 `specs/catalog-foundation/{spec,plan,tasks}.md`，检查 `git status --short`、`git log --oneline -8`、`git branch -vv`。
-2. **T-24 已获明确许可，不重复请求同一许可**；继续前先核对本轮任务记录、实际资源和清理状态。许可仅限候选隔离快照、受限构建、一次性 PostgreSQL/API 测试与本轮资源清理；禁真实材料/v0/正式 pgdata 挂载、禁正式 Compose。
-3. 获准后按 README T-24 执行：记录最终候选完整 SHA、隔离临时目录；低峰且 NAS MemAvailable >=2GB；核实构建后端真正支持并落实硬内存 / swap 限制，不支持就停止报告，不能删限额重试。数据库 384m、测试容器 512m，memswap 分别相等；不发布宿主端口，临时网络，无宿主数据卷。
-4. 容器内显式执行 `python -m pytest tests acceptance/test_compare.py`，db 项必须 **0 跳过**。SQL / 事务 / 线程 / 锁 / 历史 / 原文字节 / 迁移路径由这一步补证。失败的语义修复仍由新的 Astra 子 agent 在本机完成，形成新候选快照；NAS 不改代码。
-5. 保存镜像、版本、限额、测试输出与实际清理结果。无论成功失败，只清理本轮已识别的一次性资源，不运行全局 prune，不删除未知服务/数据。
-6. T-24 补齐后才 Converge / 独立 Review → 用户 Gate 2 → merge。正式部署 T-25、用户触发全量与重跑的 T-26 另获许可；merge 不等于 feature 全量验收完成。部署后修代码仍重走 Review → Gate 2 → merge → 获准部署。
-
-T-24 首轮及清理已完成留证，但测试未全通过。P6 Astra 已自然结束，主会话已复核最小差异并完整本机复验；下一步以包含这两处测试修复的新候选完整 SHA 重跑 T-24。不要重放首轮旧快照，不需重复请求既有隔离测试许可；尚未派发审核员 A 或正式验收。
-
-## 6. 实施分工与关键接口
-
-所有业务编码与语义修复由独立 **`openai/gpt-6-astra`** 子 agent 完成；主会话派发、约定接口、集成、复验、记录。独立文件可并行，共享文件串行；模型不可用时报告并请用户决定，不擅自换模型。审核员 A 仍为独立 Claude 会话，不由 Astra 自测代审。
-
-- `prepare_import(pool, triggered_by=..., code_version=..., session_cookie=..., v0_url=...)` 同步持连接与咨询锁后创建批次。API 先准备再返回 202；已有批次转 409，不能提前归还连接。
-- `PreparedImport.execute(roots, cache_dir)` 后台执行，派发失败才 `cancel()`；不是用户取消 API。真实线程 / SQL / 资源生命周期仍待 T-24。
-- `compute_import` 是真实文件计算流水线；附件读到即消费，不保存全量原文；CatalogState 不模拟数据库。
-- `latest_valid_snapshot` 按 import_run 的 valid 状态取最近批次；有效空快照、失败批次的有效快照都不能错误退回旧非空记录。本批 A1 覆盖必须本批索引有效，不能用旧链接快照代替。
-- `preserved_items` 只冻结编号 / 线索 / 出处；新影像的严格展示策略、原始位置追加、新附件关联仍须更新；原主编号在待确认时不丢失。
-- NLC 权威只覆盖一级国图写卷目录，不清除词表外子单元自己的编号；画布序号从 0 起。派生仅信成功记录，不能将 raw 完成或退出码 0 当最终 TIFF 成功。
-- 合并建议按参与端各有一条结构化异常（每对两条），不改变归并；不要只关联左端或重新解析自然语言猜对象。
-- 只读接口、参数和路径设计权威在 feature plan；实际实现与受保护 OpenAPI 见 `api.py`。没有目录写操作、CLI 导入、取消 / 回滚 API。
-- `DH_CODE_VERSION` 本机默认 development；镜像构建与运行必须注入真实候选 / 已合并 SHA，不在容器里运行 git。
-- `report.health` 字段为 count / failures / max_seconds / samples；`report.cache_access` 是白名单打开记录；只读挂载与测试审计联合证明，不通过遍历 cache 验证。
-
-## 7. 子 agent、进程与证据位置
-
-P5：实际模型 **openai/gpt-6-astra**；派发 HEAD `private-candidate-031`；21:28:27～21:45:32 自然完成，exit=0，stderr 为空。只写上述四个文件，无越界修改，无提交/推送，主会话已复验。
-
-P6：同为 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`；22:26:19～22:28:04 自然完成，exit=0、stderr 为空。仅两个测试文件四行替换；原始 DB 测试断言完整，未改生产代码或访问 NAS。主会话本机完整复验已通过，真实库复验待执行。
-
-P1～P6 均已确认结束；没有本轮遗留子 agent 或需要重启的服务。**不要重放 P4 / P5 旧提示词或误停用户已有服务。** 设计端口（尚未监听）：新 API 宿主 8504 → 容器 8000，DB 5432 仅项目内部；v0 8503 保持原状。
-
-调度沿用 `/srv/example/private-audit/implement/run_task.sh`（仓库备份 run_task.sh（非公开历史记录））：固定 Astra、独立 pi --no-session、read/bash/edit/write、2400 秒超时。实施与审核的外部调度脚本 cwd 均已改为 `/srv/example/project`，仓库工具备份也已从源脚本重新同步；只做 bash -n，未派发新 agent。外部审计目录仍在 `/srv/example/private-audit`，没有一并搬迁；输出目录不变。历史提示词/日志中的旧项目路径保留为证据，不能直接重放。需新任务时核对新路径、当前 HEAD、新提示词与新批次 ID，不覆盖旧日志；不是新 agent 框架。
-
-新增归档位于 历史归档（非公开历史记录）：
-
-- `prompts/prompt-P5-T23.txt`：实际任务边界、AC、HEAD 与命令。
-- `logs/P5-T23.{meta,status}`、`logs/P5-T23.out.txt`：实际模型、起止、退出码与子 agent 原报告。
-- `logs/P5-T23-main-local.txt`、`P5-T23-main-full.txt`：主会话两种回归原输出。
-- `logs/P5-T23-main-static.txt`：编码、Python 3.12 AST、README 片段语法结果，仅机械证据。
-- `logs/local-relocation-tests.txt`：旧目录移除后，在 `/srv/example/project` 完整回归的原始输出（360 passed / 42 db skipped / 1 warning）。
-- `logs/T24-A1/`：首轮预检、构建/限额、合成 Compose 校验、脱敏 pytest、诊断与清理证据；为便于 Git 展示自动转 LF、去显示控制符/行尾空白，archive-manifest.json 保留原输出与归档 SHA-256。原输出仍在外部 `/srv/example/private-audit/t24/20261028-221119-private-candidate-034/`；不提交快照 tar、raw 输出或任何临时 .env。
-
-旧暂停归档、P1～P4 日志、工具备份仍保留，不修改原生成证据。P4 历史 out.txt 有两个 Markdown 换行空格的已知提示，与源码无关。原始 NAS 抽查内容仍只在外部 `dh-audit/protocol-facts-20261028.txt` / `protocol-log-blocks-20261028.txt`，不复制入库；不含恢复必需材料。没有复制真实 .env、users.json、密钥或 pi 认证。
-
-审核工具原目录 `/srv/example/private-audit/review/`：A 优先 claude-bridge，不可用才 anthropic/claude-fable-5-1；每轮记录实际通道与切换原因。旧接入不可用记录仅为历史信息，下轮重新核实；当前未进入独立 Review。
-
-## 8. 仍需用户决定
-
-GitHub 功能分支同步与 T-24 隔离测试均已获批准；不包含 main 合并、正式部署或真实材料验收。
-
-1. 首轮已用实际 cgroup 探针证明 legacy builder 的硬内存/swap 限额生效；后续若换后端或限额不生效仍须停止并请用户决定，不能删限额重试。T-24 原批准范围不含正式部署。
-2. 独立 Review 后的 Gate 2、正式部署许可、全量导入 / A1～A7 许可分别仍需确认，不由“继续”或换模型自动替代。
-3. 是否同步 related-project 的 AGENTS / 模板仍待单独确认；该仓库有用户未提交改动，本轮未动。
-
-下次恢复后的建议开场：**T-24 隔离测试已获批准；我先核对本轮测试及资源清理状态，不重复启动未知资源，也不进入正式部署。**
+本机命令默认仍会跳过42个 db 项；不把它写成 NAS 402 passed。T-24 的完整通过证据已归档，不为状态查看重新连接正式库或 NAS 材料。related-project 仓库/模板未动，其同步仍需单独确认。

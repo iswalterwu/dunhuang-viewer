@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过，当前为 Implement；用户于 2026-10-28 明确批准 T-24 隔离测试，现开始预检与执行，T-25/T-26 仍待单独许可。
+> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过；T-01～T-24 的实现与对应自动化验证已完成，T-24 修复重验为 402 passed / 0 skipped。当前待 Converge / 独立 Review，未过 Gate 2；T-25/T-26 仍待单独许可，不能宣称全量验收或全量收敛。
 
 ## 执行约定
 
@@ -29,7 +29,7 @@
 
 ### T-02 初始数据模型与迁移（2 小时）
 
-- **状态**：代码与真实 PostgreSQL 测试已写成（2026-10-28），未标完成；本机没有测试库，test_db.py 的 15 项测试跳过，待 T-24 实测 SQL / 迁移 / 约束
+- **状态**：实现与数据库验证完成（2026-10-28，T-24 A2）。Python 3.12.15 / PostgreSQL 17.4 全套 402 项通过、0 跳过，其中 test_db.py 15 项实际通过，含迁移重复执行/失败回滚、UUID/多对多/唯一约束/编号约束与 migrate CLI；不以本机语法检查代替数据库证据。独立 Review 仍待执行
 - **上下文**：M1；以 plan §3 的表和约束承载稳定 ID、关联、附件、字段依据及历史。
 - **依赖**：T-01
 - **修改范围**：`catalog/migrations/0001_init.sql`、`db.py`、`__main__.py` 的 migrate、`test_db.py`。
@@ -38,7 +38,7 @@
 
 ### T-03 连接、事务与导入互斥（1 小时）
 
-- **状态**：代码已写成（2026-10-28），未标完成；连接池、事务与会话锁的真实验证随 T-24 执行，不以语法检查代替
+- **状态**：实现与数据库验证完成（2026-10-28，T-24 A2）。真实 PostgreSQL 双连接验证连接池开闭、事务回滚、咨询锁互斥、回滚不释放会话锁及异常退出后释放；test_db.py 15 项与完整 402 项均实际通过，0 跳过。部署/真实材料验证不在本任务冒充完成
 - **上下文**：M1/M5；用同一咨询锁保证只有一批导入，不另建任务队列或进程锁。
 - **依赖**：T-02
 - **修改范围**：`db.py`、`test_db.py`。
@@ -65,7 +65,7 @@
 
 ### T-06 编号解析与规范化（2 小时）
 
-- **状态**：本机完成（2026-10-28）；test_identifiers.py 45 项通过；写卷最多一个主编号及存疑不归并的端到端保证留 T-10/T-24
+- **状态**：本机完成（2026-10-28）；test_identifiers.py 45 项通过；写卷最多一个主编号及存疑不归并的端到端保证已由 T-10/T-24 补验通过
 - **上下文**：M3；只解析单元规定的编号来源，不解析写卷内部普通文件名。
 - **依赖**：T-01
 - **修改范围**：`identifiers.py`、`rules.py` 的号段、`test_identifiers.py`。
@@ -74,7 +74,7 @@
 
 ### T-07 单元划分、附件归属与合并建议（2 小时）
 
-- **状态**：本机完成（2026-10-28）；test_units.py 共 20 项通过，含词表、国图页图、散放文件、附件与只提合并建议；持久化关联留 T-17/T-24
+- **状态**：本机完成（2026-10-28）；test_units.py 共 20 项通过，含词表、国图页图、散放文件、附件与只提合并建议；持久化关联已由 T-17/T-24 补验通过
 - **上下文**：M2；从扫描结果生成 spec §1 的写卷单元。
 - **依赖**：T-04、T-06
 - **修改范围**：`units.py`、`rules.py` 的词表、`test_units.py`。
@@ -92,7 +92,7 @@
 
 ### T-09 影像身份、路径与缺失恢复（1.5 小时）
 
-- **状态**：本机完成（2026-10-28）；首批影像用例 10 项通过，从扫描开始真实改名 / 移动 / 互换 / 原子覆盖 / 回收站还原；新增写卷计算证据见 T-10/T-11，数据库历史仍待 T-17/T-18/T-24
+- **状态**：本机完成（2026-10-28）；首批影像用例 10 项通过，从扫描开始真实改名 / 移动 / 互换 / 原子覆盖 / 回收站还原；新增写卷计算证据见 T-10/T-11，数据库历史已由 T-17/T-18/T-24 补验通过
 - **上下文**：M3；在每个根内先匹配文件标识，再按未被认领的位置延续。
 - **依赖**：T-05
 - **修改范围**：`identity.py`、`test_identity.py`。
@@ -101,7 +101,7 @@
 
 ### T-10 写卷初建、主编号与多影像关联（2 小时）
 
-- **状态**：本机计算完成（2026-10-28）；test_identity.py 共 35 项通过，含同号跨目录、多号共享、分件、无号 / 存疑不合并、新影像归属、整件缺失保留编号 / 线索；preserved_items 给后续导入器保留出处的依据，持久化保证留 T-18/T-24
+- **状态**：本机计算完成（2026-10-28）；test_identity.py 共 35 项通过，含同号跨目录、多号共享、分件、无号 / 存疑不合并、新影像归属、整件缺失保留编号 / 线索；preserved_items 给后续导入器保留出处的依据，持久化保证已由 T-18/T-24 补验通过
 - **上下文**：M3；实现 plan §4.2.3 D/E 中初建写卷的正常流程。
 - **依赖**：T-06、T-08、T-09
 - **修改范围**：`identity.py`、`test_identity.py`。
@@ -110,7 +110,7 @@
 
 ### T-11 编号变化、同号回退与顺序无关（2 小时）
 
-- **状态**：本机计算完成（2026-10-28）；test_identity.py 共 35 项通过，含五种待确认情形及改回恢复、两件互换 / 三件轮换、增号 / 改号、同号迭代回退、改号后新增目录的归属；数据库端到端互换未验
+- **状态**：本机计算完成（2026-10-28）；test_identity.py 共 35 项通过，含五种待确认情形及改回恢复、两件互换 / 三件轮换、增号 / 改号、同号迭代回退、改号后新增目录的归属；数据库端到端互换已在 T-24 实测通过
 - **上下文**：M3；已有写卷始终保留 ID，不自动合并 / 拆分。
 - **依赖**：T-10
 - **修改范围**：`identity.py`、`test_identity.py`。
@@ -119,7 +119,7 @@
 
 ### T-12 谱系、许可与出处规则（2 小时）
 
-- **状态**：本机规则完成（2026-10-28）；test_rules.py 32 项通过，含读失败不误判 BnF、目录混合、严格许可继承、署名来源、出处建议 / 冲突、人工结论保留及不变初值复用；真实数据基线与落库保留尚未验
+- **状态**：本机规则完成（2026-10-28）；test_rules.py 32 项通过，含读失败不误判 BnF、目录混合、严格许可继承、署名来源、出处建议 / 冲突、人工结论保留及不变初值复用；落库保留已在 T-24 补验通过，真实材料基线仍待 T-26
 - **上下文**：M4；规则有名称、版本与依据，不把触发者当作者。
 - **依赖**：T-05、T-06、T-08
 - **修改范围**：`rules.py`、`test_rules.py`。
@@ -128,7 +128,7 @@
 
 ### T-13 国图清单与画布（1.5 小时）
 
-- **状态**：本机完成（2026-10-28，Astra 子 agent P1）；test_nlc.py 36 项通过，主会话已复验；只读抽查确认画布从 0 起、strips 列表 / 整数两种结构。Pressmark 来源、大小写与异常、署名、TIFF / pages 画布映射均已覆盖；原附件落库与 NAS 全量对应率留 T-17/T-26
+- **状态**：本机完成（2026-10-28，Astra 子 agent P1）；test_nlc.py 36 项通过，主会话已复验；只读抽查确认画布从 0 起、strips 列表 / 整数两种结构。Pressmark 来源、大小写与异常、署名、TIFF / pages 画布映射均已覆盖；原附件落库已由 T-17/T-24 补验通过，NAS 真实全量对应率仍待 T-26
 - **上下文**：M4；国图 JSON 是外部输入，在此处解析和校验。
 - **依赖**：T-06
 - **修改范围**：`nlc.py`、`test_nlc.py`。
@@ -155,7 +155,7 @@
 
 ### T-16 v0 快照、健康采样与链接（1.5 小时）
 
-- **状态**：本机完成（2026-10-28）；test_v0.py 19 项通过，HTTP 边界用 MockTransport，验证索引有效 / 未就绪 / 失败 / 有效空快照、原会话传递与释放、健康采样 / 2 秒指标、链接与不给链接原因；未访问实际 v0，快照落库及完整覆盖报告留 T-17/T-19
+- **状态**：本机完成（2026-10-28）；test_v0.py 19 项通过，HTTP 边界用 MockTransport，验证索引有效 / 未就绪 / 失败 / 有效空快照、原会话传递与释放、健康采样 / 2 秒指标、链接与不给链接原因；未访问实际 v0，快照落库及覆盖报告已由 T-17/T-19/T-24 测试通过，真实 v0 覆盖仍待 T-26
 - **上下文**：M4；v0 是外部 HTTP 边界，导入使用触发者原会话，结束丢弃。
 - **依赖**：T-04、T-15
 - **修改范围**：`v0.py`、`test_v0.py`。
@@ -164,7 +164,7 @@
 
 ### T-17 导入主流程与事务写入（2 小时）
 
-- **状态**：P2 Astra 实现及集成修复已写成（2026-10-28），未标全部完成；test_import.py 本机计算阶段在 P2 为 37 项通过、P3 补双端异常后 38 项通过；15 项真实 DB 用例跳过，主会话已完整复验。同步持锁准备批次、后台执行生命周期、单事务及快照独立提交均已有代码 / 真实 DB 测试，SQL 行为待 T-24
+- **状态**：实现与数据库集成验证完成（2026-10-28，P2/P3 实现，T-24 A2 实测）。test_import.py 53 项均通过（含 15 项真实 DB），完整回归 402 passed / 0 skipped；同步持锁准备、后台生命周期、单事务/失败回滚、有效快照独立提交、编号/路径互换、附件原字节与重导入均已运行真实 PostgreSQL 测试。真实全量材料覆盖仍留 T-26，独立 Review 尚未执行
 - **上下文**：M5；主函数只串正常流程，调用前面各模块，不重新实现规则。
 - **依赖**：T-03、T-11、T-12、T-13、T-14、T-16
 - **修改范围**：`importer.py`、`test_import.py`。
@@ -173,7 +173,7 @@
 
 ### T-18 变化、字段依据与批次历史（2 小时）
 
-- **状态**：P2 Astra 代码与计算回归已写成（2026-10-28），未标全部完成；保留人工结论、整件缺失信息、编号回退、字段作者及未变依据已在真实临时文件流水线验证。修复保留信息冻结过宽、机构误取目录号和编号排序假变化；数据库历史 / 回滚 / 按批次查询待 T-24
+- **状态**：实现与数据库集成验证完成（2026-10-28，T-24 A2）。保留人工结论、缺失/重现、编号回退、字段作者/依据、规则变化与按批次历史查询均随真实文件 + PostgreSQL 完整流水线通过；test_import.py 53 项及完整 402 项通过、0 跳过。不是 NAS 全量材料验收或人工标注功能完成
 - **上下文**：M5；变化历史与 import_run 分开，能够按批次还原对象。
 - **依赖**：T-17
 - **修改范围**：`importer.py`、`test_import.py`。
@@ -182,7 +182,7 @@
 
 ### T-19 导入记录、报告与异常（1.5 小时）
 
-- **状态**：P2 Astra 报告计算和只读 report CLI 已写成（2026-10-28），未标全部完成；18 类异常与计数、覆盖对照、访问记录汇集有本机回归。CLI 的真实数据库路径、导入后报告持久化及 NAS 基线待 T-24/T-26，未实现基线比较器
+- **状态**：实现与数据库集成验证完成（2026-10-28，T-24 A2）。18 类异常/计数、覆盖对照、访问审计、报告持久化及只读 report CLI 在真实 PostgreSQL 测试通过；P6 仅修 CLI 测试使用的连接夹具，未改生产代码或减断言。基线比较器已由 T-23 实现，真实 NAS 基线对照仍留 T-26
 - **上下文**：M5；报告引用各模块产生的事实与异常，不另做一套判断。
 - **依赖**：T-18
 - **修改范围**：`importer.py`、`__main__.py` 的 report、`test_import.py`。
@@ -191,7 +191,7 @@
 
 ### T-20 只读查询与按批次历史（2 小时）
 
-- **状态**：P3 Astra 代码已写成（2026-10-28），未标全部完成；test_api.py 本机 3 项路由 / 认证 / 无配置拒绝测试通过、12 项真实 DB API 测试跳过，主会话已复验。全部 GET、筛选分页、编号、原文、历史和链接均已有实现；真实 SQL 与 P95 待 T-24/T-26
+- **状态**：实现与数据库/API 集成验证完成（2026-10-28，T-24 A2）。test_api.py 15 项均实际通过（12 项 db），覆盖全部 GET、编号解析、筛选分页、附件原文、历史、v0 链接与无写路由；完整回归 402 passed / 0 skipped。全量数据的 NAS P95 与真实链接抽查仍待 T-26，未以合成数据代替
 - **上下文**：M6；公开路径按 plan §2.1，统一认证与参数校验后查询数据库。
 - **依赖**：T-15、T-19
 - **修改范围**：`api.py`、`test_api.py`。
@@ -200,7 +200,7 @@
 
 ### T-21 管理员触发、导入状态与 OpenAPI（1 小时）
 
-- **状态**：P3 Astra 代码已写成（2026-10-28），未标全部完成；同步持锁准备、真实后台线程、202 / 409 与生命周期、DH_CODE_VERSION、只读 health 均已有实现 / 测试。health 配置错误本机已验；SQL / 线程 / 锁 / 迁移成功路径待 T-24，运行验证待 T-25
+- **状态**：实现与数据库/API 集成验证完成（2026-10-28，T-24 A2）。同步持锁准备、真实后台线程、202/409、权限/认证、代码版本与迁移/只读 health 成败路径均通过真实 PostgreSQL + TestClient/子进程验证；两处 CLI 测试经 P6 最小修复后真实库通过。正式容器默认命令启动与运行冒烟仍留 T-25
 - **上下文**：M6；使用已实现的后台导入与咨询锁，不引入任务系统。
 - **依赖**：T-20
 - **修改范围**：`api.py`、`__main__.py` 的 health、`test_api.py`。
@@ -209,7 +209,7 @@
 
 ### T-22 镜像与独立 compose 配置（1 小时）
 
-- **状态**：源码与本机静态验证完成（2026-10-28 恢复后）。P4 Astra 六个文件经主会话复核，test_runtime.py 7 项通过；全套本机回归 318 passed / 42 db skipped / 1 条原有依赖警告，文档一致性与差异空白检查通过。384m / 512m 及 memswap、四项只读挂载、工作区外 pgdata、数据库无宿主端口、LAN / Tailscale 显式绑定与无凭证默认值均符合源码契约。不是 Compose 语法 / 镜像 / Python 3.12 / 挂载运行证据；仍须 T-23 提供真实 acceptance 文件，T-24 / T-25 补实际验证，不标全部完成
+- **状态**：运行文件实现、静态契约与隔离构建/合成 Compose 配置验证完成（2026-10-28，T-24 A1/A2）。两候选均以 legacy builder 的 512m=memswap 受限构建，实际 cgroup 探针通过；镜像含 src/migrations/tests/acceptance/pytest.ini，Python 3.12.15 全套 402 项通过，test_runtime.py 7 项实际通过，合成 .env 的 Compose config -q 通过。源码中四项 ro 挂载、外部 pgdata、无 DB 宿主端口、LAN/Tailscale 显式绑定符合设计。正式挂载/端口/默认启动的运行验证仍归 T-25，真实全量内存归 T-26；不能把测试容器证据冒充正式服务已部署
 - **上下文**：M7；只写新服务运行文件，不操作 NAS 或 v0 compose。
 - **依赖**：T-03、T-21
 - **修改范围**：`catalog/Dockerfile`、`catalog/docker-compose.yml`、`catalog/.env.example`、`catalog/README.md`。
@@ -218,7 +218,7 @@
 
 ### T-23 基线对照、验收入口与本机回归（1.5 小时）
 
-- **状态**：本机完成（2026-10-28，P5 Astra，主会话已独立复核）。34 项固定日期基线、标准库只读比较器、42 项比较测试及 README A1～A7 操作/证据入口已提供。支持 CLI 的 counts.counts、API 的 report.counts 和缺批次状态的直接报告；Q-024 六个 txt 保留差异，不改 477 基线；图块 JPG、母号查询结果、长卷逐条派生覆盖三项明确未验证，不以总数冒充对象级证据。主会话非 DB 回归 360 passed / 42 deselected / 1 条原有警告；显式包含 acceptance 的全套回归 360 passed / 42 db skipped / 1 条原有警告，比较测试单独运行 42 passed。v0 三文件编译、31 个 catalog Python 文件的 3.12 AST 语法、README 12 段 Bash/9 段 JavaScript/3 段 Python 语法、UTF-8 LF、文档一致性及差异空白检查通过；均非 NAS/浏览器/Compose/容器/SQL 运行证据。真实 A1～A7、T-24～T-26 仍未执行且待许可
+- **状态**：本机完成（2026-10-28，P5 Astra，主会话已独立复核）。34 项固定日期基线、标准库只读比较器、42 项比较测试及 README A1～A7 操作/证据入口已提供。支持 CLI 的 counts.counts、API 的 report.counts 和缺批次状态的直接报告；Q-024 六个 txt 保留差异，不改 477 基线；图块 JPG、母号查询结果、长卷逐条派生覆盖三项明确未验证，不以总数冒充对象级证据。主会话非 DB 回归 360 passed / 42 deselected / 1 条原有警告；显式包含 acceptance 的全套回归 360 passed / 42 db skipped / 1 条原有警告，比较测试单独运行 42 passed。v0 三文件编译、31 个 catalog Python 文件的 3.12 AST 语法、README 12 段 Bash/9 段 JavaScript/3 段 Python 语法、UTF-8 LF、文档一致性及差异空白检查通过；均非 NAS/浏览器/Compose/容器/SQL 运行证据。T-24 已于后续隔离实测完成；真实 A1～A7、T-25/T-26 仍未执行且待许可
 - **上下文**：M7；用一份基线与现有 CLI 承载验收，避免多份统计规则和重复命令。
 - **依赖**：T-19、T-22
 - **修改范围**：`catalog/acceptance/baseline-2026-10-27.json`、`catalog/acceptance/compare.py`、`catalog/acceptance/test_compare.py`、`catalog/README.md`、`specs/catalog-foundation/tasks.md`。
@@ -227,12 +227,12 @@
 
 ### T-24 NAS 临时数据库与完整自动化测试（2 小时；需另获许可）
 
-- **状态**：用户已批准，首轮已实测但尚未完成（2026-10-28），P6 Astra 已最小修复两处测试配置，主会话本机复验通过，待新候选真实库重验。A1 候选完整 SHA `private-candidate-034`，隔离目录 `/tmp/dh-catalog-t24-20261028-221119-private-candidate-034`；Docker 24.0.2 / Compose v2.20.1-6047-g6817716，Python 3.12.15 / PostgreSQL 17.4。构建 cgroup 的 memory=memsw=536870912 实测通过；候选镜像 `sha256:3186ba0c2adef412ef4ec1147608cf1704765db055aa053eb9e3334959c2a857` 成功受限构建，API/DB 实际限额 512m/384m 且 memswap 相等，无宿主数据绑定或发布端口，合成 .env 的 Compose config -q 通过。完整 402 项为 **400 passed / 2 failed / 0 skipped / 1 条原有警告**（47.10 秒）：report/health 两个子进程测试使用 connection.info.dsn，而该值不保留口令；同库诊断原始测试 URL 可连接、dsn 无口令重连失败。不是生产认证问题，不放宽认证、不跳过失败测试。数据库/匿名卷/容器/网络/两镜像标签/隔离目录与临时凭据均已清理，v0 ID/启动时间/restart 数未变。证据在 private-audit-record（T24-A1；非公开历史记录，不是可执行入口）（归档显示文本规范化，保留原输出哈希；临时口令已脱敏）。正式 Compose/真实挂载、T-25/T-26 仍未获许可
+- **状态**：完成（2026-10-28，经用户批准，主会话在 NAS 独立执行并清理）。**A2：402 passed / 0 failed / 0 skipped / 1 条原有依赖警告，47.62 秒**；候选完整 SHA `private-candidate-035`，快照 SHA-256 `d2c9f1c845747c4c2fdec1ed49afe765e7a5f04b9816ce8f24f6103ea3877c5d`，隔离目录 `/tmp/dh-catalog-t24-20261028-223110-private-candidate-035`，镜像 `sha256:b849fc8b9af3e4c386e3864d0677981f6ce1a5cccd9d1e564dc19f780dd35777`。Docker 24.0.2 / Compose v2.20.1-6047-g6817716，Python 3.12.15 / PostgreSQL 17.4；构建 512m=memswap，API 512m / DB 384m 且各自 memswap 相等，无宿主绑定材料/认证/pgdata、无发布端口，DB 仅匿名临时卷，合成配置 config -q 通过。API die 事件 exitCode=0、无 OOM 事件，DB OOM=false。A1 候选 `private-candidate-034` 为 400 passed / 2 failed / 0 skipped（47.10 秒），真实 cgroup 探针证实硬限额；两处 CLI 测试误用不含口令的 connection.info.dsn，由 P6 仅替换四行夹具/环境传值后在 A2 真库全通过，不改生产代码、不放宽认证、不减断言。两轮库/匿名卷/容器/网络/镜像标签/隔离目录/临时凭据均已清理，v0 容器 ID/启动时间/restart 数未变；未全局 prune、未起正式 Compose/未部署。证据在 T24-A1（非公开历史记录） 与 `T24-A2/`，A2 commands.txt 记录实际受限构建/创建/启动/清理命令；归档文本按 manifest 自动规范化且口令脱敏。T-25/T-26、独立 Review 与 Gate 2 仍未执行
 - **上下文**：M7；本机没有 PostgreSQL / Docker，在目标 Python 3.12 环境验证所有数据库与 HTTP 行为。
 - **依赖**：T-23、用户测试许可；正式部署仍在 Review / Gate 2 / merge 后。测试前明确候选提交与 NAS 临时目录，以 `git archive <候选提交> catalog` 传入隔离位置；不推送 nas main、不启动正式 compose。
 - **修改范围**：代码修复只在本机 `catalog/`；NAS 只接收候选快照并运行 plan §6.2 的一次性测试容器，不挂真实材料、正式 pgdata 或 v0 配置。数据库 `--rm`、384m = memswap；测试 API 容器 `--rm`、512m = memswap；无宿主数据库端口，共用临时 Docker 网络。
 - **完成标准**：补齐 T-02、T-03、T-17～T-22 的数据库和镜像证据，验证 AC-003-7、AC-007-4、AC-008-2、AC-009-1、AC-009-2、AC-009-3、AC-009-4、AC-009-5、AC-011-1、AC-011-2、AC-011-3、AC-011-4、AC-011-5、AC-013-1、AC-013-2、AC-013-3；数据库来自一次性 PostgreSQL 容器，不使用正式 `catalog-db`；在其中建独立测试前缀的临时库，设置测试连接，跑完删库并删除容器 / 网络 / 快照。不得因缺测试库静默跳过 db 项后声称全通过。
-- **验证命令**：获准后以 `/usr/local/bin/docker build -t dh-catalog-test <隔离目录>/catalog` 构建候选镜像；按 plan §6.2 启动一次性 PostgreSQL（随机测试口令、不挂宿主卷），就绪后在同网络的一次性测试容器内设置临时库 URL，执行 `python -m pytest tests acceptance/test_compare.py`（db 项 0 跳过）。测试不依赖正式 .env，不在此执行 compose `up`。把实际候选提交、容器与清理命令、通过数及输出摘要写回本任务。
+- **验证命令**：实际采用 `DOCKER_BUILDKIT=0 /usr/local/bin/docker build --pull=false --memory 512m --memory-swap 512m --rm --force-rm --build-arg DH_CODE_VERSION=<候选完整SHA> -t <本轮独立测试标签> <隔离目录>/catalog`；一次性 PG 384m=memswap，测试容器 512m=memswap、--rm、无宿主绑定/端口，先 create 并 inspect 限额，再 start --attach 执行 `python -m pytest tests acceptance/test_compare.py`，完整命令与清理见 A2 commands.txt。退出码与 Docker die 事件均为 0，全部 42 个 db 项实际执行、0 跳过；不使用正式 .env、不执行 compose up。
 
 ### T-25 正式部署与只读冒烟（1 小时；需另获许可）
 
@@ -263,13 +263,13 @@
 | P3 | T-20 → T-21 | GPT 6 Astra / openai（gpt-6-astra） | api.py、config.py、__main__.py、test_api.py / test_config.py；importer.py / test_import.py 仅补合并建议双端对象关联 | 16:15～16:33 串行完成；子 agent 指定文件 73 通过 / 27 db 跳过；主会话完整复验 311 通过 / 42 db 跳过 / 1 条原有警告，真实 DB 未验 |
 | P4 | T-22 | GPT 6 Astra / openai（gpt-6-astra） | catalog/Dockerfile、docker-compose.yml、.env.example、.dockerignore、test_runtime.py、README.md | 16:53:17～17:01:12 自然完成 exit=0，随暂停 WIP 保存；21:26 恢复后主会话复核并完整回归：318 passed / 42 db skipped / 1 条原有警告，其中静态运行契约 7 通过；文档一致性与差异空白检查通过，Compose / 镜像 / 运行仍待验 |
 | P5 | T-23 | GPT 6 Astra / openai（gpt-6-astra） | acceptance/baseline-2026-10-27.json、compare.py、test_compare.py、catalog/README.md | 当前安全点 private-candidate-031；独立进程 21:28:27～21:45:32，exit=0，仅写四个分配文件。子 agent 非 DB 回归 360 passed / 42 deselected / 1 warning；主会话同命令复验一致，另跑完整回归 360 passed / 42 db skipped / 1 warning、比较测试独立 42 passed；源码与文档语法/一致性通过，未连接 NAS 或启动服务 |
-| P6 | T-24 两处 CLI 测试修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 test_api.py、test_import.py | 22:26:19～22:28:04，exit=0；各测试显式接收 test_database_url 并传给子进程，共替换 4 行，保留真实 subprocess 与全部断言，不改生产代码或认证。子 agent 两文件 41 passed / 27 db skipped，完整本机 360 passed / 42 db skipped / 1 warning；主会话完整复验一致，真实两处子进程仍待新候选 NAS 重验 |
+| P6 | T-24 两处 CLI 测试修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 test_api.py、test_import.py | 22:26:19～22:28:04，exit=0；各测试显式接收 test_database_url 并传给子进程，共替换 4 行，保留真实 subprocess 与全部断言，不改生产代码或认证。子 agent 两文件 41 passed / 27 db skipped，完整本机 360 passed / 42 db skipped / 1 warning；主会话完整本机复验一致；随后在 T-24 A2 候选 private-candidate-035 真库复验，两处子进程及完整 402 项全部通过、0 跳过 |
 
-P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的最新完整回归为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。上述是 P5/迁移阶段的历史结果，彼时尚未执行真实数据库或 Python 3.12 容器测试；后续已获准的 T-24 首轮结果和清理证据见本任务，不混作 P5 成果。正式 NAS 部署验收仍未执行；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
+P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的本机完整回归当时为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。上述是 P5/迁移阶段的历史结果，彼时尚未执行真实数据库或 Python 3.12 容器测试；后续已获准的 T-24 A2 最新真实库回归为 402 passed / 0 skipped / 1 条原有警告，首轮失败与两轮清理证据见本任务，不混作 P5 成果。正式 NAS 部署验收仍未执行；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 
-按用户要求将本机工作副本迁至 `/srv/example/project`。原样复制阶段对含 `.git`、忽略的本地环境在内的 6,049 个文件逐一 SHA-256 校验一致；随后重新生成虚拟环境激活脚本及 17 个命令入口，依赖不重装、不下载/升级，清除可再生旧字节码缓存。实施/审核外部调度脚本及仓库备份的 cwd 已更新，新路径验证成功后移除旧目录。旧目录移除后的完整回归为 **360 passed / 42 db skipped / 1 条原有警告**，pip check、Git fsck、模块 help 与调度脚本语法通过；证据在 local-relocation-tests.txt（非公开历史记录）。业务代码、冻结 spec/plan/checklist、v0 与 NAS 部署路径不变，未启动子 agent、容器或服务。迁移当时 T-24 许可尚待确认，其后已单独批准并执行首轮，详见 T-24；路径/文档更新按已批准约定同步 GitHub 功能分支，不合并 main、不推送 NAS。
+按用户要求将本机工作副本迁至 `/srv/example/project`。原样复制阶段对含 `.git`、忽略的本地环境在内的 6,049 个文件逐一 SHA-256 校验一致；随后重新生成虚拟环境激活脚本及 17 个命令入口，依赖不重装、不下载/升级，清除可再生旧字节码缓存。实施/审核外部调度脚本及仓库备份的 cwd 已更新，新路径验证成功后移除旧目录。旧目录移除后的完整回归为 **360 passed / 42 db skipped / 1 条原有警告**，pip check、Git fsck、模块 help 与调度脚本语法通过；证据在 local-relocation-tests.txt（非公开历史记录）。业务代码、冻结 spec/plan/checklist、v0 与 NAS 部署路径不变，未启动子 agent、容器或服务。迁移当时 T-24 许可尚待确认，其后已单独批准并完成 T-24 两轮实测与清理，详见 T-24；路径/文档更新按已批准约定同步 GitHub 功能分支，不合并 main、不推送 NAS。
 
 ## Handoff 文档（实施与评审完成后）
 
