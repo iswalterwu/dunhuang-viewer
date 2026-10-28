@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from .rules import PELLIOT_RANGES
+from .rules import KAIBAO_DIRECTORY, KAIBAO_WORDS, PELLIOT_RANGES
 
 PART = r"(?:-(?:P)?\d+(?:Pi[èe]ce)?|[A-Za-z](?![A-Za-z]))?"
 PELLIOT = re.compile(
@@ -21,7 +21,6 @@ SHARER = re.compile(r"(?<![A-Za-z0-9])(?P<prefix>W[AB])\s*(?P<number>\d+)(?!\d)"
 BARE_NUMBER = re.compile(r"(?<![\dA-Za-z.,×x*])\d{4}(?![\dA-Za-z.,×x*])")
 UNIT_OR_YEAR = re.compile(r"\s*(?:cm|mm|年|[×x*])", re.IGNORECASE)
 ZHIHAO = re.compile(r"([\u4e00-\u9fff])字")
-KAIBAO_DIRECTORY = re.compile(r"^敦煌藏經洞\s*\d+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,5 +120,5 @@ def _bd_identifier(match: re.Match) -> Identifier:
 
 def _kaibao_context(name: str, psb_names: Sequence[str]) -> bool:
     return bool(KAIBAO_DIRECTORY.match(name)) or any(
-        "開寶藏" in text or "开宝藏" in text for text in (name, *psb_names)
+        marker in text for text in (name, *psb_names) for marker in KAIBAO_WORDS
     )

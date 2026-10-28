@@ -1,9 +1,11 @@
 """仅生成合成材料；不读取 NAS，也不在 fixture 中复制业务规则。"""
 
+import os
 import struct
 from pathlib import Path
 
 import numpy as np
+from psycopg.conninfo import conninfo_to_dict
 import pytest
 import tifffile
 from PIL import Image
@@ -37,3 +39,15 @@ def make_image():
             raise ValueError(f"测试夹具不支持此文件类型：{suffix}")
         return path
     return make
+
+
+@pytest.fixture(scope="session")
+def test_database_url():
+    """仅在显式指定的一次性测试库上执行数据库测试；不借用正式配置。"""
+    url = os.environ.get("DH_TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("未配置 DH_TEST_DATABASE_URL；真实 PostgreSQL 测试尚未执行")
+    database = conninfo_to_dict(url).get("dbname", "")
+    if not database.startswith("dh_catalog_test_"):
+        raise pytest.UsageError("测试库名必须以 dh_catalog_test_ 开头，拒绝改动其他数据库")
+    return url

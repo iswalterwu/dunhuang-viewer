@@ -1,4 +1,7 @@
+import os
 import secrets
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,3 +60,17 @@ def test_secret_quotes_whitespace_and_no_interpolation(tmp_path, quote):
 def test_invalid_v0_url_rejected_at_config_boundary(value):
     with pytest.raises(ValueError, match="HTTP"):
         load_settings({"DH_V0_URL": value})
+
+
+@pytest.mark.parametrize("command", ["import", "migrate"])
+def test_cli_has_no_import_entry_or_database_fallback(tmp_path, command):
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))
+    env.pop("DH_DATABASE_URL", None)
+    env["DH_V0_ENV_FILE"] = str(tmp_path / "absent.env")
+    result = subprocess.run(
+        [sys.executable, "-X", "utf8", "-m", "dh_catalog", command], env=env,
+        capture_output=True, encoding="utf-8", check=False,
+    )
+    assert result.returncode == 2
+    expected = "invalid choice" if command == "import" else "DH_DATABASE_URL"
+    assert expected in result.stderr
