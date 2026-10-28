@@ -5,7 +5,8 @@
 > 审核员为独立会话（与实施隔离、不同模型）：claude-fable-5-1 与 gpt-6.1-sol 并行审核，
 > 按共识取通过项，分歧项视为未通过。
 
-- **审核员 A**：claude-fable-5-1（`claude-bridge`）；**审核员 B**：gpt-6.1-sol（`openai`）
+- **审核员 A**：claude-fable-5-1，优先走 `claude-bridge` 通道，不可用时改走 Anthropic API 通道（`anthropic`），两条通道同为 Claude 模型（AGENTS.md §2）；**审核员 B**：gpt-6.1-sol（`openai`）
+- 各轮实际通道：第 1～4 轮 A 走 `claude-bridge`；第 5 轮 `claude-bridge` 接入不可用，当时还没有备用通道，A 未运行；第 6 轮起写在各轮标题中
 - 每轮审核都在独立的只读 pi 会话中进行（`pi -p --no-session --tools read,grep,find,ls`），与实施会话隔离；两人拿同一份检查项，互不知晓对方结论
 - 下表的勾选由两名审核员的结论机械汇总：两人都判「通过」才勾选，分歧视为未通过；实施者不做判断
 - 检查项沿用 `templates/checklist.md` 的通用项（CHK-01～07），并按 spec 的每条需求（CHK-R）与 plan 的一致性（CHK-P）展开；CHK-04、CHK-07 要等 tasks.md 与 Analyze 完成后再评
@@ -772,7 +773,7 @@ Claude 首选接入不可用；原错误及账户细节仅在非公开原件保�
 
 </details>
 
-## 第 6 轮（审阅 spec 第 6 版与 plan 第 6 版；待审核员 A 恢复）
+## 第 6 轮（2026-10-28，审阅 spec 第 6 版与 plan 第 6 版；A = claude-fable-5-1 via anthropic，因 `claude-bridge` 接入不可用；B = gpt-6.1-sol via openai）
 
 <!-- R6_SUMMARY -->
 

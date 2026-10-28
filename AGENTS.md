@@ -51,8 +51,12 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
    确保需求描述完整、清晰且一致。这些自定义检查清单属于审核员所确定的需求质量审查成果；只有当审核员认为
    某项检查标准得到满足时，才会标记该项检查为已通过。虽然某些自定义项已通过检查，但这并不意味着实施工作已经完成。
    **审核员约束**：审核必须是独立会话（新开会话、与实施会话隔离），并使用与实施不同的模型；
-   至少配置 2 名审核员（claude-fable-5-1 与 gpt-6.1-sol）并行审核，各自产出勾选结果，
+   至少配置 2 名审核员（A = claude-fable-5-1、B = gpt-6.1-sol）并行审核，各自产出勾选结果，
    按共识取通过项；有分歧的项视为未通过并附说明。
+   **接入通道**：审核员 A 优先走 `claude-bridge` 通道（`--model claude-bridge/claude-fable-5-1`）；
+   该通道不可用时（额度耗尽、鉴权失败、launcher 异常等）改走 Anthropic API 通道
+   （`--model anthropic/claude-fable-5-1`）。两条通道同为 Claude 模型本身，只换接入路径，不改变审核员身份。
+   每轮 checklist 头部记录实际使用的通道（如 `A = claude-fable-5-1 via anthropic`）及切换原因。
    产物：`specs/<feature>/checklist.md`（实施者不勾选）。
 6. **Tasks**：把方案拆成 0.5 到 2 小时可完成的任务，每个任务包含上下文、修改范围、完成标准和验证命令。
    **完成标准必须引用 spec 的 AC 编号**（如“满足 AC-001-1”），验证命令与完成标准一一对应。
