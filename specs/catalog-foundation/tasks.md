@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过，可以进入 Implement；以下任务按依赖实施，NAS 项仍待许可。
+> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过，当前为 Implement；用户于 2026-10-28 明确批准 T-24 隔离测试，现开始预检与执行，T-25/T-26 仍待单独许可。
 
 ## 执行约定
 
@@ -227,7 +227,7 @@
 
 ### T-24 NAS 临时数据库与完整自动化测试（2 小时；需另获许可）
 
-- **状态**：待用户许可，未开始
+- **状态**：用户已批准，首轮已实测但尚未完成（2026-10-28），P6 Astra 已最小修复两处测试配置，主会话本机复验通过，待新候选真实库重验。A1 候选完整 SHA `private-candidate-034`，隔离目录 `/tmp/dh-catalog-t24-20261028-221119-private-candidate-034`；Docker 24.0.2 / Compose v2.20.1-6047-g6817716，Python 3.12.15 / PostgreSQL 17.4。构建 cgroup 的 memory=memsw=536870912 实测通过；候选镜像 `sha256:3186ba0c2adef412ef4ec1147608cf1704765db055aa053eb9e3334959c2a857` 成功受限构建，API/DB 实际限额 512m/384m 且 memswap 相等，无宿主数据绑定或发布端口，合成 .env 的 Compose config -q 通过。完整 402 项为 **400 passed / 2 failed / 0 skipped / 1 条原有警告**（47.10 秒）：report/health 两个子进程测试使用 connection.info.dsn，而该值不保留口令；同库诊断原始测试 URL 可连接、dsn 无口令重连失败。不是生产认证问题，不放宽认证、不跳过失败测试。数据库/匿名卷/容器/网络/两镜像标签/隔离目录与临时凭据均已清理，v0 ID/启动时间/restart 数未变。证据在 private-audit-record（T24-A1；非公开历史记录，不是可执行入口）（归档显示文本规范化，保留原输出哈希；临时口令已脱敏）。正式 Compose/真实挂载、T-25/T-26 仍未获许可
 - **上下文**：M7；本机没有 PostgreSQL / Docker，在目标 Python 3.12 环境验证所有数据库与 HTTP 行为。
 - **依赖**：T-23、用户测试许可；正式部署仍在 Review / Gate 2 / merge 后。测试前明确候选提交与 NAS 临时目录，以 `git archive <候选提交> catalog` 传入隔离位置；不推送 nas main、不启动正式 compose。
 - **修改范围**：代码修复只在本机 `catalog/`；NAS 只接收候选快照并运行 plan §6.2 的一次性测试容器，不挂真实材料、正式 pgdata 或 v0 配置。数据库 `--rm`、384m = memswap；测试 API 容器 `--rm`、512m = memswap；无宿主数据库端口，共用临时 Docker 网络。
@@ -263,12 +263,13 @@
 | P3 | T-20 → T-21 | GPT 6 Astra / openai（gpt-6-astra） | api.py、config.py、__main__.py、test_api.py / test_config.py；importer.py / test_import.py 仅补合并建议双端对象关联 | 16:15～16:33 串行完成；子 agent 指定文件 73 通过 / 27 db 跳过；主会话完整复验 311 通过 / 42 db 跳过 / 1 条原有警告，真实 DB 未验 |
 | P4 | T-22 | GPT 6 Astra / openai（gpt-6-astra） | catalog/Dockerfile、docker-compose.yml、.env.example、.dockerignore、test_runtime.py、README.md | 16:53:17～17:01:12 自然完成 exit=0，随暂停 WIP 保存；21:26 恢复后主会话复核并完整回归：318 passed / 42 db skipped / 1 条原有警告，其中静态运行契约 7 通过；文档一致性与差异空白检查通过，Compose / 镜像 / 运行仍待验 |
 | P5 | T-23 | GPT 6 Astra / openai（gpt-6-astra） | acceptance/baseline-2026-10-27.json、compare.py、test_compare.py、catalog/README.md | 当前安全点 private-candidate-031；独立进程 21:28:27～21:45:32，exit=0，仅写四个分配文件。子 agent 非 DB 回归 360 passed / 42 deselected / 1 warning；主会话同命令复验一致，另跑完整回归 360 passed / 42 db skipped / 1 warning、比较测试独立 42 passed；源码与文档语法/一致性通过，未连接 NAS 或启动服务 |
+| P6 | T-24 两处 CLI 测试修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 test_api.py、test_import.py | 22:26:19～22:28:04，exit=0；各测试显式接收 test_database_url 并传给子进程，共替换 4 行，保留真实 subprocess 与全部断言，不改生产代码或认证。子 agent 两文件 41 passed / 27 db skipped，完整本机 360 passed / 42 db skipped / 1 warning；主会话完整复验一致，真实两处子进程仍待新候选 NAS 重验 |
 
-P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的最新完整回归为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。本次恢复完全未连接 NAS；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
+P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的最新完整回归为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。上述是 P5/迁移阶段的历史结果，彼时尚未执行真实数据库或 Python 3.12 容器测试；后续已获准的 T-24 首轮结果和清理证据见本任务，不混作 P5 成果。正式 NAS 部署验收仍未执行；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 
-按用户要求将本机工作副本迁至 `/srv/example/project`。原样复制阶段对含 `.git`、忽略的本地环境在内的 6,049 个文件逐一 SHA-256 校验一致；随后重新生成虚拟环境激活脚本及 17 个命令入口，依赖不重装、不下载/升级，清除可再生旧字节码缓存。实施/审核外部调度脚本及仓库备份的 cwd 已更新，新路径验证成功后移除旧目录。旧目录移除后的完整回归为 **360 passed / 42 db skipped / 1 条原有警告**，pip check、Git fsck、模块 help 与调度脚本语法通过；证据在 local-relocation-tests.txt（非公开历史记录）。业务代码、冻结 spec/plan/checklist、v0 与 NAS 部署路径不变，未启动子 agent、容器或服务。T-24 许可仍待确认；路径/文档更新按已批准约定同步 GitHub 功能分支，不合并 main、不推送 NAS。
+按用户要求将本机工作副本迁至 `/srv/example/project`。原样复制阶段对含 `.git`、忽略的本地环境在内的 6,049 个文件逐一 SHA-256 校验一致；随后重新生成虚拟环境激活脚本及 17 个命令入口，依赖不重装、不下载/升级，清除可再生旧字节码缓存。实施/审核外部调度脚本及仓库备份的 cwd 已更新，新路径验证成功后移除旧目录。旧目录移除后的完整回归为 **360 passed / 42 db skipped / 1 条原有警告**，pip check、Git fsck、模块 help 与调度脚本语法通过；证据在 local-relocation-tests.txt（非公开历史记录）。业务代码、冻结 spec/plan/checklist、v0 与 NAS 部署路径不变，未启动子 agent、容器或服务。迁移当时 T-24 许可尚待确认，其后已单独批准并执行首轮，详见 T-24；路径/文档更新按已批准约定同步 GitHub 功能分支，不合并 main、不推送 NAS。
 
 ## Handoff 文档（实施与评审完成后）
 

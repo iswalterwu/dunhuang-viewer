@@ -472,9 +472,9 @@ def test_http_parameter_validation_and_not_found(api_db, roots, make_image):
 
 
 @pytest.mark.db
-def test_health_cli_readonly_and_migration_check(api_db, connection, tmp_path):
+def test_health_cli_readonly_and_migration_check(api_db, connection, test_database_url, tmp_path):
     api = api_db
-    env = dict(os.environ, DH_DATABASE_URL=connection.info.dsn, DH_V0_ENV_FILE=str(api.settings.v0_env_file),
+    env = dict(os.environ, DH_DATABASE_URL=test_database_url, DH_V0_ENV_FILE=str(api.settings.v0_env_file),
                DH_DATA_DIR=str(tmp_path / "must-not-read"), DH_BACKUP_DIR=str(tmp_path / "must-not-read"),
                DH_V0_CACHE_DIR=str(tmp_path / "must-not-read"),
                PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))

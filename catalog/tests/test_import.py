@@ -728,11 +728,11 @@ def test_failed_current_empty_snapshot_is_retained(connection, import_runner, ro
 
 
 @pytest.mark.db
-def test_report_cli_readonly_without_auth_files(connection, import_runner, tmp_path):
+def test_report_cli_readonly_without_auth_files(connection, import_runner, test_database_url, tmp_path):
     run, _, _ = import_runner
     run_id, _ = run()
     count = connection.execute("SELECT count(*) AS n FROM import_run").fetchone()["n"]
-    env = dict(os.environ, DH_DATABASE_URL=connection.info.dsn,
+    env = dict(os.environ, DH_DATABASE_URL=test_database_url,
                DH_V0_ENV_FILE=str(tmp_path / "must-not-read.env"), DH_V0_URL="must-not-load-http-settings",
                PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))
     result = subprocess.run([sys.executable, "-X", "utf8", "-m", "dh_catalog", "report", "--run", str(run_id)],

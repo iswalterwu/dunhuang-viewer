@@ -1,8 +1,8 @@
 # 目录服务（catalog-foundation）
 
-当前是开发中的独立后端，**尚未部署；目录 API、导入与历史代码已写成，真实数据库 / HTTP 集成尚未验证，不能作为生产可用证据**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
+当前是开发中的独立后端，**尚未部署；T-24 首轮真实数据库 / Python 3.12 测试已执行，但两处 CLI 测试配置待修复重验，不能作为生产可用证据**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
-已实现配置、只读清单与影像事实、编号解析、单元 / 备份映射、影像与写卷身份计算、谱系 / 许可 / 出处规则、共用会话认证、v0 快照 / 采样 / 链接。API 工厂已包含登录墙、受保护的文档 / OpenAPI、只读目录查询与管理员导入触发路由。国图清单 / 画布、派生白名单及导入计算阶段已完成本机测试；导入持久化、历史、报告代码以及数据库初始迁移、连接池和咨询锁均已写成，但尚未经过真实 PostgreSQL 验证。查询 / 触发 API 及 health 代码已写成；T-22 的 Dockerfile、独立 Compose、配置示例与构建排除规则现已编制，仅做本机静态契约检查，尚未校验 Compose 语法或构建镜像。T-23 已提供固定基线、只读比较器与下文 A1～A7 验收入口；这些入口尚未在 NAS 执行，SQL、后台线程和资源生命周期的真实集成留 T-24。阶段证据见 tasks.md，不以单元测试代替端到端验收。
+已实现配置、只读清单与影像事实、编号解析、单元 / 备份映射、影像与写卷身份计算、谱系 / 许可 / 出处规则、共用会话认证、v0 快照 / 采样 / 链接。API 工厂包含登录墙、受保护文档 / OpenAPI、只读查询与管理员导入触发。T-24 首轮已在一次性 PostgreSQL 17.4 / Python 3.12.15 容器实测迁移、事务、锁、导入持久化、历史与 HTTP 路径；两处 report/health 子进程测试因测试连接信息未保留口令而失败，正在最小修复，不能宣称全通过。T-22 镜像已在硬限额内构建，合成配置的 Compose config -q 通过；这些不证明正式挂载、端口或上线运行。T-23 固定基线、只读比较器及下文 A1～A7 已提供，真实材料与性能验收尚未执行。实际候选 SHA、测试数、失败与清理证据以 tasks.md 为准，不以本机或隔离测试代替生产验收。
 
 ## 本机开发
 
@@ -31,7 +31,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 
 配置在启动入口读取，导入模块不加载运行配置或原始材料、不连接网络或数据库。API 工厂是 `dh_catalog.api:create_app`（uvicorn `--factory`）；缺少 v0 AUTH_SECRET 时，登录墙对所有请求返回 503，不退回环境中另一份 secret；每个通过的请求只验证一次 cookie、只读一次用户记录，后续路由消费 Principal。
 
-运维 CLI 已实现 `migrate`、只读 `report [--run ID]` 与 `health`，不提供 CLI 导入。设置专用数据库连接后，在仓库根使用 `PYTHONPATH=catalog/src python -m dh_catalog <命令>`。report 在数据库只读事务中取已保存批次，不加载认证文件或调用 v0；health 校验 secret 与数据库 / 迁移可用性，不走 HTTP、不读用户表或原图、不加载扫描 / 导入器。这些命令的数据库路径尚未实测，不能作为已部署或迁移成功的证据。
+运维 CLI 已实现 `migrate`、只读 `report [--run ID]` 与 `health`，不提供 CLI 导入。设置专用数据库连接后，在仓库根使用 `PYTHONPATH=catalog/src python -m dh_catalog <命令>`。report 在数据库只读事务中取已保存批次，不加载认证文件或调用 v0；health 校验 secret 与数据库 / 迁移可用性，不走 HTTP、不读用户表或原图、不加载扫描 / 导入器。T-24 首轮 migrate CLI 已通过，report/health 的两处子进程测试配置待修复并在真实库重验；不据此宣称生产部署成功。
 
 ## 导入器集成接口（代码已写，数据库待验）
 
@@ -52,10 +52,10 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 
 正式部署须独立 Review → Gate 2 → merge 后另获许可，不得从功能分支推送 NAS。部署只读冒烟不触发导入；正式全量导入由用户在接口文档页触发（T-26）。NAS 内存 / 耗时 / P95 与原材料只读验收尚未执行，不能以本机单元测试代替。
 
-## 运行文件（T-22，仅源码与静态检查）
+## 运行文件（T-22，隔离构建已验证，正式运行待验）
 
 - 构建上下文必须是 `catalog/`，不是仓库根。镜像只安装本目录固定依赖，pip 源与 v0 相同；无 apt、libvips 或图块管线。`src/` 放在 `/app/src`，迁移在 `/app/migrations`，与 `db.MIGRATIONS` 对齐。
-- 同一镜像包含真实 `tests/`、`pytest.ini`、`acceptance/`，以及静态测试读取的运行配置源文件。**T-23 已提供 acceptance 基线、compare 与真实测试文件；镜像尚未构建，须完成本机复验后另获 T-24 许可。** 文件存在不是 COPY、构建或运行成功的证据。
+- 同一镜像包含真实 `tests/`、`pytest.ini`、`acceptance/`，以及静态测试读取的运行配置源文件。**T-24 已获准，首轮候选完成受限构建与实际测试收集；全部测试尚待修复后通过。** 镜像构建不代替正式启动、挂载或部署验证。
 - 启动先执行 migrate，成功后才 exec uvicorn 工厂；健康检查调用 `python -m dh_catalog health`，不签 cookie、不走 HTTP。`DH_CODE_VERSION` 同时作为构建参数与运行环境传入，不在镜像里执行 git。
 - `docker-compose.yml` 只有 `catalog-db` / `catalog-api`；每次操作都指定 `-p dunhuang-catalog`。内存硬限额及 memswap、PostgreSQL 参数、外部 pgdata 和四项只读挂载以此文件为准。API 按计划以 root 读取 root:600 用户表，不增加宿主可写挂载。
 - API 仅绑定 NAS 的 LAN / Tailscale 显式地址；数据库没有宿主端口。配置变量不得改为 `0.0.0.0`、`::` 或其他公网 / 通配地址。不添加 nginx / frp 公网入口，不修改真实防火墙；T-25 还须检查实际端口绑定。
@@ -63,7 +63,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 - 当前 Compose 将 POSTGRES_PASSWORD 原样放进数据库 URI，故须使用 URL 安全的随机字符，建议随机十六进制；不要使用含 `@ : / % $ #`、空格等字符的密码，也不要仅把 PostgreSQL 原密码改成百分号编码（两端会不一致）。配置通过环境传值，不 source `.env`、不把密码或其他配置拼进 shell 命令。不要将真实配置 / 展开的连接串打印、提交或放进构建上下文。
 - `.dockerignore` 排除凭证、Windows venv、缓存、日志和 Python 产物，保留源码、合成测试与验收文件。`tests/test_runtime.py` 仅保护这些关键文本契约，**不是 YAML / Compose 校验器，也不是构建、Python 3.12 或运行证明**。
 
-## T-24：获准后在 NAS 隔离快照验证（未执行）
+## T-24：在 NAS 隔离快照验证（已获准；首轮失败后修复中）
 
 本机没有 Docker，不在本机安装或运行 Docker / Compose。以下步骤须 T-23 完成并另获用户测试许可；不推送 nas main、不启动正式 Compose，不访问正式 pgdata、真实材料、真实认证文件。先记录候选完整 SHA、隔离临时目录与资源预算，低峰且 NAS `MemAvailable >= 2GB` 才执行。
 
