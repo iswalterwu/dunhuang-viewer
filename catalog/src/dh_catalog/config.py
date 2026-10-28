@@ -19,6 +19,7 @@ class Settings:
     v0_public_url: str
     database_url: str | None = field(repr=False)
     auth_secret: str | None = field(repr=False)
+    code_version: str = "development"
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -36,6 +37,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         v0_public_url=public_url,
         database_url=values.get("DH_DATABASE_URL") or None,
         auth_secret=_read_auth_secret(env_file),
+        code_version=values.get("DH_CODE_VERSION") or "development",
     )
 
 

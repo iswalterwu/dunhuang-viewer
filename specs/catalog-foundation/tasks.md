@@ -19,7 +19,7 @@
 
 ### T-01 服务包、配置与合成测试夹具（1 小时）
 
-- **状态**：本机完成（2026-10-28）；test_config.py 14 项通过（含 CLI 不提供导入入口、不使用数据库默认连接），固定依赖已在独立 venv 安装，pip check 通过；HTTP 503 留 T-15/T-21 验证
+- **状态**：本机完成（2026-10-28）；test_config.py 18 项通过（含 CLI 不提供导入入口、不使用数据库默认连接及 health 配置错误拒绝），固定依赖已在独立 venv 安装，pip check 通过；HTTP 协议与真实 DB 验证分别见 T-15/T-21
 - **上下文**：M1；建立本机测试入口与明确的外部配置边界，后续模块使用确定类型的配置值。
 - **依赖**：无
 - **修改范围**：`catalog/README.md`、`catalog/requirements.txt`、`catalog/pytest.ini`、`catalog/src/dh_catalog/__init__.py`、`config.py`、`catalog/tests/conftest.py`、`test_config.py`。现有 `.gitignore` 的 `.env` / `.venv/` 规则已覆盖子目录，不另建一份。
@@ -145,7 +145,7 @@
 
 ### T-15 共用会话校验（1.5 小时）
 
-- **状态**：本机完成（2026-10-28）；test_auth.py 14 项通过，含真实签名协议、过期 / 非法 cookie、删用户、管理员位、secret 缺失全请求 503、文档页与 OpenAPI 登录墙；只建认证框架，无正式查询或导入路由
+- **状态**：本机完成（2026-10-28）；test_auth.py 14 项通过，含真实签名协议、过期 / 非法 cookie、删用户、管理员位、secret 缺失全请求 503、文档页与 OpenAPI 登录墙；认证本身已验，查询 / 触发路由及 DB 集成状态见 T-20/T-21
 - **上下文**：M6；只验证 v0 会话，不创建账号或签发 cookie。
 - **依赖**：T-01
 - **修改范围**：`api.py` 的认证入口、`test_auth.py`。
@@ -163,7 +163,7 @@
 
 ### T-17 导入主流程与事务写入（2 小时）
 
-- **状态**：P2 Astra 实现及集成修复已写成（2026-10-28），未标全部完成；test_import.py 本机计算阶段 37 项通过、15 项真实 DB 用例跳过，主会话已完整复验。同步持锁准备批次、后台执行生命周期、单事务及快照独立提交均已有代码 / 真实 DB 测试，SQL 行为待 T-24
+- **状态**：P2 Astra 实现及集成修复已写成（2026-10-28），未标全部完成；test_import.py 本机计算阶段在 P2 为 37 项通过、P3 补双端异常后 38 项通过；15 项真实 DB 用例跳过，主会话已完整复验。同步持锁准备批次、后台执行生命周期、单事务及快照独立提交均已有代码 / 真实 DB 测试，SQL 行为待 T-24
 - **上下文**：M5；主函数只串正常流程，调用前面各模块，不重新实现规则。
 - **依赖**：T-03、T-11、T-12、T-13、T-14、T-16
 - **修改范围**：`importer.py`、`test_import.py`。
@@ -190,7 +190,7 @@
 
 ### T-20 只读查询与按批次历史（2 小时）
 
-- **状态**：未开始
+- **状态**：P3 Astra 代码已写成（2026-10-28），未标全部完成；test_api.py 本机 3 项路由 / 认证 / 无配置拒绝测试通过、12 项真实 DB API 测试跳过，主会话已复验。全部 GET、筛选分页、编号、原文、历史和链接均已有实现；真实 SQL 与 P95 待 T-24/T-26
 - **上下文**：M6；公开路径按 plan §2.1，统一认证与参数校验后查询数据库。
 - **依赖**：T-15、T-19
 - **修改范围**：`api.py`、`test_api.py`。
@@ -199,7 +199,7 @@
 
 ### T-21 管理员触发、导入状态与 OpenAPI（1 小时）
 
-- **状态**：未开始
+- **状态**：P3 Astra 代码已写成（2026-10-28），未标全部完成；同步持锁准备、真实后台线程、202 / 409 与生命周期、DH_CODE_VERSION、只读 health 均已有实现 / 测试。health 配置错误本机已验；SQL / 线程 / 锁 / 迁移成功路径待 T-24，运行验证待 T-25
 - **上下文**：M6；使用已实现的后台导入与咨询锁，不引入任务系统。
 - **依赖**：T-20
 - **修改范围**：`api.py`、`__main__.py` 的 health、`test_api.py`。
@@ -259,6 +259,7 @@
 | P1 | T-14 | GPT 6 Astra / openai（gpt-6-astra） | derivation.py、test_derivation.py | 与 T-13 并行且无共享修改文件，14:23～14:33；子 agent 35 通过，主会话同套件与完整回归复验通过 |
 | P2 | T-17 → T-18 → T-19 | GPT 6 Astra / openai（gpt-6-astra） | importer.py、test_import.py、__main__.py；conftest.py / test_db.py 只提取共享真实 DB 夹具 | 独立进程，14:48～15:11，依赖串行；指定测试 47 通过 / 30 db 跳过，主会话发现四项集成缺口后派回修复 |
 | P2-fix | P2 集成修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 importer.py、test_import.py | 15:29～15:33，新增四个真实文件回归并修复；指定测试 51 通过 / 30 db 跳过；主会话完整复验 303 通过 / 30 db 跳过 / 1 条原有警告 |
+| P3 | T-20 → T-21 | GPT 6 Astra / openai（gpt-6-astra） | api.py、config.py、__main__.py、test_api.py / test_config.py；importer.py / test_import.py 仅补合并建议双端对象关联 | 16:15～16:33 串行完成；子 agent 指定文件 73 通过 / 27 db 跳过；主会话完整复验 311 通过 / 42 db 跳过 / 1 条原有警告，真实 DB 未验 |
 
 P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 

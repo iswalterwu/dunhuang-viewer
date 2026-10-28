@@ -677,8 +677,10 @@ def _collect_anomalies(result):
     keyed = {unit.key for unit in result.units.units if unit.parsed.keys}
     for suggestion in result.units.suggestions:
         if suggestion.left not in keyed and suggestion.right not in keyed:
-            anomalies.append(_anomaly("合并建议", "unit", suggestion.left, None, None,
-                                      suggestion.left + "；" + suggestion.right, suggestion.reason))
+            # 建议仍只有一对，不改变归并；异常按参与端各记一条，供查询准确关联。
+            for endpoint in (suggestion.left, suggestion.right):
+                anomalies.append(_anomaly("合并建议", "unit", endpoint, None, None,
+                                          suggestion.left + "；" + suggestion.right, suggestion.reason))
     for value in result.nlc.values():
         for issue in value.issues:
             anomalies.append(_anomaly(issue.category, "file", f"{issue.root}:{issue.relative_path}",

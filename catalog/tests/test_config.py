@@ -21,6 +21,7 @@ def test_paths_urls_and_private_fields(tmp_path):
         "DH_V0_URL": "http://localhost:8503/",
         "DH_V0_PUBLIC_URL": "https://example.test/",
         "DH_DATABASE_URL": "postgresql://test@localhost/test_catalog",
+        "DH_CODE_VERSION": "synthetic-commit",
     })
     assert settings.data_dir == tmp_path / "影像"
     assert settings.backup_dir == tmp_path / "备份"
@@ -28,6 +29,7 @@ def test_paths_urls_and_private_fields(tmp_path):
     assert settings.auth_secret == secret
     assert settings.v0_url == "http://localhost:8503"
     assert settings.v0_public_url == "https://example.test"
+    assert settings.code_version == "synthetic-commit"
     assert secret not in repr(settings)
     assert "postgresql://" not in repr(settings)
 
@@ -46,6 +48,7 @@ def test_absent_v0_env_is_unavailable(tmp_path):
     assert settings.auth_secret is None
     assert settings.v0_public_url == settings.v0_url
     assert settings.data_dir == Path("/data")
+    assert settings.code_version == "development"
 
 
 @pytest.mark.parametrize("quote", ["'", '"', ""])
@@ -74,3 +77,29 @@ def test_cli_has_no_import_entry_or_database_fallback(tmp_path, command):
     assert result.returncode == 2
     expected = "invalid choice" if command == "import" else "DH_DATABASE_URL"
     assert expected in result.stderr
+
+
+@pytest.mark.parametrize("case", ["secret", "database", "run", "config"])
+def test_health_configuration_errors_without_importer_or_scan(tmp_path, case):
+    config = tmp_path / "v0.env"
+    config.write_text("" if case == "secret" else "AUTH_SECRET=" + secrets.token_urlsafe(32), encoding="utf-8")
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"),
+               DH_V0_ENV_FILE=str(config), DH_V0_CACHE_DIR=str(tmp_path / "must-not-read"),
+               DH_DATA_DIR=str(tmp_path / "must-not-read"), DH_BACKUP_DIR=str(tmp_path / "must-not-read"),
+               DH_V0_URL="invalid-url" if case == "config" else "http://v0.test")
+    env.pop("DH_DATABASE_URL", None)
+    env.pop("DH_V0_PUBLIC_URL", None)
+    argv = ["dh_catalog", "health", "--run", "1"] if case == "run" else ["dh_catalog", "health"]
+    code = (
+        "import runpy, sys\n"
+        f"sys.argv = {argv!r}\n"
+        "try:\n    runpy.run_module('dh_catalog', run_name='__main__')\n"
+        "except SystemExit as error:\n"
+        "    assert 'dh_catalog.importer' not in sys.modules\n"
+        "    assert 'dh_catalog.scan' not in sys.modules\n"
+        "    raise\n"
+    )
+    result = subprocess.run([sys.executable, "-X", "utf8", "-c", code], env=env,
+                            capture_output=True, encoding="utf-8", check=False)
+    assert result.returncode == (2 if case in {"run", "database"} else 1)
+    assert {"secret": "AUTH_SECRET", "database": "DH_DATABASE_URL", "run": "--run", "config": "运行配置无效"}[case] in result.stderr

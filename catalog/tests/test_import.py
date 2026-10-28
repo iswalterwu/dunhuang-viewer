@@ -257,6 +257,20 @@ def test_share_numbers_and_zhihao_are_not_doubtful_collection_numbers(roots, cac
     assert counts["title_clue_suggestion_units"] == 0
 
 
+def test_merge_suggestion_anomalies_bind_both_endpoints(roots, cache, make_image):
+    for name in ("WB29 甲", "WB29 乙"):
+        make_image(roots["data"] / "敦煌003" / name / "native.tif")
+    result = _compute(roots, cache)
+    suggestion, = result.units.suggestions
+    anomalies = [a for a in result.anomalies if a["category"] == "合并建议"]
+    assert len(result.items) == 2  # 仅补关联，不自动合并。
+    assert len(anomalies) == 2
+    assert {a["object_key"] for a in anomalies} == {suggestion.left, suggestion.right}
+    assert {a["object_kind"] for a in anomalies} == {"unit"}
+    assert all(a["raw"] == suggestion.left + "；" + suggestion.right for a in anomalies)
+    assert _report(result)["counts"]["anomalies_by_category"]["合并建议"] == 2
+
+
 def test_basic_report_counts_do_not_double_count_shared_images(roots, cache, make_image):
     for path in ("敦煌003/P2002+2003/native.tif", "敦煌003/P2504-1/native.tif",
                  "敦煌003/P2504-2/native.tif", "敦煌003/WB29/.hidden.psb"):
