@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：T-24 隔离重验 402 passed / 0 skipped 已完成；现进入 Converge，主会话发现 AC-005-1 的 JPEG 头异常逃逸缺口（C1，T-27），尚未收敛或启动独立 Review。未过 Gate 2；T-25/T-26 仍待单独许可，不能用原有全套测试通过代替新增缺口验证或全量验收。
+> 状态：当前 Converge；T-24 旧候选402项通过后发现 JPEG 头异常缺口（C1/T-27），P7 Astra 已最小修复并经主会话本机362通过/42 db跳过，待新候选真库复验，尚未最终收敛或启动独立 Review。58条AC核对见 converge.md。未过 Gate 2；T-25/T-26 仍待单独许可，不用旧测试数冒充新版本或全量验收。
 
 ## 执行约定
 
@@ -254,7 +254,7 @@
 
 ### T-27 Converge C1：JPEG 头安全异常不中断整批（0.5 小时）
 
-- **状态**：Converge 已复现，待 Astra 修复。631 字节合成 JPEG 文件头声明 20000×20000，真实 compute_import 抛 Pillow DecompressionBombError；它不属于现有 read_facts 捕获的 OSError/ValueError，整批意外中断。只读取头、无像素解码或大内存分配；证据见 Converge-C1-header-read.txt（非公开历史记录）。旧 402 项未覆盖此异常类型，不改写旧通过证据。
+- **状态**：P7 Astra 最小修复及主会话本机复验完成（2026-10-29），新候选真库复验待执行。原631字节合成JPEG声明20000×20000，compute_import 抛 DecompressionBombError 中断，证据 Converge-C1-header-read.txt（非公开历史记录）。P7 仅在读取边界增加具体异常，新增两个真实合成文件回归（直接读取与compute_import/build_report）覆盖missing/not_applicable、失败重读、恢复、其他影像继续与身份不变；不关闭Pillow保护、不解码像素。主会话完整本机 **362 passed / 42 db skipped / 1 原有警告**，404 collected；旧402不覆盖本次新增测试，新NAS结果不得预填。
 - **上下文/依赖**：T-24 后 Converge，修复既有 AC-005-1/AC-010-1，不新增需求或恢复 Q-025 规则；不依赖 T-25/T-26，不部署。
 - **修改范围**：仅 `catalog/src/dh_catalog/scan.py`、`catalog/tests/test_scan.py`、`catalog/tests/test_import.py`。
 - **完成标准**：保留 Pillow 的安全限制，不设置 MAX_IMAGE_PIXELS=None、不关闭保护、不做像素解码或宽泛吞异常；在文件读取边界按具体库异常返回显式缺失事实与读错误。真实合成文件验证 R-005 要求的失败后继续、下次重读与有效头恢复；通过 compute_import/build_report 证明其他材料仍导入并产生对应异常。不得复制生产规则进测试或 mock 文件头解析。
@@ -274,6 +274,8 @@
 | P6 | T-24 两处 CLI 测试修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 test_api.py、test_import.py | 22:26:19～22:28:04，exit=0；各测试显式接收 test_database_url 并传给子进程，共替换 4 行，保留真实 subprocess 与全部断言，不改生产代码或认证。子 agent 两文件 41 passed / 27 db skipped，完整本机 360 passed / 42 db skipped / 1 warning；主会话完整本机复验一致；随后在 T-24 A2 候选 private-candidate-035 真库复验，两处子进程及完整 402 项全部通过、0 跳过 |
 
 P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的本机完整回归当时为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。上述是 P5/迁移阶段的历史结果，彼时尚未执行真实数据库或 Python 3.12 容器测试；后续已获准的 T-24 A2 最新真实库回归为 402 passed / 0 skipped / 1 条原有警告，首轮失败与两轮清理证据见本任务，不混作 P5 成果。正式 NAS 部署验收仍未执行；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
+
+P7：GPT 6 Astra / openai（gpt-6-astra），派发 HEAD `private-candidate-037`，2026-10-29 00:00:58～00:03:35（meta/status 原始记录），exit=0。只改 scan.py、test_scan.py、test_import.py；一处具体异常处理及两条真实文件回归。子 agent 指定文件56通过/15 db跳过，完整本机362通过/42 db跳过/1原有警告；主会话完整复验一致，未由子 agent 访问NAS。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 

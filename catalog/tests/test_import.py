@@ -4,6 +4,7 @@ import base64
 import json
 import os
 from pathlib import Path, PurePosixPath
+import struct
 import subprocess
 import sys
 from uuid import uuid4
@@ -203,6 +204,66 @@ def test_unreadable_file_retried_and_recovers(roots, cache, make_image):
     assert "读不了的文件" not in {a["category"] for a in third.anomalies}
     fourth = _compute(roots, cache, previous=_state(third), run=4)
     assert all(reading.reused for reading in fourth.readings.values())
+
+
+def test_jpeg_decompression_bomb_does_not_abort_import_and_recovers(roots, cache, make_image):
+    relative = "中国国博馆藏/BD12345/BD12345_preview.jpg"
+    path = make_image(roots["data"] / relative, dpi=(180, 180))
+    valid = path.read_bytes()
+    header = bytearray(valid)
+    sof = header.index(b"\xff\xc0")
+    # 合成文件仍只有几百字节；只让文件头触发真实 Pillow 安全异常。
+    header[sof + 5:sof + 9] = struct.pack(">HH", 20000, 20000)
+    path.write_bytes(header)
+    make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    first = _compute(roots, cache)
+    image = next(row for row in first.images.values() if row["relative_path"] == relative)
+    healthy = next(row for row in first.images.values() if row["kind"] == "tiff")
+    assert not image["read_ok"] and image["read_error"].startswith("DecompressionBombError:")
+    assert image["lineage"] == "国图 IDP 下载" and image["state"] == "present"
+    assert {name: fact["status"] for name, fact in image["facts"].items()} == {
+        "pixel_size": "missing", "channels": "missing", "color_mode": "missing",
+        "bit_depth": "missing", "resolution": "missing",
+        "compression": "not_applicable", "software": "not_applicable",
+    }
+    assert healthy["read_ok"] and healthy["lineage"] == "BnF 原图"
+    assert {row["grouping_key"] for row in first.items.values()} == {"nlc:BD12345", "pelliot:2002"}
+    report = _report(first)
+    assert report["counts"]["present_images"] == report["counts"]["items"] == 2
+    issue, = [a for a in report["anomalies"] if a["category"] == "读不了的文件"]
+    assert issue == {
+        "category": "读不了的文件", "object_kind": "image", "object_key": f"data:{relative}",
+        "root": "data", "relative_path": relative, "raw": path.name,
+        "description": image["read_error"],
+    }
+    assert report["counts"]["anomalies_by_category"]["读不了的文件"] == 1
+
+    second = _compute(roots, cache, previous=_state(first), run=2)
+    failed_reading = next(r for f, r in second.readings.items() if str(f.relative_path) == relative)
+    assert failed_reading.error == image["read_error"] and not failed_reading.reused
+    assert _report(second, _state(first))["counts"]["facts_reused"] == 1
+    assert [a for a in _report(second, _state(first))["anomalies"] if a["category"] == "读不了的文件"] == [issue]
+
+    path.write_bytes(valid)
+    third = _compute(roots, cache, previous=_state(second), run=3)
+    repaired = third.images[image["id"]]
+    assert repaired["read_ok"] and repaired["read_error"] is None
+    assert repaired["facts"]["pixel_size"] == {"status": "value", "value": [7, 5]}
+    assert repaired["facts"]["resolution"] == {"status": "value", "value": [180.0, 180.0, "INCH"]}
+    assert all(not r.error for r in third.readings.values())
+    assert not next(r for f, r in third.readings.items() if str(f.relative_path) == relative).reused
+    recovered_report = _report(third, _state(second))
+    assert "读不了的文件" not in {a["category"] for a in recovered_report["anomalies"]}
+    assert recovered_report["counts"]["facts_reused"] == 1
+    for result in (second, third):
+        assert set(result.images) == set(first.images)
+        assert set(result.items) == set(first.items)
+        assert set(result.links) == set(first.links)
+        assert result.identifiers == first.identifiers
+        assert result.images[image["id"]]["lineage"] == "国图 IDP 下载"
+        assert result.images[healthy["id"]]["read_ok"]
+    fourth = _compute(roots, cache, previous=_state(third), run=4)
+    assert all(r.reused and not r.error for r in fourth.readings.values())
 
 
 def test_raw_names_verbatim(roots, cache, make_image):

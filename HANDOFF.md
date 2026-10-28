@@ -1,6 +1,6 @@
 # 会话交接 — catalog-foundation
 
-> **状态：已进入 Converge；发现 JPEG 头安全异常会意外中断整批（C1/T-27），待 Astra 修复，尚未收敛或启动独立 Review。** 原 T-24 为 402 passed / 0 skipped，资源已清理；原测试数不能替代新增缺口验证。
+> **状态：Converge 的 C1/T-27 已由 P7 Astra 最小修复并本机复验362通过/42 db跳过；58条AC核对见 converge.md，待新候选真库复验后收敛并独立 Review。** 原 T-24 为 402 passed / 0 skipped，资源已清理；原测试数不能替代新增缺口验证。
 > 更新日期：2026-10-28。这是会话恢复入口，不代表工作流已到 Handoff 阶段；尚未过 Gate 2、未合并 main、未正式部署或全量导入。
 
 ## 1. 当前任务与闸门
@@ -10,7 +10,7 @@
 - spec 第 7 版已获 Gate 1 批准并冻结（13 条需求、58 条 AC、25 条最终决策），feature plan 第 8 版；不重复申请 Gate 1，不修改冻结规格或 checklist。
 - Checklist / Analyze 第 11 轮由独立审核员 A 判定 12 项全部通过，**只是设计质量结论，不是实际实现 Review**。
 - T-01～T-24 的实现及对应自动化验证已完成。最新真实 PostgreSQL/Python 3.12 测试包括原来跳过的全部 42 个 db 项，均已执行通过；T-22 隔离构建及合成 Compose 配置校验亦通过。
-- 当前为 Converge。主会话已完整核对主要源码，利用 631 字节合成 JPEG（头声明400M像素、未解码）复现 DecompressionBombError 逃出 read_facts 导致 compute_import 中断，违反 AC-005-1；已登记 T-27。需 Astra 最小修复并补回归、新候选 T-24 后再收敛/Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
+- 当前为 Converge。主会话已完整核对主要源码，利用 631 字节合成 JPEG（头声明400M像素、未解码）复现 DecompressionBombError 逃出 read_facts 导致 compute_import 中断，违反 AC-005-1；已登记 T-27。P7 已只增加具体异常处理并补两条真实文件回归，主会话本机复验通过；新候选 T-24 后再最终收敛/Review。**还没有实际实现的独立 Review、Gate 2 或全量收敛结论**。
 - T-25 正式部署、T-26 用户触发真实全量导入与 A1～A7 仍未执行、未获许可；合并也不等于 feature 全量验收完成。
 
 ## 2. 本机、GitHub 与候选身份
@@ -42,6 +42,8 @@
 - pytest 唯一警告是原有 Starlette/httpx 弃用提示，未升级依赖或屏蔽。构建/SSH 原输出还保留 legacy builder 弃用、pip root、SSH 非后量子密钥交换提示；没有改 NAS/SSH/Docker 版本或安全配置来消除提示。
 
 ## 4. 修复范围与清理结果
+
+P7 同为 **openai/gpt-6-astra**，已自然结束。仅 scan.py、test_scan.py、test_import.py：保留 Pillow 安全限制，具体捕获 DecompressionBombError 并增加直接读取/完整计算流水线两条回归。本机新增两项后362 passed/42 db skipped，新候选真实库待验，不能用旧402代替。
 
 P6 实际模型 **openai/gpt-6-astra**，派发 HEAD `private-candidate-034`，22:26:19～22:28:04 自然结束，exit=0、stderr 为空。仅修改：
 

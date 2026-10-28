@@ -167,6 +167,38 @@ def test_unreadable_files_keep_not_applicable_and_retry(roots, make_image, name,
     assert repaired.facts["pixel_size"] == Fact("value", (7, 5))
 
 
+def test_jpeg_decompression_bomb_is_read_error_and_recovers(roots, make_image):
+    path = make_image(roots["data"] / "中国国博馆藏/BD12345/BD12345_preview.jpg", dpi=(180, 180))
+    valid = path.read_bytes()
+    header = bytearray(valid)
+    sof = header.index(b"\xff\xc0")
+    # 只改小 JPEG 的 SOF 尺寸，不创建或解码大图，也不修改 Pillow 安全限制。
+    header[sof + 5:sof + 9] = struct.pack(">HH", 20000, 20000)
+    path.write_bytes(header)
+    file, = scan(roots).images
+    first = read_facts(file, roots["data"])
+    assert first.error and first.error.startswith("DecompressionBombError:")
+    assert not first.reused
+    assert first.facts == {
+        "pixel_size": Fact("missing"), "channels": Fact("missing"),
+        "color_mode": Fact("missing"), "bit_depth": Fact("missing"),
+        "resolution": Fact("missing"), "compression": Fact("not_applicable"),
+        "software": Fact("not_applicable"),
+    }
+    second = read_facts(file, roots["data"], first)
+    assert second.error == first.error and not second.reused
+    assert second.facts == first.facts
+    path.write_bytes(valid)
+    repaired = read_facts(scan(roots).images[0], roots["data"], second)
+    assert repaired.error is None and not repaired.reused
+    assert repaired.facts == {
+        "pixel_size": Fact("value", (7, 5)), "channels": Fact("value", 3),
+        "color_mode": Fact("value", "RGB"), "bit_depth": Fact("value", 8),
+        "resolution": Fact("value", (180.0, 180.0, "INCH")),
+        "compression": Fact("not_applicable"), "software": Fact("not_applicable"),
+    }
+
+
 def test_successful_unchanged_facts_reused_and_change_reread(roots, make_image):
     path = make_image(roots["data"] / "敦煌003/P.2800/1.tif", software="first")
     file = scan(roots).images[0]

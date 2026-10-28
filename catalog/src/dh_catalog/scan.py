@@ -129,7 +129,7 @@ def read_facts(file: FileEntry, root_dir: Path, previous: ReadResult | None = No
     facts = _empty_facts(file.kind)
     try:
         values = _read_header(root_dir / file.relative_path, file.kind)
-    except (OSError, ValueError, SyntaxError, struct.error) as error:
+    except (OSError, ValueError, SyntaxError, struct.error, Image.DecompressionBombError) as error:
         return ReadResult(file, facts, error=f"{type(error).__name__}: {error}")
     for name, value in values.items():
         if value is not None:
