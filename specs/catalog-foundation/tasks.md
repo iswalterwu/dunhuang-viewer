@@ -127,7 +127,7 @@
 
 ### T-13 国图清单与画布（1.5 小时）
 
-- **状态**：未开始
+- **状态**：本机完成（2026-10-28，Astra 子 agent P1）；test_nlc.py 36 项通过，主会话已复验；只读抽查确认画布从 0 起、strips 列表 / 整数两种结构。Pressmark 来源、大小写与异常、署名、TIFF / pages 画布映射均已覆盖；原附件落库与 NAS 全量对应率留 T-17/T-26
 - **上下文**：M4；国图 JSON 是外部输入，在此处解析和校验。
 - **依赖**：T-06
 - **修改范围**：`nlc.py`、`test_nlc.py`。
@@ -136,7 +136,7 @@
 
 ### T-14 派生记录白名单解析（1.5 小时）
 
-- **状态**：未开始
+- **状态**：本机完成（2026-10-28，Astra 子 agent P1）；test_derivation.py 35 项通过，主会话已复验；真实文件审计证明只读尝试打开 13 个白名单文件、不列目录。实际日志格式已只读抽查；来源、时间或替换证据不足均明确列异常，真实 12 个输出覆盖留 T-26
 - **上下文**：M4；只打开 plan §4.5 的 13 个文件，不扫描 cache。
 - **依赖**：T-08、T-12
 - **修改范围**：`derivation.py`、`test_derivation.py`。
@@ -255,8 +255,10 @@
 
 | 批次 | 任务 | 实际模型 / 通道 | 修改范围 | 执行与主会话复验 |
 |---|---|---|---|---|
-| P1 | T-13 | GPT 6 Astra / openai（gpt-6-astra） | nlc.py、test_nlc.py | 模型通道已探测成功，待派发 |
-| P1 | T-14 | GPT 6 Astra / openai（gpt-6-astra） | derivation.py、test_derivation.py | 模型通道已探测成功，待派发；与 T-13 无共享修改文件，可并行 |
+| P1 | T-13 | GPT 6 Astra / openai（gpt-6-astra） | nlc.py、test_nlc.py | 独立进程，14:23～14:31；子 agent 36 通过，主会话同套件与完整回归复验通过 |
+| P1 | T-14 | GPT 6 Astra / openai（gpt-6-astra） | derivation.py、test_derivation.py | 与 T-13 并行且无共享修改文件，14:23～14:33；子 agent 35 通过，主会话同套件与完整回归复验通过 |
+
+P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告；未执行数据库或 NAS 部署验收。前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
 ## Handoff 文档（实施与评审完成后）
 
