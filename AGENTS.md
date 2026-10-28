@@ -59,6 +59,8 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 6. **Tasks**：把方案拆成 0.5–2 小时的任务，每个任务写明上下文、修改范围、完成标准（必须引用 AC 编号，如「满足 AC-001-1」）和与之对应的验证命令。产物：`tasks.md`。
 7. **Analyze**：只读地检查 spec、plan、tasks 之间的冲突、缺口与模糊之处；发现问题先修复再重新检查，然后才实施。
 8. **Implement**：开始前确认 checklist 全部勾选；按依赖顺序执行任务，过程中不改 checklist。
+   **实施子 agent**：编码与实现修复交给独立的 **GPT 6 Astra** 子 agent（`--model openai/gpt-6-astra`）；主会话负责派发、接口约定、集成、验证与状态记录。模型不可用时报告原因并请用户决定，不擅自替换模型。
+   **按需并行**：只并行依赖已满足、修改范围互不冲突的任务；派发须带任务编号、AC、文件边界与验证命令。共享文件串行处理，不覆盖其他 agent 的改动。沿用现有 pi 独立会话，不另加 agent 框架；子 agent 同样遵守本文件，不自行改冻结规格或 checklist、不提交推送、合并或部署。主会话复核差异并复跑测试，在 tasks.md 记录实际模型 / 通道及验证结果；子 agent 自报通过不代替独立审核员 A 的结论。
    **需求变更规则**：中途需求变化 → 回到 Clarify（更新 spec → 重新过 Gate 1 → 更新 plan / tasks），不许直接改 tasks.md 偷跑。
 9. **Converge**：对照 spec、plan、tasks 检查代码；有差距就在 tasks.md 加任务并继续实施，直到「已收敛」。
 10. **Review**：审核员 A 在独立会话中参考 spec、plan、tasks 与实际代码差异（git diff），按 bug、架构风险、测试缺口、目标是否对齐评审，禁止只做风格化总结。

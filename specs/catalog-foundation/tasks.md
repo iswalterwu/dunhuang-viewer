@@ -6,6 +6,7 @@
 ## 执行约定
 
 - 按依赖执行；每项估时 0.5–2 小时，不含等待许可或下载依赖的时间。完成后在该任务记验证结果，未执行的验证不记通过。
+- 2026-10-28 起按用户新要求执行 AGENTS.md §2 的实施子 agent 分工：GPT 6 Astra（openai/gpt-6-astra）；派发范围和主会话复验记录见本文末尾。
 - 仅新增 `catalog/`，不改 v0 的代码、镜像、依赖或 compose；不实现 Q-025 删去的机制，不做 PD-07（归 `stitch-hardening`）。
 - 实现位置与逐 AC 测试名以 plan §5 为准，本文不另抄测试矩阵。测试调用真实扫描、身份计算、数据库与接口；只有 v0 HTTP 边界用替身。数据全部合成；测试不复制生产逻辑。
 - 本机命令均在仓库根执行：先 `python -m venv catalog/.venv`，然后 `source catalog/.venv/Scripts/activate`；`python -m pip install -r catalog/requirements.txt`。pytest 的导入路径、测试目录与数据库标记在 `catalog/pytest.ini` 配置；不用额外脚本包一层测试命令。
@@ -249,6 +250,13 @@
 - **修改范围**：`specs/catalog-foundation/tasks.md` 的证据；缺口先记任务，不改基线凑数。
 - **完成标准**：满足 AC-001-1、AC-001-2、AC-002-1、AC-002-2、AC-002-3、AC-002-4、AC-002-5、AC-002-7、AC-002-8、AC-005-2、AC-005-3、AC-005-4、AC-006-3、AC-007-3、AC-010-2、AC-011-2、AC-011-3、AC-011-4、AC-012-1、AC-012-2、AC-012-3、AC-012-4；按 plan §6.3 A1～A7 执行，差异逐项解释；全量 <=1小时，无变化重跑 <=10分钟，API 各100次 P95 <=1秒；原图 / 备份变化归因，cache 只核对访问记录和只读挂载，不遍历缓存；20个链接抽查无错卷。
 - **验证命令**：按 `catalog/README.md` 的 A1～A7，用户在 OpenAPI 触发全量和重跑；agent 只读取导入报告、基线对照、只读挂载与资源采样、性能与链接检查结果。把每项实际输出摘要写回本任务，异常不掩盖；任何代码修复都须新提交并重新 Converge / Review → Gate 2 → merge → 部署，不在 NAS 直接修代码。
+
+## 子 agent 实施记录
+
+| 批次 | 任务 | 实际模型 / 通道 | 修改范围 | 执行与主会话复验 |
+|---|---|---|---|---|
+| P1 | T-13 | GPT 6 Astra / openai（gpt-6-astra） | nlc.py、test_nlc.py | 模型通道已探测成功，待派发 |
+| P1 | T-14 | GPT 6 Astra / openai（gpt-6-astra） | derivation.py、test_derivation.py | 模型通道已探测成功，待派发；与 T-13 无共享修改文件，可并行 |
 
 ## Handoff 文档（实施与评审完成后）
 
