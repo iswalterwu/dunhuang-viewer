@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：第 10 轮 Analyze 的两处阻断已修订，待审核员 A 第 11 轮复核；checklist 全项通过前不实施。
+> 状态：第 11 轮 Analyze 已由审核员 A 判定 12 项全部通过，可以进入 Implement；以下任务按依赖实施，NAS 项仍待许可。
 
 ## 执行约定
 
@@ -184,7 +184,7 @@
 - **上下文**：M5；报告引用各模块产生的事实与异常，不另做一套判断。
 - **依赖**：T-18
 - **修改范围**：`importer.py`、`__main__.py` 的 report、`test_import.py`。
-- **完成标准**：满足 AC-001-1、AC-001-4、AC-009-4、AC-010-1，并支持 AC-010-2；含统计、变更、异常、无关联附件、有效快照状态与健康采样；18 类异常均能由合成数据触发；导入期间 cache 访问只有白名单、不含 users.json（AC-012-2）；report 只读导出已保存结果，无 CLI 导入入口。
+- **完成标准**：满足 AC-001-1、AC-001-4、AC-009-4、AC-010-1，并支持 AC-010-2；含统计、变更、异常、无关联附件、有效快照状态、健康采样及 derivation 统一打开函数实际访问的 cache 路径记录；18 类异常均能由合成数据触发；导入期间 cache 访问只有白名单、不含 users.json（AC-012-2）；report 只读导出已保存结果，无 CLI 导入入口。
 - **验证命令**：T-24 中执行 `python -m pytest tests/test_import.py`，一次覆盖全部导入行为。
 
 ### T-20 只读查询与按批次历史（2 小时）
@@ -211,8 +211,8 @@
 - **上下文**：M7；只写新服务运行文件，不操作 NAS 或 v0 compose。
 - **依赖**：T-03、T-21
 - **修改范围**：`catalog/Dockerfile`、`catalog/docker-compose.yml`、`catalog/.env.example`、`catalog/README.md`。
-- **完成标准**：落实 AC-011-1、AC-012-1、AC-012-3 的部署前提与 D-018：Python 3.12；384m / 512m 硬上限且 memswap 相等；三数据根与 v0 .env 只读，pgdata 在工作区外；数据库无宿主端口，API 8504，文档注明不接入公网；.env.example 不含真实口令。构建验证留 T-24，运行验证留 T-25。
-- **验证命令**：本机 `git diff --check`；经许可后 T-24 在隔离快照执行 `/usr/local/bin/docker-compose -p dh-catalog-test config -q`（只校验配置、不启动服务）及 `docker build`；不打印展开后的凭证，不初始化正式 pgdata。
+- **完成标准**：落实 AC-011-1、AC-012-1、AC-012-3 的部署前提与 D-018：Python 3.12；384m / 512m 硬上限且 memswap 相等；三数据根与 v0 .env 只读，pgdata 在工作区外；数据库无宿主端口，API 8504，文档注明不接入公网；.env.example 不含真实口令；镜像含 tests/、acceptance/、pytest.ini 与 pytest，供一次性测试容器直接执行。构建验证留 T-24，运行验证留 T-25。
+- **验证命令**：本机 `git diff --check`；经许可后 T-24 以 `docker build` 构建候选快照（不需要正式 .env），不初始化正式 pgdata；compose 的配置校验留 T-25（正式 .env 就位后执行 `docker-compose -p dunhuang-catalog config -q`，不打印展开凭证）。
 
 ### T-23 基线对照、验收入口与本机回归（1.5 小时）
 
@@ -230,7 +230,7 @@
 - **依赖**：T-23、用户测试许可；正式部署仍在 Review / Gate 2 / merge 后。测试前明确候选提交与 NAS 临时目录，以 `git archive <候选提交> catalog` 传入隔离位置；不推送 nas main、不启动正式 compose。
 - **修改范围**：代码修复只在本机 `catalog/`；NAS 只接收候选快照并运行 plan §6.2 的一次性测试容器，不挂真实材料、正式 pgdata 或 v0 配置。数据库 `--rm`、384m = memswap；测试 API 容器 `--rm`、512m = memswap；无宿主数据库端口，共用临时 Docker 网络。
 - **完成标准**：补齐 T-02、T-03、T-17～T-22 的数据库和镜像证据，验证 AC-003-7、AC-007-4、AC-008-2、AC-009-1、AC-009-2、AC-009-3、AC-009-4、AC-009-5、AC-011-1、AC-011-2、AC-011-3、AC-011-4、AC-011-5、AC-013-1、AC-013-2、AC-013-3；数据库来自一次性 PostgreSQL 容器，不使用正式 `catalog-db`；在其中建独立测试前缀的临时库，设置测试连接，跑完删库并删除容器 / 网络 / 快照。不得因缺测试库静默跳过 db 项后声称全通过。
-- **验证命令**：获准后以 `/usr/local/bin/docker build -t dh-catalog-test <隔离目录>/catalog` 构建候选镜像；按 plan §6.2 启动一次性 PostgreSQL（随机测试口令、不挂宿主卷），就绪后在同网络的一次性测试容器内设置临时库 URL，执行 `python -m pytest tests acceptance/test_compare.py`（db 项 0 跳过）。可先用 `/usr/local/bin/docker-compose -p dh-catalog-test config -q` 校验候选配置，但绝不在此 `up`。把实际候选提交、容器与清理命令、通过数及输出摘要写回本任务。
+- **验证命令**：获准后以 `/usr/local/bin/docker build -t dh-catalog-test <隔离目录>/catalog` 构建候选镜像；按 plan §6.2 启动一次性 PostgreSQL（随机测试口令、不挂宿主卷），就绪后在同网络的一次性测试容器内设置临时库 URL，执行 `python -m pytest tests acceptance/test_compare.py`（db 项 0 跳过）。测试不依赖正式 .env，不在此执行 compose `up`。把实际候选提交、容器与清理命令、通过数及输出摘要写回本任务。
 
 ### T-25 正式部署与只读冒烟（1 小时；需另获许可）
 
@@ -249,3 +249,7 @@
 - **修改范围**：`specs/catalog-foundation/tasks.md` 的证据；缺口先记任务，不改基线凑数。
 - **完成标准**：满足 AC-001-1、AC-001-2、AC-002-1、AC-002-2、AC-002-3、AC-002-4、AC-002-5、AC-002-7、AC-002-8、AC-005-2、AC-005-3、AC-005-4、AC-006-3、AC-007-3、AC-010-2、AC-011-2、AC-011-3、AC-011-4、AC-012-1、AC-012-2、AC-012-3、AC-012-4；按 plan §6.3 A1～A7 执行，差异逐项解释；全量 <=1小时，无变化重跑 <=10分钟，API 各100次 P95 <=1秒；原图 / 备份变化归因，cache 只核对访问记录和只读挂载，不遍历缓存；20个链接抽查无错卷。
 - **验证命令**：按 `catalog/README.md` 的 A1～A7，用户在 OpenAPI 触发全量和重跑；agent 只读取导入报告、基线对照、只读挂载与资源采样、性能与链接检查结果。把每项实际输出摘要写回本任务，异常不掩盖；任何代码修复都须新提交并重新 Converge / Review → Gate 2 → merge → 部署，不在 NAS 直接修代码。
+
+## Handoff 文档（实施与评审完成后）
+
+除 AGENTS.md 的 review.md 与状态表要求外，按 D-018 在 `docs/architecture.md` 补入目录服务的实际架构。待验的 NAS 项继续明列，不把软件合并或清单通过写成全量验收完成。

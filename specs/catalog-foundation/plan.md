@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-28）：第 8 版，对应已获 Gate 1 批准并冻结的 spec 第 7 版（按 AGENTS.md §2「工程约束」精简；删去的内容见 spec §5 Q-025）。第 8、9 轮 Checklist 无阻断；现进入 Tasks / Analyze，各轮结果见 `checklist.md`。
+> 状态（2026-10-28）：第 8 版，对应已获 Gate 1 批准并冻结的 spec 第 7 版（按 AGENTS.md §2「工程约束」精简；删去的内容见 spec §5 Q-025）。第 11 轮 Analyze 全部 12 项通过，现进入 Implement；各轮结果见 `checklist.md`。
 
 ## 1. 技术方案
 
@@ -209,7 +209,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 ### 4.5 合并长卷的派生来源（AC-005-3、AC-012-2）
 
-只按名字直接打开 v0 `cache/` 根目录下的这些文件，不列目录、不递归：`merge_all.log`、`merge_smart_all.log`、`merge_extra.log`、`psb_convert.log`、`psb_convert_all.log`、`psb_convert_7.log`、`psb_conv_wb5back.log`、`seg_move_log.txt`、`samefolder_move_log.txt`、`extra_move_log.txt`、`seg_move_plan.json`、`samefolder_plan.json`、`validated_moves.json`（2026-10-27 按名核查，13 个都在）。对 `/v0cache` 的访问只经过 `derivation.py` 的统一打开函数。
+只按名字直接打开 v0 `cache/` 根目录下的这些文件，不列目录、不递归：`merge_all.log`、`merge_smart_all.log`、`merge_extra.log`、`psb_convert.log`、`psb_convert_all.log`、`psb_convert_7.log`、`psb_conv_wb5back.log`、`seg_move_log.txt`、`samefolder_move_log.txt`、`extra_move_log.txt`、`seg_move_plan.json`、`samefolder_plan.json`、`validated_moves.json`（2026-10-27 按名核查，13 个都在）。对 `/v0cache` 的访问只经过 `derivation.py` 的统一打开函数，实际访问路径写入导入报告，供 AC-012-2 验收核对。
 
 - 拼接日志：「开始: <相对目录>」之后列出的分片名 → 源分片（迁出后在备份目录的镜像位置），「完成: …/合并长卷.tif」→ 派生影像
 - PSB 转换日志：「转换: <相对目录>」与「PSBNAME」→ 源 PSB，「已替换合并长卷.tif」→ 覆盖之前的拼接结果
@@ -348,6 +348,6 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 | M2 扫描与单元 | `scan.py`（含事实）、`units.py` |
 | M3 编号与身份 | `identifiers.py`、`identity.py` |
 | M4 规则与外部记录 | `rules.py`、`nlc.py`、`derivation.py`、`v0.py` |
-| M5 导入与报告 | `importer.py`（写入、字段依据、历史、报告与基线对照） |
+| M5 导入与报告 | `importer.py`（写入、字段依据、历史、报告） |
 | M6 接口 | `api.py` |
 | M7 部署与验收 | compose、NAS 测试、部署、A1–A7 |
