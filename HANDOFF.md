@@ -16,7 +16,8 @@
 
 ## 2. git 安全点与未做的操作
 
-- 仓库：`/srv/example/project`；分支：`feat/catalog-foundation`。
+- 仓库：**`/srv/example/project`**；分支：`feat/catalog-foundation`。2026-10-28 按用户要求从 `/srv/example/project` 迁移，旧目录已在完整校验与新路径回归后移除；后续命令只使用新目录。
+- 迁移原样复制阶段对包含 `.git` 与本地忽略环境的 6,049 个文件逐一核对 SHA-256，一致后才继续。保留已安装依赖，使用标准 venv 与已安装包元数据重新生成激活脚本、17 个命令入口；清除可再生的旧字节码缓存，未下载/升级依赖。旧路径移除后 pip/pytest/模块入口与完整回归均在 D 盘验证，Git fsck 通过。
 - 本轮起点为暂停 WIP `private-candidate-030`；恢复复核 T-22 的记录已本地提交为 `private-candidate-031`。
 - T-23 实现、任务状态、本文件及非敏感证据随本轮安全提交保存；**实际最新 SHA 用 `git log -1 --oneline` / `git rev-parse HEAD` 查看**，不把未知的自引用 SHA 写入本文。T-24 必须记录最终候选完整 SHA，不能拿子 agent 派发时的旧 HEAD 代替。
 - 用户于 2026-10-28 批准 GitHub 同步后，已将截至 `private-candidate-032` 的 9 个实施提交推送至 `origin/feat/catalog-foundation`，并建立 upstream；已用 `git ls-remote` 核对远端 SHA 与本机一致。此同步状态修订也随文档提交推送同一功能分支；最新 SHA 以分支 HEAD 为准。
@@ -35,6 +36,7 @@
 | 验收比较测试独立执行 | **42 passed** | 合成报告与真实 compute_import → build_report 流水线，不是 NAS 基线结果 |
 | 编译与语法 | v0 三文件 py_compile；31 个 catalog Python 文件的 Python 3.12 AST；README 12 段 Bash、9 段 JavaScript、3 段 Python 均通过语法检查 | 本机 Python 3.14.2；未运行 Python 3.12、浏览器或 NAS 操作片段 |
 | 机械检查 | UTF-8 LF / 无 BOM、文档一致性、差异空白检查通过；pip check 无依赖冲突 | 未升级依赖或屏蔽警告 |
+| 迁移到 D 盘后（旧目录已移除） | **360 passed / 42 db skipped / 1 条原有警告**；虚拟环境激活、pip/pytest 启动、模块 help 与 Git 完整性通过 | 仅本机目录迁移验证，不是 T-24 / NAS 验证 |
 
 42 个数据库跳过项仍为：`test_db.py` 15、`test_import.py` 15、`test_api.py` 12。唯一已知警告仍是 Starlette TestClient 对固定版本 httpx 的弃用提示。
 
@@ -106,7 +108,7 @@ README 已给这些事项的 API / 报告逐对象核查入口；P.2002 两套�
 
 P1～P4 全部早已结束，P5 也已确认结束；没有本轮遗留子 agent 或需要重启的服务。**不要重放 P4 / P5 旧提示词或误停用户已有服务。** 设计端口（尚未监听）：新 API 宿主 8504 → 容器 8000，DB 5432 仅项目内部；v0 8503 保持原状。
 
-调度沿用 `/srv/example/private-audit/implement/run_task.sh`（仓库备份 run_task.sh（非公开历史记录））：固定 Astra、独立 pi --no-session、read/bash/edit/write、2400 秒超时。脚本 cwd 固定 `~/dunhuang-viewer`，输出固定 `~/dh-audit/implement`。需新任务时先核对路径、准备当前 HEAD 的新提示词与新批次 ID，不覆盖旧日志；不是新 agent 框架。
+调度沿用 `/srv/example/private-audit/implement/run_task.sh`（仓库备份 run_task.sh（非公开历史记录））：固定 Astra、独立 pi --no-session、read/bash/edit/write、2400 秒超时。实施与审核的外部调度脚本 cwd 均已改为 `/srv/example/project`，仓库工具备份也已从源脚本重新同步；只做 bash -n，未派发新 agent。外部审计目录仍在 `/srv/example/private-audit`，没有一并搬迁；输出目录不变。历史提示词/日志中的旧项目路径保留为证据，不能直接重放。需新任务时核对新路径、当前 HEAD、新提示词与新批次 ID，不覆盖旧日志；不是新 agent 框架。
 
 新增归档位于 历史归档（非公开历史记录）：
 
@@ -114,6 +116,7 @@ P1～P4 全部早已结束，P5 也已确认结束；没有本轮遗留子 agent
 - `logs/P5-T23.{meta,status}`、`logs/P5-T23.out.txt`：实际模型、起止、退出码与子 agent 原报告。
 - `logs/P5-T23-main-local.txt`、`P5-T23-main-full.txt`：主会话两种回归原输出。
 - `logs/P5-T23-main-static.txt`：编码、Python 3.12 AST、README 片段语法结果，仅机械证据。
+- `logs/local-relocation-tests.txt`：旧目录移除后，在 `/srv/example/project` 完整回归的原始输出（360 passed / 42 db skipped / 1 warning）。
 
 旧暂停归档、P1～P4 日志、工具备份仍保留，不修改原生成证据。P4 历史 out.txt 有两个 Markdown 换行空格的已知提示，与源码无关。原始 NAS 抽查内容仍只在外部 `dh-audit/protocol-facts-20261028.txt` / `protocol-log-blocks-20261028.txt`，不复制入库；不含恢复必需材料。没有复制真实 .env、users.json、密钥或 pi 认证。
 

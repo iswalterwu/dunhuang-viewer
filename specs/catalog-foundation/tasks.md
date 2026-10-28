@@ -266,6 +266,10 @@
 
 P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的最新完整回归为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。本次恢复完全未连接 NAS；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
+## 本机目录迁移（2026-10-28，非功能实施任务）
+
+按用户要求将本机工作副本迁至 `/srv/example/project`。原样复制阶段对含 `.git`、忽略的本地环境在内的 6,049 个文件逐一 SHA-256 校验一致；随后重新生成虚拟环境激活脚本及 17 个命令入口，依赖不重装、不下载/升级，清除可再生旧字节码缓存。实施/审核外部调度脚本及仓库备份的 cwd 已更新，新路径验证成功后移除旧目录。旧目录移除后的完整回归为 **360 passed / 42 db skipped / 1 条原有警告**，pip check、Git fsck、模块 help 与调度脚本语法通过；证据在 local-relocation-tests.txt（非公开历史记录）。业务代码、冻结 spec/plan/checklist、v0 与 NAS 部署路径不变，未启动子 agent、容器或服务。T-24 许可仍待确认；路径/文档更新按已批准约定同步 GitHub 功能分支，不合并 main、不推送 NAS。
+
 ## Handoff 文档（实施与评审完成后）
 
 除 AGENTS.md 的 review.md 与状态表要求外，按 D-018 在 `docs/architecture.md` 补入目录服务的实际架构。待验的 NAS 项继续明列，不把软件合并或清单通过写成全量验收完成。

@@ -87,4 +87,5 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 - 原始扫描件、缓存产物、私有数据、凭证永不入库；`.gitignore` 锚点（`.env`、`cache/`、`pyramids/`、`thumbs/`）不得移除；凭证只在 NAS 部署目录的 `.env`（权限 600），代码零 fallback 字面量
 - 部署：只部署已 merge 到 main 的提交（`git push origin main` → `git push nas main`），禁止在 NAS 上直接改代码。`static/` 挂载进容器，推送即生效；改 `app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 须重建镜像，**重建 / 重启容器前先征得用户确认**，且只针对目标服务（`docker-compose up -d --build dunhuang-viewer`；不带服务名会同时拉起两个图块生成器）
 - NAS 操作：文件用 `ssh nas`（operator），容器用 `ssh nasroot` + `/usr/local/bin/docker`、`/usr/local/bin/docker-compose`；禁止对 `cache/` 做全量遍历（`du` / `find` 会长时间占用 NAS IO）
+- 本机工作副本：`/srv/example/project`（2026-10-28 从 `/srv/example/project` 迁移）；本机命令在此仓库根目录执行，NAS 部署目录不变
 - 环境：本机开发（Windows 11 + Git Bash + Python 3.14，无 WSL），运行在 NAS 容器（Python 3.12 + libvips）；提交前跑测试（`tests/` 建立前至少 `python -m py_compile app.py pyramid_worker.py stitch_apply.py`）

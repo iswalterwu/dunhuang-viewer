@@ -15,7 +15,7 @@
 
 - GitHub 私有仓库 `contributor/dunhuang-viewer`（默认分支 `main`）为代码权威
 - NAS 部署目录初始化为 git 仓库，设置 `receive.denyCurrentBranch=updateInstead`，接收推送即更新工作区
-- 本机工作副本 `/srv/example/project` 配两个远端：`origin`（GitHub）、`nas`（NAS 部署目录）
+- 本机工作副本 `/srv/example/project`（2026-10-28 按用户要求从 `/srv/example/project` 迁移）配两个远端：`origin`（GitHub）、`nas`（NAS 部署目录）；迁移不改变远端或部署通道
 - `.gitignore` 排除 `.env`、`cache/`、`pyramids/`、`thumbs/`、`build.log`；`.gitattributes` 统一 LF 行尾
 
 ## 取舍理由
