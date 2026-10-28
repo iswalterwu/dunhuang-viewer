@@ -1,13 +1,13 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-28）：第 8 版，对应 spec 第 7 版（按 AGENTS.md §2「工程约束」精简；删去的内容见 spec §5 Q-025）。各轮 Checklist 结果见 `checklist.md`。
+> 状态（2026-10-28）：第 8 版，对应已获 Gate 1 批准并冻结的 spec 第 7 版（按 AGENTS.md §2「工程约束」精简；删去的内容见 spec §5 Q-025）。第 8、9 轮 Checklist 无阻断；现进入 Tasks / Analyze，各轮结果见 `checklist.md`。
 
 ## 1. 技术方案
 
 - **架构落点**：前后端分离后的第一个后端服务「目录服务」（D-011、D-016、D-018），与 v0 并存、互不依赖；影像查看仍由 v0 提供
 - **技术栈**：Python 3.12 + FastAPI + uvicorn（D-018）；PostgreSQL 17.4（NAS 已有镜像 `postgres:17.4-alpine3.21`，D-016），驱动 psycopg 3；影像事实用 tifffile 读 TIFF 标签、Pillow 读 JPEG 信息，PSB 只读文件头 26 字节；测试用 pytest
-- **依赖**：`catalog/requirements.txt` 写精确版本（与 v0 的 `requirements.txt` 写法相同）；与 v0 共有的库取 v0 当前版本（plan.md RK-05）
+- **依赖**：`catalog/requirements.txt` 写精确版本（v0 的范围约束保持不动）；与 v0 共有的库取 v0 当前版本（plan.md RK-05）
 - **规则数据**：批次层登记、子目录词表、编号号段、疑似编号、谱系、许可默认表、出处线索集中在 `rules.py`；每条规则有名称，整体带版本号（如 `2026-10-28.1`），作为字段依据的「作者」（R-013）
 - **校验位置**（AGENTS.md §2 工程约束第 2 条）：外部输入只在入口校验——文件系统（`scan.py`）、国图清单与执行记录（`nlc.py`、`derivation.py`）、登录 cookie 与接口参数（`api.py`）、v0 的响应（`v0.py`）；之后传类型确定的值，内部不重复检查
 - **测试数据**：全部合成（目录树、TIFF、PSB 头、JPEG、清单、仿照格式的执行记录），不把 NAS 上的真实日志或文件放进仓库

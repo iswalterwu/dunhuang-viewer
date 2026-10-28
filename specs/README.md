@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准第 1 版 → Plan 与 7 轮 Checklist（结果见 checklist.md）→ spec 第 7 版（按 AGENTS.md 工程约束精简：13 条需求 / 58 条验收规则）与 plan 第 8 版；Checklist 第 8、9 轮（只设审核员 A）均 10 项通过、无阻断（CHK-04、07 待 tasks.md）；待 Gate 1 再批准 |
+| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准并冻结 spec 第 7 版（13 条需求 / 58 条验收规则，含第 9 轮措辞澄清）；plan 第 8 版；Checklist 第 8、9 轮均无阻断；tasks 已拆分，审核员 A 执行第 10 轮 Analyze（含 CHK-04、07）；NAS 测试与部署待另获许可 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。
