@@ -5,7 +5,11 @@ import struct
 from pathlib import Path
 
 import numpy as np
+import psycopg
+from psycopg.rows import dict_row
 from psycopg.conninfo import conninfo_to_dict
+
+from dh_catalog.db import migrate
 import pytest
 import tifffile
 from PIL import Image
@@ -51,3 +55,12 @@ def test_database_url():
     if not database.startswith("dh_catalog_test_"):
         raise pytest.UsageError("测试库名必须以 dh_catalog_test_ 开头，拒绝改动其他数据库")
     return url
+
+
+@pytest.fixture
+def connection(test_database_url):
+    with psycopg.connect(test_database_url, autocommit=True, row_factory=dict_row) as conn:
+        migrate(conn)
+        # URL 已由唯一入口确认是 dh_catalog_test_*；所有业务表都引用 import_run。
+        conn.execute("TRUNCATE import_run RESTART IDENTITY CASCADE")
+        yield conn

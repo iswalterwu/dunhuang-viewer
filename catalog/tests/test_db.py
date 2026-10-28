@@ -16,15 +16,6 @@ from dh_catalog.db import ImportBusy, create_pool, import_lock, migrate
 pytestmark = pytest.mark.db
 
 
-@pytest.fixture
-def connection(test_database_url):
-    with psycopg.connect(test_database_url, autocommit=True, row_factory=dict_row) as conn:
-        migrate(conn)
-        # URL 已由唯一入口确认是 dh_catalog_test_*；所有业务表都引用 import_run。
-        conn.execute("TRUNCATE import_run RESTART IDENTITY CASCADE")
-        yield conn
-
-
 def _run(conn):
     return conn.execute("""
         INSERT INTO import_run(status, triggered_by, rule_version, code_version)

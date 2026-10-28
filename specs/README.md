@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准并冻结 spec 第 7 版（13 条需求 / 58 条验收规则，含第 9 轮措辞澄清）；plan 第 8 版；Checklist 第 8、9 轮均无阻断；第 11 轮 Analyze 由 A 判定全部 12 项通过；Implement 分支 feat/catalog-foundation：T-01、04～16 的本机模块完成，T-13/14 已由 GPT 6 Astra 子 agent 并行实现并经主会话复验；T-02、03 数据库代码待真实验证。导入器与查询 API 未完成；测试证据见 tasks.md，NAS 测试与部署待另获许可 |
+| catalog-foundation | in-progress | 无 | 2026-10-28 | Gate 1 已批准并冻结 spec 第 7 版（13 条需求 / 58 条验收规则，含第 9 轮措辞澄清）；plan 第 8 版；Checklist 第 8、9 轮均无阻断；第 11 轮 Analyze 由 A 判定全部 12 项通过；Implement 分支 feat/catalog-foundation：T-01、04～16 的本机模块完成，T-13/14 已由 GPT 6 Astra 子 agent 并行实现并经主会话复验；T-02、03 数据库代码待真实验证。T-17～19 导入器 / 历史 / 报告代码及本机计算回归已写成，真实数据库路径待验；查询 / 触发 API、运行文件和验收入口仍待实现。测试证据见 tasks.md，NAS 测试与部署待另获许可 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。
