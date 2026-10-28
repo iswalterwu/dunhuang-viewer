@@ -1,0 +1,64 @@
+# Always select this independent project with -p dunhuang-catalog.
+# Do not combine with the repository-root (v0) compose file.
+services:
+  catalog-db:
+    image: postgres:17.4-alpine3.21
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dunhuang_catalog
+      POSTGRES_USER: dunhuang_catalog
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in catalog/.env}"
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=20", "-c", "work_mem=4MB"]
+    volumes:
+      - /srv/example/pgdata:/var/lib/postgresql/data
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dunhuang_catalog", "-d", "dunhuang_catalog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  catalog-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DH_CODE_VERSION: "${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+    image: "dunhuang-catalog:${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+    restart: unless-stopped
+    user: root
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      DH_DATABASE_URL: "postgresql://dunhuang_catalog:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in catalog/.env}@catalog-db:5432/dunhuang_catalog"
+      DH_CODE_VERSION: "${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+      DH_DATA_DIR: /data
+      DH_BACKUP_DIR: /backup
+      DH_V0_CACHE_DIR: /v0cache
+      DH_V0_ENV_FILE: /run/v0.env
+      DH_V0_URL: "${DH_V0_URL:-http://192.0.2.10:8503}"
+      DH_V0_PUBLIC_URL: "${DH_V0_PUBLIC_URL:-http://192.0.2.10:8503}"
+    ports:
+      - "${CATALOG_LAN_IP:-192.0.2.10}:8504:8000"
+      - "${CATALOG_TAILSCALE_IP:-192.0.2.20}:8504:8000"
+    volumes:
+      - /srv/example/data:/data:ro
+      - /srv/example/backup:/backup:ro
+      - /srv/example/cache:/v0cache:ro
+      - /srv/example/viewer/.env:/run/v0.env:ro
+    mem_limit: 512m
+    memswap_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"

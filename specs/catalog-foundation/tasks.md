@@ -208,7 +208,7 @@
 
 ### T-22 镜像与独立 compose 配置（1 小时）
 
-- **状态**：未开始
+- **状态**：按用户要求暂停在源码落盘安全点（2026-10-28）。P4 Astra 于 17:01:12 自然完成、exit=0，六个分配文件已保存，子 agent 自报静态测试 7 通过；主会话未复验、未标完成。Compose 语法 / 构建 / 运行未验，acceptance 目录须先由 T-23 提供；恢复入口见根 HANDOFF.md
 - **上下文**：M7；只写新服务运行文件，不操作 NAS 或 v0 compose。
 - **依赖**：T-03、T-21
 - **修改范围**：`catalog/Dockerfile`、`catalog/docker-compose.yml`、`catalog/.env.example`、`catalog/README.md`。
@@ -260,6 +260,7 @@
 | P2 | T-17 → T-18 → T-19 | GPT 6 Astra / openai（gpt-6-astra） | importer.py、test_import.py、__main__.py；conftest.py / test_db.py 只提取共享真实 DB 夹具 | 独立进程，14:48～15:11，依赖串行；指定测试 47 通过 / 30 db 跳过，主会话发现四项集成缺口后派回修复 |
 | P2-fix | P2 集成修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 importer.py、test_import.py | 15:29～15:33，新增四个真实文件回归并修复；指定测试 51 通过 / 30 db 跳过；主会话完整复验 303 通过 / 30 db 跳过 / 1 条原有警告 |
 | P3 | T-20 → T-21 | GPT 6 Astra / openai（gpt-6-astra） | api.py、config.py、__main__.py、test_api.py / test_config.py；importer.py / test_import.py 仅补合并建议双端对象关联 | 16:15～16:33 串行完成；子 agent 指定文件 73 通过 / 27 db 跳过；主会话完整复验 311 通过 / 42 db 跳过 / 1 条原有警告，真实 DB 未验 |
+| P4 | T-22 | GPT 6 Astra / openai（gpt-6-astra） | catalog/Dockerfile、docker-compose.yml、.env.example、.dockerignore、test_runtime.py、README.md | 16:53:17～17:01:12 自然完成 exit=0；子 agent 自报静态 7 通过，用户暂停后未启动主会话复验；全部文件随暂停 WIP 保存，T-23 未开始 |
 
 P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
