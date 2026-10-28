@@ -1,6 +1,6 @@
 # 会话交接 — catalog-foundation
 
-> **状态：已恢复并完成 T-23 本机实现与复验，停在 T-24 用户许可之前。** 这只是会话恢复入口，不代表工作流已到 Handoff 阶段。
+> **状态：T-23 本机实现与复验完成，功能分支已同步 GitHub，停在 T-24 用户许可之前。** 这只是会话恢复入口，不代表工作流已到 Handoff 阶段。
 > 更新日期：2026-10-28。恢复时以本文件、`AGENTS.md`、feature 规范与当前 git 工作区为准；prior-handoff.txt（非公开历史记录） 及旧暂停日志仅作历史参考。
 
 ## 1. 当前任务与闸门
@@ -19,7 +19,9 @@
 - 仓库：`/srv/example/project`；分支：`feat/catalog-foundation`。
 - 本轮起点为暂停 WIP `private-candidate-030`；恢复复核 T-22 的记录已本地提交为 `private-candidate-031`。
 - T-23 实现、任务状态、本文件及非敏感证据随本轮安全提交保存；**实际最新 SHA 用 `git log -1 --oneline` / `git rev-parse HEAD` 查看**，不把未知的自引用 SHA 写入本文。T-24 必须记录最终候选完整 SHA，不能拿子 agent 派发时的旧 HEAD 代替。
-- 本地 `main` 与 `origin/main` 记录仍为 `private-candidate-023`，本轮未 fetch、push、merge 或部署。功能分支尚未推送，亦未推送 NAS。
+- 用户于 2026-10-28 批准 GitHub 同步后，已将截至 `private-candidate-032` 的 9 个实施提交推送至 `origin/feat/catalog-foundation`，并建立 upstream；已用 `git ls-remote` 核对远端 SHA 与本机一致。此同步状态修订也随文档提交推送同一功能分支；最新 SHA 以分支 HEAD 为准。
+- GitHub 分支：`origin 的 feat/catalog-foundation 分支（项目角色描述，非网址）`。后续已验证阶段及时同步此功能分支；本机编辑 → commit → push，不要求在 GitHub 网页直接编辑。推送功能分支不代表批准合并或部署。
+- 已只读核实 GitHub `main` 仍为 `private-candidate-023`，未 merge、未推送 NAS、未部署。
 - 已核对 v0 源码、根 Dockerfile / compose / requirements、冻结 spec / feature plan / checklist 与批准的 main 无差异。
 - 没有安装 Docker、下载依赖、连接 NAS、启动 HTTP / PostgreSQL / Docker 服务；没有重启或停止 v0、NAS 现有服务。pytest 使用 TestClient / 合成材料，不代表监听了真实服务。
 
@@ -119,9 +121,10 @@ P1～P4 全部早已结束，P5 也已确认结束；没有本轮遗留子 agent
 
 ## 8. 仍需用户决定
 
+GitHub 功能分支同步已获批准并完成，不再列为待确认；本次批准不包含 NAS 测试、main 合并或部署。
+
 1. **是否允许 T-24 NAS 隔离候选快照 / 受限构建 / 一次性数据库测试**（合成数据，禁真实挂载、禁正式 Compose，不影响 v0）。当前待回复。
-2. 是否将功能分支 push 到 origin；目前没有 push，也没有 merge main。
-3. 独立 Review 后的 Gate 2、正式部署许可、全量导入 / A1～A7 许可分别仍需确认，不由“继续”或换模型自动替代。
-4. 是否同步 related-project 的 AGENTS / 模板仍待单独确认；该仓库有用户未提交改动，本轮未动。
+2. 独立 Review 后的 Gate 2、正式部署许可、全量导入 / A1～A7 许可分别仍需确认，不由“继续”或换模型自动替代。
+3. 是否同步 related-project 的 AGENTS / 模板仍待单独确认；该仓库有用户未提交改动，本轮未动。
 
 下次恢复后的建议开场：**T-23 已完成并复验；我先确认 T-24 的隔离 NAS 测试许可，未经批准不构建、启动容器或部署。**
