@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-28）：第 6 版，对应 spec 第 6 版（待 Gate 1 再批准）。各轮 Checklist 的结果与修订对照见 `checklist.md`。
+> 状态（2026-10-28）：第 7 版，对应 spec 第 6 版（待 Gate 1 再批准）。各轮 Checklist 的结果与修订对照见 `checklist.md`。
 
 ## 1. 技术方案
 
@@ -102,8 +102,8 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 1. 取得咨询锁，没取到就返回「已有导入在跑」；写入 `import_run`（running，记触发方式）
 2. **v0 索引快照**（§4.7）：用触发者自己的 `dh_session` 调用 v0 `/api/index`；HTTP 200 且 `status` 为 `ready` 时快照有效，写入 `v0_volume`；否则（调用失败、`status` 为 empty / scanning / error）记「v0 索引不可用」异常及原因，报告标明「v0 覆盖对照不可验证」，导入照常进行。随后启动 v0 健康采样（§4.7）
-3. **扫描**（只读）：遍历原图目录的各分类（一级子目录）与备份目录，跳过以 `@`、`#`、`.` 开头的目录并记入 `excluded`（`#recycle`、`@eaDir`、国图 `BD00081/.pages` 等）。按种类分类文件：`.tif` / `.tiff` / `.btf` / `.psb` 为影像，国图 `pages/*.jpg` 为页图，`*_preview.jpg` 为预览图，`.txt` 与国图三种 JSON 为附件；国图 `tiles/`、`.npy` 及其他文件（PDF、PNG、下载中的临时文件等）记入 `excluded`。每个文件取得 大小、mtime_ns、inode
-4. **事实与指纹**：（根，相对路径，大小，mtime_ns，inode）与库中记录相同、且上次读取成功的，沿用已有事实与指纹；否则读取事实（§4.4），计算指纹 = 文件大小 + sha256（头、25%、50%、75%、尾 5 段各 64 KiB）。读不了的记「读不了的文件」，仍建影像记录：按种类不记的字段为不适用，其余为缺失，没有指纹，读取状态记为失败；失败的结果不沿用，下次导入即使大小、mtime_ns、inode 都未变也重读，读成功后更新事实、不再记该异常（spec AC-005-1）。继续下一个。结果流式写入 `stage_file`
+3. **扫描**（只读）：遍历原图目录的各分类（一级子目录）与备份目录，跳过以 `@`、`#`、`.` 开头的目录并记入 `excluded`（`#recycle`、`@eaDir`、国图 `BD00081/.pages` 等）。按种类分类文件：`.tif` / `.tiff` / `.btf` / `.psb` 为影像，国图 `pages/*.jpg` 为页图，国图 `*_preview.jpg` 为预览图（其他分类的 JPG 不导入），`.txt` 与国图三种 JSON 为附件；国图 `tiles/`、`.npy` 及其他文件（PDF、PNG、下载中的临时文件等）记入 `excluded`。每个文件取得 大小、mtime_ns、inode
+4. **事实与指纹**：（根，相对路径，大小，mtime_ns，inode）与库中记录相同、且上次读取成功的，沿用已有事实与指纹；否则读取事实（§4.4），计算指纹 = 文件大小 + sha256（头、25%、50%、75%、尾 5 段各 64 KiB）。读不了的记「读不了的文件」，仍建影像记录：按种类不记的字段为不适用，其余为缺失，读取状态记为失败；打不开或读不出字节的没有指纹，字节能读、只是解析事实失败的仍计算指纹（可参与 §4.2.1 第 2 行）；失败的结果不沿用，下次导入即使大小、mtime_ns、inode 都未变也重读，读成功后更新事实、不再记该异常（spec AC-005-1）。继续下一个。结果流式写入 `stage_file`
 5. **国图清单与 10-21 执行记录**：解析 `manifest.json` / `report.json` / `index.json`（§4.6），解析白名单内的执行记录（§4.5）
 6. **影像身份**（§4.2.1）、**写卷单元**（§4.2.2）、**归并与写卷身份**（§4.2.3）、**规则**（§4.4）：写卷、编号、影像关系、谱系、许可、出处认定初值、合并建议、异常
 7. **应用**：以上结果在一个事务中写入正式表，派生字段有变化的写入 `history`；任何一步失败则整批回滚，`import_run` 记为 failed，正式表保持上一次的状态。写卷的 grouping_key、影像的（根，相对路径）有变化的，先在同一事务中改为临时值（grouping_key 置空，影像位置加临时前缀），再写入新值，编号或位置互换时不违反唯一约束（AC-003-9）
@@ -117,7 +117,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 | 顺序 | 情形 | 判定 |
 |---|---|---|
-| 1 | 文件所在（根，相对路径）上有一条影像，大小、mtime_ns、inode 都与文件相同 | 同一影像，位置不变（沿用已有事实与指纹） |
+| 1 | 文件所在（根，相对路径）上有一条影像，大小、mtime_ns、inode 都与文件相同（有几条时取末见批次最新者） | 同一影像，位置不变；上次读取成功的沿用已有事实与指纹，失败的重读（§4.1 第 4 步） |
 | 2 | 其余文件。候选 = 同根、未被认领的影像中，inode、大小、mtime_ns、指纹都与文件相同者；文件恰有一个候选，且该候选恰对应这一个文件 | 同一影像（改名、移动或互换位置），写路径历史 |
 | 3 | 其余文件：所在（根，相对路径）上末见批次最新的那条影像未被认领 | 同一影像，内容变化：重读事实与指纹，写变化历史 |
 | 4 | 其余文件 | 新影像；存在部分相符（同根同 inode、任一根下大小与指纹相同、或第 2 行的候选不唯一，含硬链接）时记「身份待确认」，注明疑似的原影像 |
@@ -125,7 +125,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 第 1～3 行认领到 missing 影像时，状态改为 present，记「重新出现」（spec 第 4 条）。
 
-与 spec 的对应：第 1、2 行即 spec 的「可确认是同一文件」，合起来是 spec 第 1 条：第 1 行是第一步（按位置认定，视为内容未变，沿用已有事实与指纹，spec §5 Q-047），第 2 行是第二步（在未被认领的文件与影像之间判定一一对应）；一对已登记的硬链接只改名其一时，不动的一个在第 1 行认领，改名的一个在第 2 行认到另一条影像。读不了的文件没有指纹，不参与第 2 行。第 3 行即 spec 第 2 条：位置上原有的影像已被第 1、2 行认到别处（移走了）时，该位置上的文件按第 4 行作新影像。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 与指纹对不上任何影像，落到第 3 行（AC-009-3）。两个目录整名互换时，同名文件在第 2 行各自认到对方原来的影像（AC-003-9）。
+与 spec 的对应：第 1、2 行即 spec 的「可确认是同一文件」，合起来是 spec 第 1 条：第 1 行是第一步（按位置认定，视为内容未变，沿用已有事实与指纹，spec §5 Q-047），第 2 行是第二步（在未被认领的文件与影像之间判定一一对应）；一对已登记的硬链接只改名其一时，不动的一个在第 1 行认领，改名的一个在第 2 行认到另一条影像。没有指纹的文件（打不开或读不出字节）不参与第 2 行。一个位置上可能同时有一条 present 与几条 missing 的记录（另一条影像移入、覆盖了原文件时），第 1 行在其中取末见批次最新者，这是 spec 第 1 条在该极端情形下的实现选择。第 3 行即 spec 第 2 条：位置上原有的影像已被第 1、2 行认到别处（移走了）时，该位置上的文件按第 4 行作新影像。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 与指纹对不上任何影像，落到第 3 行（AC-009-3）。两个目录整名互换时，同名文件在第 2 行各自认到对方原来的影像（AC-003-9）。
 
 依据：
 
@@ -137,7 +137,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 
 **4.2.2 写卷单元**（spec §1 术语；AC-001-3、AC-002-2、AC-002-3、AC-002-7）
 
-1. 批次层按 `rules.py` 的登记表判定；未登记的分类按「没有批次层」处理，并在报告中提示
+1. 批次层按 `rules.py` 的登记表判定；未登记的分类按「没有批次层」处理；有批次层的分类中出现登记表以外的批次目录时，照常作批次目录处理；两种情况都在报告中提示
 2. 写卷目录 = 批次目录（没有批次层时为分类目录）下的一级子目录。不在任何写卷目录中的影像文件（直接放在批次目录或分类目录里）各成一个单元，编号取自文件名（2026-10-27：`2018年` 中 7 个 TIFF、1 个 PSB）；直接放在原图根目录的文件记入 `excluded`；直接放在分类或批次目录中的附件作为不关联写卷的附件导入（2026-10-27 晚出现 1 个：`A077-敦煌文献目录/目录.txt`）
 3. 写卷目录之下逐层判定子目录（名称精确匹配词表）：
    - 分段类、版本类、国图 `pages/`：并入所在单元，沿用该单元的编号；其下的子目录继续按本条判定
@@ -173,7 +173,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
   - 同一个新 key 只新建一件写卷，几个单元共用同一个新 key 时都关联到它
   - 已有影像与写卷的关联只在 D 的新增编号中增加，不移除（第 7 条）
   - 本次新建写卷的 serial 按 key 排序依次分配（没有 key 的按单元相对路径排序），与遍历顺序无关
-- **E. 收尾**：按 key 重算分件的 parent_id（`pelliot:2504:1` 的母号为 `pelliot:2504`；母号没有写卷时为空，AC-002-5）；多编号单元的写卷记「名称所示的合装或缀合」线索（AC-002-4）
+- **E. 收尾**：按 key 重算分件的 parent_id（`pelliot:2504:1` 的母号为 `pelliot:2504`；母号没有写卷时为空，AC-002-5）；多编号单元的写卷记「名称所示的合装或缀合」线索（AC-002-4）；每件写卷的其余编号（分享者自编号、帙号、存疑编号、IDP 条目 ID）取它的影像所在单元的其余编号，每次导入按单元当前名称与清单重新解析，变化的旧值转入编号历史（spec R-004、R-013）
 
 ### 4.3 编号解析与合规判定（R-004）
 
@@ -182,7 +182,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | 体系 | 识别的写法（例） | 规范写法 | 合规判定与用途 |
 |---|---|---|---|
 | 伯希和汉文写卷号 | `P2602`、`P.2033`、`P. 0901`、`p.2731`、`Pelliot chinois 2002` | `P.2602` | 号段内为合规，作主编号与归并依据；号段外为存疑：可检索，不作主编号、不作归并依据，记「编号存疑」 |
-| 伯希和分件 | `-1`、`-1Pièce`、`-P2`、`A` / `B` / `a` | `P.2504-1`、`P.2842-2`、`P.2222A` | 母号 = 不带分件的号；合规性随母号 |
+| 伯希和分件 | `-1`、`-1Pièce`、`-P2`、`A` / `B` / `a` | `P.2504-1`、`P.2842-2`、`P.2222A`（字母取大写；比较与查询不区分大小写） | 母号 = 不带分件的号；合规性随母号 |
 | 多号 | `P3012+5564`、`P2661(+3735)` | 各成一号 | 第二个号省略「P」也识别 |
 | 国图 BD 号 | 清单 Pressmark；目录名 `BD00001`、`BD00023a` | 以 Pressmark 的写法为准 | 有清单：Pressmark 为馆藏号，目录名与之不一致（比较时不区分大小写）时目录名记为存疑并记「编号与清单不一致」；Pressmark 本身写法不合规时两者都记为存疑并记该异常；无清单：目录名写法合规（BD + 5 位数字 + 可选字母）即用，并记「缺少清单」；查询不区分大小写 |
 | 分享者自编号 | `WB 15`、`WB15`、`WA9` | `WB 15`、`WA 9` | 不作主编号、不作归并依据，只提合并建议 |
@@ -219,17 +219,20 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | 属于国图分类（含页图、预览图） | 国图 IDP 下载 |
 | `.psb` | 第三方加工图（分享者的工作文件，plan.md §1.3；文件名以「合并长卷」开头的 PSB 也是） |
 | TIFF 文件名以「合并长卷」开头，或出现在 10-21 执行记录的输出中 | 本地合成 |
+| 其余 TIFF 中读取失败的（文件名之外的依据无从核实） | 未判定（已记「读不了的文件」，不另记「谱系未判定」；读成功后按下面两行重判，变化记入 `history`） |
 | 文件名为 `native.tif` / `native(n).tif`，且软件标签缺失 | BnF 原图 |
 | 软件标签有值（Photoshop 等） | 第三方加工图 |
 | 其他 | 未判定（记「谱系未判定」） |
 
 目录级汇总（报告用）：只计影像目录直接包含的 TIFF / BTF；谱系一致时取该谱系，不一致时记「混合」。
 
+拼接工作台中断后残留的临时文件（`.合并长卷_building_<时间戳>.tif`，`app.py` 拼接输出）按普通的隐藏 TIFF 导入：角色合并长卷、谱系本地合成，并记「派生来源不明」与「隐藏文件与非隐藏影像同目录」，由人工清理；这是预期行为。
+
 **来源与许可**（D-012，AC-006-1～3）：
 
 | 谱系 | 收藏机构 | 获取渠道 | 许可 | 署名 | 展示策略 | 对外策略 |
 |---|---|---|---|---|---|---|
-| 国图 IDP 下载 | 中国国家图书馆 | IDP IIIF 下载（2026-10-21 起） | IDP：个人或非商业复用 | 清单 requiredStatement（The National Library of China） | 登录墙内可展示 | 链接 IDP |
+| 国图 IDP 下载 | 中国国家图书馆 | IDP IIIF 下载（2026-10-21 起） | IDP：个人或非商业复用 | 清单 requiredStatement（The National Library of China）；没有清单时取 D-012 的默认署名，依据记为默认规则 | 登录墙内可展示 | 链接 IDP |
 | BnF 原图 | 法国国家图书馆 | 第三方资料接收（接收事件 A） | Gallica：非商业免费复用，注明出处 | Source gallica.bnf.fr / BnF | 登录墙内可展示 | 链接 Gallica / IDP |
 | 第三方加工图 | 有合规伯希和号时推断为法国国家图书馆（字段依据的置信度为「推断」，spec AC-006-1），否则未知 | 第三方资料接收（接收事件 A） | 未知（第三方衍生） | 无 | 仅供研究使用 | 不对外 |
 | 本地合成 | 继承源影像 | 本地生成（2026-10-21 脚本或拼接工作台） | 继承源影像中最严格的一项；来源不明时为未知 | 同源影像 | 同源影像中最严格的一项 | 同左 |
@@ -272,7 +275,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
   - 索引快照：`GET /api/index`，有效条件见 §4.1 第 2 步
   - 健康采样：导入期间每 5 秒 `GET /api/health`，2 秒内返回 200 且 `ok` 为 true 记为正常；采样汇总（次数、失败数、最大耗时）写入 `import_run`（AC-012-3）
   - 让路（spec AC-012-3）：连续 3 次采样失败即暂停读文件，连续 3 次正常后继续；暂停累计超过 10 分钟则中止导入（failed，回滚，正式表保持上一次的状态）
-- **v0 链接**（AC-011-4）：取最近一次快照有效的导入的 `v0_volume`，只为其中有、且本次导入时磁盘上仍存在的影像目录中的 TIFF 影像生成 `<DH_V0_PUBLIC_URL>/view/<base64url(相对目录)>`；散放文件附带 `?file=<文件名>`（v0 忽略该参数，仅供人看）；其余写明不给链接的原因（备份分片、JPG、PSB、不在 v0 索引中、从未取得有效索引）。`DH_V0_PUBLIC_URL` 默认同 `DH_V0_URL`
+- **v0 链接**（AC-011-4）：取最近一次成功、且快照有效的导入的 `v0_volume`（失败或中止的导入留下的快照不用），只为其中有、且本次导入时磁盘上仍存在的影像目录中的 TIFF 影像生成 `<DH_V0_PUBLIC_URL>/view/<base64url(相对目录)>`；散放文件附带 `?file=<文件名>`（v0 忽略该参数，仅供人看）；其余写明不给链接的原因（备份分片、JPG、PSB、不在 v0 索引中、从未取得有效索引）。`DH_V0_PUBLIC_URL` 默认同 `DH_V0_URL`
 
 ### 4.8 部署与运行（D-018）
 
@@ -308,7 +311,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | AC-003-4 | `grouping.py` §4.2.3 A、B | `test_grouping_identity.py::test_number_change_keeps_item_id` |
 | AC-003-5 | `grouping.py` §4.2.3 C | `test_grouping_identity.py::test_number_collision_not_merged`（改名为另一件写卷持有的编号、两件同时改用同一个新编号、退回引起的连锁同号：ID 与主编号不变，记「身份待确认」并注明同号的写卷；目录名改回后下一次导入不再列入） |
 | AC-003-6 | `grouping.py` §4.2.3 B | `test_grouping_identity.py::test_split_not_automatic`（一件写卷两个目录中的一个改名为别的编号；部分影像移入另一个有编号的目录：目录原有影像仍在时两类都记，已全部删除时只记「规则要求拆分」） |
-| AC-003-7 | `identity.py` §4.2.1、`facts.py` 指纹 | `test_identity.py::test_uncertain_identity_not_continued`：用真实文件算真实指纹（同大小、5 段相同、未采样部分不同的两个文件），再与文件条目组合出 inode 复用且 mtime_ns 不同、重复副本、跨根同内容、一对多与多对一、新建的硬链接（文件都放在没有影像记录的位置）；另测一对已登记的硬链接一个不动、一个改名：不动的按位置认定，改名的延续另一条影像（spec Q-047） |
+| AC-003-7 | `identity.py` §4.2.1、`facts.py` 指纹 | `test_identity.py::test_uncertain_identity_not_continued`：用真实文件算真实指纹（同大小、5 段相同、未采样部分不同的两个文件），再与文件条目组合出 inode 复用且 mtime_ns 不同、重复副本、跨根同内容、一对多与多对一、新建的硬链接（文件都放在没有影像记录的位置）；另测一对已登记的硬链接一个不动、一个改名：不动的按位置认定，改名的延续另一条影像（spec Q-047）；另测两条已登记的硬链接都缺失后只恢复一条到没有影像记录的新位置：对应不唯一，作新影像并记「身份待确认」 |
 | AC-003-8 | `grouping.py` §4.2.3 D | `test_grouping_identity.py::test_new_images_assignment` |
 | AC-003-9 | `identity.py` §4.2.1、`grouping.py` §4.2.3（A～D 只读 S0）、`importer.py` §4.1 第 7 步 | `test_grouping_identity.py::test_swap_and_chain_order_independent`（纯函数：同一输入打乱单元顺序 20 次，结果含 serial 完全相同）；`test_identity.py::test_whole_name_swap_follows_files`（临时目录中经中转名真实互换两个目录的整个名称，目录中的 TIFF 同名；互换过程中导入与不导入，结果相同）；`test_import.py::test_number_swap_end_to_end`（数据库上从扫描起完整导入，不预先给出影像 ID：名称其余部分不同的互换、整名互换、三目录编号轮换、整体顺移到没有被持有的编号；不违反写卷编号与影像位置的唯一约束，写卷 ID 不变、编号分别更新） |
 | AC-003-10 | `grouping.py` §4.2.3 A、D | `test_grouping_identity.py::test_multi_number_stable_add_and_rewrite` |
@@ -318,8 +321,8 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，备份目录在 `/srv/example
 | AC-004-3 | `nlc.py`、`identifiers.py` | `test_nlc.py::test_pressmark_authority_and_missing_manifest`（含 Pressmark 写法不合规、与目录名只差大小写） |
 | AC-004-4 | `identifiers.py` | `test_identifiers.py::test_sharer_and_zhihao_systems` |
 | AC-004-5 | `identifiers.py`、`grouping.py` | `test_identifiers.py::test_primary_only_compliant_catalog_numbers` |
-| AC-005-1 | `facts.py`、事实字段表 | `test_facts.py::test_facts_by_kind_and_states`（合成 TIFF、PSB、JPG 的有值 / 不适用 / 缺失）、`test_facts.py::test_unreadable_file_anomaly`（读不了的 PSB、JPG 的不适用字段不变；第一次读取失败、第二次读取成功而大小、mtime_ns、inode 都未变时，事实被更新、异常消除） |
-| AC-005-2 | `rules.py` 谱系、`report.py` 目录级汇总 | `test_lineage.py::test_lineage_rules_psb_and_mixed_summary`（含同目录的 `合并长卷.psb`、`.合并长卷.psb` 与 `合并长卷.tif`：分别验证谱系、角色与来源许可默认值）；NAS A3 |
+| AC-005-1 | `facts.py`、事实字段表 | `test_facts.py::test_facts_by_kind_and_states`（合成 TIFF、PSB、JPG 的有值 / 不适用 / 缺失）、`test_facts.py::test_unreadable_file_anomaly`（读不了的 PSB、JPG 的不适用字段不变；字节能读而解析失败的仍有指纹；第一次读取失败、第二次读取成功而大小、mtime_ns、inode 都未变时，事实被更新、异常消除；读不了的 `native(n).tif` 第一次谱系为未判定、许可为未知，第二次读成功后变为 BnF 原图与 Gallica 条款，并写入 `history`） |
+| AC-005-2 | `rules.py` 谱系、`report.py` 目录级汇总 | `test_lineage.py::test_lineage_rules_psb_and_mixed_summary`（含同目录的 `合并长卷.psb`、`.合并长卷.psb` 与 `合并长卷.tif`：分别验证谱系、角色与来源许可默认值；读不了的 TIFF 谱系为未判定）；NAS A3 |
 | AC-005-3 | `derivation.py` | `test_derivation.py::test_stitch_and_psb_logs`（仿照格式的合成日志，含白名单文件缺失）；NAS A2（12 个合并长卷） |
 | AC-005-4 | `nlc.py` | `test_nlc.py::test_canvas_mapping_with_and_without_strips`；NAS A4 |
 | AC-005-5 | `item_image.set_key` | `test_grouping.py::test_image_sets_distinguishable` |
