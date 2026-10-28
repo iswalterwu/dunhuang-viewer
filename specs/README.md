@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-29 | Gate 1 已批准并冻结 spec 第 7 版（13 R / 58 AC）、plan 第 8 版；第 11 轮 Analyze 全部 12 项通过。feat/catalog-foundation 的 T-01～T-24 实现与对应自动化验证完成；T-24 经许可在 Python 3.12.15 / PostgreSQL 17.4 一次性容器实测，Astra 最小修复两处 CLI 测试后，A2 为 402 passed / 0 skipped / 1 warning，临时资源全部清理，v0 未重启。Converge发现C1后由P7 Astra最小修复，A3新候选404 passed/0 skipped/1 warning且资源清理完成；58条AC的软件/待部署证据矩阵在converge.md，软件范围收敛、当前准备独立Review，未过Gate2；未 merge main、未部署，T-25/T-26 与真实材料/全量/性能验收仍待许可。GitHub 功能分支持续同步，证据见 tasks.md 与 HANDOFF.md |
+| catalog-foundation | in-progress | 无 | 2026-10-29 | Gate 1 已批准并冻结 spec 第 7 版（13 R / 58 AC）、plan 第 8 版；第 11 轮 Analyze 全部 12 项通过。feat/catalog-foundation 的 T-01～T-24 实现与对应自动化验证完成；T-24 经许可在 Python 3.12.15 / PostgreSQL 17.4 一次性容器实测，Astra 最小修复两处 CLI 测试后，A2 为 402 passed / 0 skipped / 1 warning，临时资源全部清理，v0 未重启。Converge发现C1后由P7 Astra最小修复，A3新候选404 passed/0 skipped/1 warning且资源清理完成；58条AC的软件/待部署证据矩阵在converge.md，独立CodeReview-R1现已通过Anthropic Claude正常返回「需修复后重审」，P1全量内存风险与两项P3缺口经主会话复核，Converge重新打开，T-28～T-30方案待确认，未过Gate2；未 merge main、未部署，T-25/T-26 与真实材料/全量/性能验收仍待许可。GitHub 功能分支持续同步，证据见 tasks.md 与 HANDOFF.md |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。

@@ -3,7 +3,7 @@
 > 本文档是项目方案的总入口：定位与愿景、现有材料、决策记录、编号与命名体系、原则、架构方向、领域模型、路线图、待确认决策、风险与已知问题。
 > 架构现状见 `architecture.md`（v0 查看器），设计现状见 `designUI.md`。变更本文件内容即变更项目方案，需同步相关文档。
 > 工作流位置：本文是 **Constitution** 阶段产物，2026-10-27 定稿：§9.0 事实核查已完成，§9.1 决策已按建议确认（D-012～D-017），§5 原则由 AGENTS.md §4 引用。
-> Phase 1 的第一个 feature `catalog-foundation` 已获 Gate 1 批准 spec 第 7 版，现已完成软件范围 Converge（含 C1 修复后隔离复验），准备独立 Review；真实材料/性能仍待部署后验收；实施状态见 `specs/README.md`。
+> Phase 1 的第一个 feature `catalog-foundation` 已获 Gate 1 批准 spec 第 7 版，现处于 Review 修复循环（R1指出正常规模内存风险，最小优化方向待确认）；真实材料/性能仍待部署后验收；实施状态见 `specs/README.md`。
 
 ## 1. 背景与目标
 

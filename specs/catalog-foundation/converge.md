@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准 spec 第 7 版、plan 第 8 版、tasks、实际源码/测试及 T-24 证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：C1/T-27 已由 P7 Astra 最小修复，新候选 `private-candidate-038` 已在 Python 3.12.15 / PostgreSQL 17.4 **404 passed / 0 failed / 0 skipped / 1 warning（48.27秒）**，资源清理完成。**软件实现与自动化验证范围已收敛，可进入独立 Review；部署后 AC 仍待验，不称全量收敛。** 没有修改冻结 spec/plan/checklist。
+> 当前结论：C1/T-27及A3全404项通过仍成立，但**独立CodeReview-R1已发现CR1-01/P1规模内存风险和CR1-02/05两项小缺口，结论「需修复后重审」；Converge重新打开，暂不收敛、不进入Gate2**。主会话独立两点正常比例测量支持内存风险，T-28～T-30方向/验证见review.md与tasks.md，尚未实施。没有修改冻结spec/plan/checklist，也不把旧合成测试全绿当规模已达标。
 
 ## 1. 范围与证据边界
 
@@ -35,7 +35,7 @@
 | AC-003-2 | 先签名后位置的两阶段认领、image_path_history；test_identity::test_rename_move_and_swap；API历史详情测试 | S；真实改名/移动/互换，不复制算法 |
 | AC-003-3 | UUIDv4 分配；test_identity::test_ids_not_path_derived、schema稳定UUID | S；相同路径独立初建不同ID |
 | AC-003-4 | S0 同时决策与编号历史；test_identity::test_number_change_keeps_id；test_import::test_number_swap_end_to_end | S；ID保持、旧号历史化 |
-| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | S；不自动合并/拆分，保留原主号 |
+| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | 原S算法回归通过；R1发现同号说明缺参与ID（CR1-05/T-30），待补后重验 |
 | AC-003-6 | 旧影像数量/serial确定新影像归属；test_identity::test_new_images_assignment、test_new_images_assignment_between_unkeyed_items、test_multi_number_new_images_shared | S；数量并列取较早登记 |
 | AC-003-7 | 改号提案同时生效、临时唯一值释放；test_identity::test_swap_and_rotation_order_independent、test_import::test_number_swap_end_to_end | S；两件互换/三件轮换含真实SQL |
 | AC-003-8 | 新增号与单号改写分开处理；test_identity::test_multi_number_add_and_rewrite | S；原ID/共享关联不丢 |
@@ -66,13 +66,13 @@
 | AC-010-1 | _collect_anomalies/build_report及API分页；test_import::test_anomaly_categories（18类）、P7 JPEG流水线异常回归 | S；结构化对象/原文/说明，合并建议双端关联 |
 | AC-010-2 | 34项固定JSON基线/只读compare/42个对照测试；无重扫或复制归并 | N；真实报告、差异说明及3项人工证据仍待A2 |
 | AC-011-1 | 唯一HTTP认证边界/管理员/503/401/403/202/409；test_auth；test_api::test_auth_and_admin_import、test_secret_missing_rejects_data_and_trigger | S+N；T-25真实v0登录态/普通用户冒烟未做 |
-| AC-011-2 | resolve只current、母号含分件；test_api::test_resolve | S+N；真实WB29/P.2504/P.0901对象结果由A2补证 |
+| AC-011-2 | resolve只current、母号含分件；test_api::test_resolve | 查询S回归通过；R1发现撤销pending误入历史（CR1-02/T-29），待修；真实对象由A2补证 |
 | AC-011-3 | SQL筛选/稳定分页/只读事务；test_api::test_filters_and_pagination | S+N；A6全量NAS列表/详情各100次P95尚未测 |
 | AC-011-4 | latest_valid_snapshot、viewer_link与目录存在检查；test_api::test_v0_links、test_v0_empty_failed_snapshot_and_never_valid | S+N；A7抽20真实卷链接，不能只看页面200 |
 | AC-011-5 | 唯一写方法仅POST imports；test_api::test_no_mutating_routes | S；无目录写/取消/回滚/CLI导入 |
 | AC-012-1 | compose四项ro、外部pgdata、运行契约；T24测试无真实宿主挂载/端口 | N；T25 inspect正式挂载，A5原图/备份前后元数据归因 |
 | AC-012-2 | derivation.open_cache_record仅13名，导入不读users；test_import::test_v0_cache_access 实际open审计 | S+N；A5正式访问记录/ro核对，不遍历cache |
-| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限合成容器 | N；A5真实全量内存及v0持续健康未证明 |
+| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | R1/主会话规模探针显示P1内存风险（CR1-01/T-28），待优化；不能仅以A5部署后待验掩盖源码规模瓶颈 |
 | AC-012-4 | 成功未变事实复用、失败重读；test_scan复用回归 | N；A5全量≤1小时、无变重跑≤10分钟未证明 |
 | AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者不是字段作者，原始依据保留 |
 | AC-013-2 | file-header/外部清单为确定，谱系/默认规则为推断；test_import::test_field_basis_and_author、test_rules及nlc依据断言 | S；confidence实际断言在综合用例中 |
@@ -98,8 +98,10 @@
 
 其他核对：正式读查询用只读 repeatable-read事务、外部值参数绑定；咨询锁/连接跨后台生命周期；有效空/失败快照不错误回退；附件原文逐单元消费；原有/缺失关联与人工出处保留；派生只信最终成功证据；许可取最严格；无新的原图写入或v0改动。没有因为猜测罕见情形引入Q-025已删机制。
 
-## 5. 进入 Review / Gate 2 的边界
+## 5. 独立 Review 已返回，需修复后重审
 
-C1 新候选全套与资源清理已通过，现将实际差异和本表交给独立审核员 A（Claude，不是 Astra）复核。402/404等测试数不自动推出无bug；Reviewer仍须查具体代码/断言/测试缺口。若再发现缺口，继续登记任务、Astra修复并复验。
+R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=1、无结论；回退同Claude模型经Anthropic API正常exit=0，报告「需修复后重审」。CR1-01为P1，主会话又用2000/6000影像、每卷6个微型PSB头的真实计算流程复测，约23KiB/影像首轮、30KiB/影像重导；36k含基线线性估算865.5/1111.4MiB（Windows/Py3.14，不是NAS实测），明确高于512MiB。其他确认的小缺口为撤销候选状态语义和冲突说明；未证实/低概率CR1-03/04留真实材料核查，不擅自改规则。
+
+完整独立原文、实际范围/局限及主会话复核见review.md与 CodeReview-R1（非公开历史记录）。T-28拟以依据复用降低正常规模内存，方向/复杂度先请用户确认；若须缩S0列或流式设计，先停下更新plan，不默改架构。T-29/T-30一起补测后，新候选完整/目标环境及规模验证，再独立Review-R2。当前没有P8运行或新生产代码改动，404全绿不作为Gate2通过。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。
