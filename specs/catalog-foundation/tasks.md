@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。依据 plan 第 8 版拆分。
-> 状态：Tasks 已写成，待审核员 A 执行 Analyze；checklist 全项通过前不实施。
+> 状态：第 10 轮 Analyze 的两处阻断已修订，待审核员 A 第 11 轮复核；checklist 全项通过前不实施。
 
 ## 执行约定
 
@@ -10,7 +10,8 @@
 - 实现位置与逐 AC 测试名以 plan §5 为准，本文不另抄测试矩阵。测试调用真实扫描、身份计算、数据库与接口；只有 v0 HTTP 边界用替身。数据全部合成；测试不复制生产逻辑。
 - 本机命令均在仓库根执行：先 `python -m venv catalog/.venv`，然后 `source catalog/.venv/Scripts/activate`；`python -m pip install -r catalog/requirements.txt`。pytest 的导入路径、测试目录与数据库标记在 `catalog/pytest.ini` 配置；不用额外脚本包一层测试命令。
 - 带 `db` 标记的测试使用 `DH_TEST_DATABASE_URL` 指定的**临时测试库**；变量缺失时跳过，不能误用正式库。本机没有 PostgreSQL / Docker，数据库测试等 NAS 许可后执行。未带该标记的测试不得连接数据库。
-- 平时只跑任务对应的测试文件；T-23 跑一次全部本机测试。T-24 在 NAS 容器跑一次全部测试，不为每项任务重复起容器。
+- 平时只跑任务对应的完整测试文件，不用 `-k` 模糊筛选；本机模块通过不等于数据库端到端通过，相关证据到 T-24 补齐。T-23 跑一次全部本机测试，T-24 在一次性容器跑一次全部测试；各任务列出的数据库命令只说明对应验证范围，不要求再重复运行。
+- T-01～T-24 完成后做 Converge / Review；review.md 显式列出部署后才能证明的 NAS 验收项，由用户在 Gate 2 决定是否接受待验并允许 merge。merge 不代表 feature 验收完成；T-25/T-26 未完成前状态维持 in-progress，不宣称全量已收敛。部署后发现代码缺口，一律新提交重走 Review → Gate 2 → merge → 部署。
 - **许可边界**：T-24～T-26 涉及 NAS 测试、建库、构建或启动容器，必须另获用户许可；本次「批准，继续」不是这些操作的许可。正式全量导入由用户在接口文档页触发。只推送 origin，不推送 nas。
 
 ## 任务
@@ -31,7 +32,7 @@
 - **依赖**：T-01
 - **修改范围**：`catalog/migrations/0001_init.sql`、`db.py`、`__main__.py` 的 migrate、`test_db.py`。
 - **完成标准**：为 AC-002-4、AC-003-3、AC-004-5、AC-008-2、AC-009-2、AC-013-3 建表；UUIDv4 与路径解耦；多对多关系、非空 grouping_key 唯一、present 位置唯一、编号索引齐全；迁移重复执行不重复建表，不引入 ORM 或迁移框架。
-- **验证命令**：T-24 中执行 `python -m pytest tests/test_db.py -k migration`，连接真实临时 PostgreSQL 库；本机只编译 `python -m compileall -q catalog/src`，不能据此宣称数据库验证通过。
+- **验证命令**：T-24 中执行 `python -m pytest tests/test_db.py`，连接真实临时 PostgreSQL 库；本机只编译 `python -m compileall -q catalog/src`，不能据此宣称数据库验证通过。
 
 ### T-03 连接、事务与导入互斥（1 小时）
 
@@ -49,7 +50,7 @@
 - **依赖**：T-01
 - **修改范围**：`scan.py`、`rules.py` 的分类登记与文件类型、`test_scan.py`。
 - **完成标准**：满足 AC-001-2、AC-001-4、AC-008-1；只扫描 data / backup，保留原始 Unicode 名称与隐藏文件；跳过 @/#/. 开头目录并记录原因；国图 JPG 范围、附件、未知文件及 Q-024 新目录的处理与 spec 一致；不遍历 v0 cache，不为拼接临时 TIFF 另加排除模式。
-- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_scan.py -k 'inventory or excluded or names'`。
+- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_scan.py`。
 
 ### T-05 文件头事实与读取复用（2 小时）
 
@@ -76,7 +77,7 @@
 - **依赖**：T-04、T-06
 - **修改范围**：`units.py`、`rules.py` 的词表、`test_units.py`。
 - **完成标准**：满足 AC-001-3、AC-002-2、AC-002-3、AC-002-6；按分类 / 批次识别写卷目录，词表内沿用父单元，词表外自成单元且不继承父编号；散放影像各自成单元；无影像不建单元；附件关联所在单元或保持无关联；无号单元只提合并建议、不自动合并。
-- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_units.py -k 'subdirs or loose or suggestions or attachments'`。
+- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_units.py`。
 
 ### T-08 备份镜像路径与角色（1 小时）
 
@@ -94,7 +95,7 @@
 - **依赖**：T-05
 - **修改范围**：`identity.py`、`test_identity.py`。
 - **完成标准**：满足 AC-003-1、AC-003-2、AC-003-3、AC-009-2、AC-009-3、AC-009-5 的影像部分；ID 不复用，改名 / 移动 / 互换随文件，覆盖记变化，缺失只标记，再出现恢复；从真实扫描结果计算，不加入内容指纹或 Q-025 规则。
-- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_identity.py -k 'image or rename or ids or reappearance or changed'`。
+- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_identity.py`。
 
 ### T-10 写卷初建、主编号与多影像关联（2 小时）
 
@@ -103,7 +104,7 @@
 - **依赖**：T-06、T-08、T-09
 - **修改范围**：`identity.py`、`test_identity.py`。
 - **完成标准**：满足 AC-002-1、AC-002-4、AC-002-5、AC-002-8、AC-003-1、AC-003-6、AC-005-5；跨谱系同号归并，多编号共享影像，分件记母号，无号分别建卷；新文件归属按已有数量与 serial 判定；全部影像缺失的写卷保留编号、线索与出处。
-- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_identity.py -k 'merged or share or parts or doubtful or reimport or assignment or distinguishable or missing'`。
+- **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_identity.py`。
 
 ### T-11 编号变化、同号回退与顺序无关（2 小时）
 
@@ -147,7 +148,7 @@
 - **上下文**：M6；只验证 v0 会话，不创建账号或签发 cookie。
 - **依赖**：T-01
 - **修改范围**：`api.py` 的认证入口、`test_auth.py`。
-- **完成标准**：满足 AC-011-1 的认证部分；正确验证 v0 的签名、过期时间、用户存在与管理员位；缺 secret 拒绝服务；用户表只在请求校验读取，不进入导入器；测试按 app.py 的签名协议生成外部 cookie，调用真实认证函数，不另写被测实现。
+- **完成标准**：满足 AC-011-1 的认证部分；正确验证 v0 的签名、过期时间、用户存在与管理员位；缺 secret 拒绝服务；用户表只在请求校验读取，不进入导入器；测试按 app.py 的签名协议生成外部 cookie，调用真实认证函数，不另写被测实现。v0 .env 的 secret 按 env_file 的常见写法读取首尾空白与成对引号，测试含带引号的配置。
 - **验证命令**：`python -I -X utf8 -m pytest -c catalog/pytest.ini catalog/tests/test_auth.py`。HTTP 路由权限另由 T-21 验证。
 
 ### T-16 v0 快照、健康采样与链接（1.5 小时）
@@ -166,7 +167,7 @@
 - **依赖**：T-03、T-11、T-12、T-13、T-14、T-16
 - **修改范围**：`importer.py`、`test_import.py`。
 - **完成标准**：满足 AC-001-3、AC-003-1、AC-003-7、AC-008-1、AC-008-2、AC-009-1；后台线程内持锁，快照单独提交，正式数据单事务；编号与路径互换先用临时值避开唯一约束；附件边读边写，保存最新原文；真实数据库验证失败回滚与成功保留；不加暂存表 / 后备份 / 任务队列。
-- **验证命令**：T-24 中执行 `python -m pytest tests/test_import.py -k 'attachments or raw or new_files or swap or rollback or reimport'`。
+- **验证命令**：T-24 中执行 `python -m pytest tests/test_import.py`。
 
 ### T-18 变化、字段依据与批次历史（2 小时）
 
@@ -175,7 +176,7 @@
 - **依赖**：T-17
 - **修改范围**：`importer.py`、`test_import.py`。
 - **完成标准**：满足 AC-007-4、AC-009-2、AC-009-3、AC-009-5、AC-013-1、AC-013-2、AC-013-3；保留人工认定，缺失不删写卷或编号，整件缺失不清空线索 / 出处；改文件与改规则产生可追溯快照，按任一批次取值及来源作者；不把修改和移动混在同一内容变化测试中。
-- **验证命令**：T-24 中执行 `python -m pytest tests/test_import.py -k 'human or missing or changed or reappearance or basis or confidence or any_run'`。
+- **验证命令**：T-24 中执行 `python -m pytest tests/test_import.py`。
 
 ### T-19 导入记录、报告与异常（1.5 小时）
 
@@ -193,7 +194,7 @@
 - **依赖**：T-15、T-19
 - **修改范围**：`api.py`、`test_api.py`。
 - **完成标准**：满足 AC-011-2、AC-011-3、AC-011-4、AC-011-5、AC-013-3；编号任一写法、不区分大小写，历史 / 待确认编号不查，母号加分件；筛选分页覆盖多影像目录；详情返回依据、关系、原文与路径；附件原字节取回；无目录修改接口。P95 留 T-26 测真实 NAS。
-- **验证命令**：T-24 中执行 `python -m pytest tests/test_api.py -k 'resolve or filters or links or history or attachment or mutating'`，TestClient 调真实路由和临时 PostgreSQL。
+- **验证命令**：T-24 中执行 `python -m pytest tests/test_api.py`，TestClient 调真实路由和临时 PostgreSQL。
 
 ### T-21 管理员触发、导入状态与 OpenAPI（1 小时）
 
@@ -211,7 +212,7 @@
 - **依赖**：T-03、T-21
 - **修改范围**：`catalog/Dockerfile`、`catalog/docker-compose.yml`、`catalog/.env.example`、`catalog/README.md`。
 - **完成标准**：落实 AC-011-1、AC-012-1、AC-012-3 的部署前提与 D-018：Python 3.12；384m / 512m 硬上限且 memswap 相等；三数据根与 v0 .env 只读，pgdata 在工作区外；数据库无宿主端口，API 8504，文档注明不接入公网；.env.example 不含真实口令。构建验证留 T-24，运行验证留 T-25。
-- **验证命令**：本机 `git diff --check`；经许可后 T-24 执行 `/usr/local/bin/docker-compose -p dunhuang-catalog config -q` 与镜像构建，不打印展开后的凭证。
+- **验证命令**：本机 `git diff --check`；经许可后 T-24 在隔离快照执行 `/usr/local/bin/docker-compose -p dh-catalog-test config -q`（只校验配置、不启动服务）及 `docker build`；不打印展开后的凭证，不初始化正式 pgdata。
 
 ### T-23 基线对照、验收入口与本机回归（1.5 小时）
 
@@ -226,19 +227,19 @@
 
 - **状态**：待用户许可，未开始
 - **上下文**：M7；本机没有 PostgreSQL / Docker，在目标 Python 3.12 环境验证所有数据库与 HTTP 行为。
-- **依赖**：T-23、用户许可；Review / Gate 2 / merge 后才部署正式服务。若测试需把候选代码放 NAS，先明确候选提交与隔离测试位置，不推送 nas main 绕过部署约定。
-- **修改范围**：仅 `catalog/` 中本任务暴露的实现 / 测试缺口；NAS 使用隔离的测试库与合成目录，不挂真实材料执行测试。
-- **完成标准**：补齐 T-02、T-03、T-17～T-22 的数据库和镜像证据，验证 AC-003-7、AC-007-4、AC-008-2、AC-009-1、AC-009-2、AC-009-3、AC-009-4、AC-009-5、AC-011-1、AC-011-2、AC-011-3、AC-011-4、AC-011-5、AC-013-1、AC-013-2、AC-013-3；临时库以独立测试前缀命名，仅在该库设置测试连接；跑完删除临时库。不得因缺测试库静默跳过 db 项后声称全通过。
-- **验证命令**：在获准的隔离测试位置执行 `/usr/local/bin/docker-compose -p dunhuang-catalog config -q`、构建 catalog-api；在该镜像的一次性容器内设置临时库 URL 后执行 `python -m pytest tests acceptance/test_compare.py`（db 项 0 跳过）。把实际候选提交、命令、通过数和输出摘要写回本任务。
+- **依赖**：T-23、用户测试许可；正式部署仍在 Review / Gate 2 / merge 后。测试前明确候选提交与 NAS 临时目录，以 `git archive <候选提交> catalog` 传入隔离位置；不推送 nas main、不启动正式 compose。
+- **修改范围**：代码修复只在本机 `catalog/`；NAS 只接收候选快照并运行 plan §6.2 的一次性测试容器，不挂真实材料、正式 pgdata 或 v0 配置。数据库 `--rm`、384m = memswap；测试 API 容器 `--rm`、512m = memswap；无宿主数据库端口，共用临时 Docker 网络。
+- **完成标准**：补齐 T-02、T-03、T-17～T-22 的数据库和镜像证据，验证 AC-003-7、AC-007-4、AC-008-2、AC-009-1、AC-009-2、AC-009-3、AC-009-4、AC-009-5、AC-011-1、AC-011-2、AC-011-3、AC-011-4、AC-011-5、AC-013-1、AC-013-2、AC-013-3；数据库来自一次性 PostgreSQL 容器，不使用正式 `catalog-db`；在其中建独立测试前缀的临时库，设置测试连接，跑完删库并删除容器 / 网络 / 快照。不得因缺测试库静默跳过 db 项后声称全通过。
+- **验证命令**：获准后以 `/usr/local/bin/docker build -t dh-catalog-test <隔离目录>/catalog` 构建候选镜像；按 plan §6.2 启动一次性 PostgreSQL（随机测试口令、不挂宿主卷），就绪后在同网络的一次性测试容器内设置临时库 URL，执行 `python -m pytest tests acceptance/test_compare.py`（db 项 0 跳过）。可先用 `/usr/local/bin/docker-compose -p dh-catalog-test config -q` 校验候选配置，但绝不在此 `up`。把实际候选提交、容器与清理命令、通过数及输出摘要写回本任务。
 
-### T-25 正式部署与合成小批冒烟（1 小时；需另获许可）
+### T-25 正式部署与只读冒烟（1 小时；需另获许可）
 
 - **状态**：待用户许可，未开始
 - **上下文**：M7；正式部署前必须通过独立 Review、Gate 2，并 merge 到 main；这是运行验收，不提前绕过交付闸门。
 - **依赖**：T-24、Review / Gate 2 / merge、用户部署许可、NAS 可用内存 >=2GB
 - **修改范围**：不改 v0；仅部署已合并的目录服务。若需修代码，回本机任务并重新评审，不在 NAS 工作区编辑。
-- **完成标准**：核实 AC-011-1、AC-011-5、AC-012-1 的运行前提：项目独立、只读挂载、硬内存限额、secret 缺失拒绝服务、登录和管理员权限正确；先用独立测试库 / 合成数据完成小批导入，不把合成记录写入正式库；不重建或重启 v0。
-- **验证命令**：按 `catalog/README.md` 的获准部署步骤，`git push origin main` 后再 `git push nas main`；只启动 `dunhuang-catalog`。`python -m dh_catalog health`、`docker inspect` 核对挂载与限额；管理员在 OpenAPI 触发合成测试批次，取回报告核对。
+- **完成标准**：核实 AC-011-1、AC-011-5、AC-012-1 的运行前提：项目独立、只读挂载、硬内存限额、数据库无宿主端口，未登录请求拒绝、普通用户不能 POST、管理员 GET 通过；不重建或重启 v0。secret 缺失拒绝服务与合成导入以 T-24 的测试结果为证，不在正式服务删 secret 或触发导入；正式首次导入留 T-26。
+- **验证命令**：按 `catalog/README.md` 的获准部署步骤，`git push origin main` 后再 `git push nas main`；只启动 `dunhuang-catalog`。`python -m dh_catalog health`、`docker inspect` 核对挂载与限额；只读核验权限与导入记录接口，不执行管理员 POST 导入。
 
 ### T-26 全量导入与 A1～A7 验收（2 小时；需另获许可）
 
@@ -247,4 +248,4 @@
 - **依赖**：T-25、用户验收许可与低峰时段
 - **修改范围**：`specs/catalog-foundation/tasks.md` 的证据；缺口先记任务，不改基线凑数。
 - **完成标准**：满足 AC-001-1、AC-001-2、AC-002-1、AC-002-2、AC-002-3、AC-002-4、AC-002-5、AC-002-7、AC-002-8、AC-005-2、AC-005-3、AC-005-4、AC-006-3、AC-007-3、AC-010-2、AC-011-2、AC-011-3、AC-011-4、AC-012-1、AC-012-2、AC-012-3、AC-012-4；按 plan §6.3 A1～A7 执行，差异逐项解释；全量 <=1小时，无变化重跑 <=10分钟，API 各100次 P95 <=1秒；原图 / 备份变化归因，cache 只核对访问记录和只读挂载，不遍历缓存；20个链接抽查无错卷。
-- **验证命令**：按 `catalog/README.md` 的 A1～A7，用户在 OpenAPI 触发全量和重跑；agent 只读取导入报告、基线对照、只读挂载与资源采样、性能与链接检查结果。把每项实际输出摘要写回本任务，异常不掩盖；需要修复则回 Converge / Review，影响既有评审结论的再过 Gate 2。
+- **验证命令**：按 `catalog/README.md` 的 A1～A7，用户在 OpenAPI 触发全量和重跑；agent 只读取导入报告、基线对照、只读挂载与资源采样、性能与链接检查结果。把每项实际输出摘要写回本任务，异常不掩盖；任何代码修复都须新提交并重新 Converge / Review → Gate 2 → merge → 部署，不在 NAS 直接修代码。
