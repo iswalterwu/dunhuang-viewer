@@ -19,13 +19,13 @@
 
 | 文档 | 内容 | 何时读 |
 |---|---|---|
-| `docs/plan.md` | 总方案：定位与愿景、现有材料与沿革（来源、谱系、出处）、决策记录、编号与命名体系、原则、架构方向、领域模型、路线图、决策记录（PD）、风险（RK）与 v0 已知问题（KI） | 任何任务前先读 |
-| `docs/architecture.md` | v0 系统架构：组件职责、ID 与缓存布局、图块管线、拼接工作台、认证、部署拓扑、内存安全红线（目标架构按 D-016 随 feature 补充） | 动后端/容器/部署相关代码前必读 |
-| `docs/designUI.md` | v0 设计理念：配色令牌、页面形态（画廊/查看器/拼接/登录/管理）、查看器交互约定（新前端设计按 D-016 随 feature 补充） | 动前端/样式前必读 |
-| `docs/decisions/` | ADR 决策记录（编号、日期、背景、取舍） | 新决策先登记再实现 |
-| `specs/<feature>/` | 功能规格目录：spec.md / plan.md / tasks.md / review.md | 开发任何功能时（唯一实施入口） |
-| `templates/` | spec-driven 工作流模板（spec/plan/tasks/checklist/review） | 新建功能规格时 |
-| `README-部署.md` | 部署与日常运维操作（人读；数值以 `docker-compose.yml` 为准，部分内容已过时，见 plan.md §10） | 部署/运维时 |
+| `docs/plan.md` | 总方案：定位、现有材料与沿革、决策汇总（§3）、编号与命名、原则（§5）、架构方向、领域模型、路线图、待确认决策（PD）、风险（RK）与 v0 已知问题（KI） | 任何任务前先读 |
+| `docs/architecture.md` | v0 系统架构：组件、ID 与缓存布局、图块管线、拼接工作台、认证、部署拓扑、内存红线 | 动后端 / 容器 / 部署前 |
+| `docs/designUI.md` | v0 设计理念：配色、页面形态、查看器交互约定 | 动前端 / 样式前 |
+| `docs/decisions/` | ADR 决策记录 | 新决策先登记再实现 |
+| `specs/` | 功能规格（目录结构与状态表见 `specs/README.md`） | 开发任何功能时（唯一实施入口） |
+| `templates/` | 工作流模板 | 新建功能规格时 |
+| `README-部署.md` | v0 部署与日常运维（人读；数值以 `docker-compose.yml` 为准，部分已过时，见 plan.md §10） | 部署 / 运维时 |
 
 ## 2. 工作流：spec-driven（固定流程，所有功能开发必须遵守）
 
@@ -33,104 +33,56 @@
 Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Tasks → Analyze → Implement → Converge → Review → 【Gate 2】 → Handoff
 ```
 
-**总规则**：每一步开始时重新读取对应文件（AGENTS.md、docs/、`specs/<feature>/` 产物），不依赖会话记忆。
+**总规则**：每一步开始时重新读取对应文件（AGENTS.md、docs/、`specs/<feature>/` 产物），不依赖会话记忆；每一步都遵守下面的工程约束。
 
-1. **Constitution**：先固化项目原则，明确安全边界、什么该做什么不该做。
-   载体：本文件（§3 决策红线、§4 工作约定）+ `docs/`（plan/architecture/designUI）+ `docs/decisions/` ADR。
-2. **Spec**：按照 what/why 写 feature 的需求，不写技术方案；每条需求必须能映射到具体的验收规则。
-   产物：`specs/<feature>/spec.md`。
-3. **Clarify**：AI Agent 追问所有描述不明确的地方和歧义点；能从仓库、文档、既有方案推断的，不问用户；
-   将回答融入 spec 中，避免出现模糊不清的情况。产物：更新 `spec.md`（歧义记录表）。
+**工程约束**（贯穿各步骤：写 spec、plan、tasks，实现与评审都适用）：
 
-**Gate 1（人工批准，硬闸门）**：Clarify 完成后、Plan 开始前，由用户批准 `spec.md`。批准后 **spec 冻结**；
-未批准不得进入 Plan。此后任何需求变更都按第 8 步的变更规则处理。
+1. **不为臆测的边界情况加复杂度**：不为猜测出来、几乎不会发生的竞态或安全边界情况加规则或代码。确有必要时，先说清楚具体会怎么出错、概率多大、要写多少代码，用户同意后再做；不悄悄扩大改动范围
+2. **只在系统边界校验**：外部传入的数据（用户输入、外部 API、网络、文件系统）只在入口层校验，往里传已确定类型的值；内部不反复做防御性检查
+3. **不提前抽函数**：只有会复用、包住了确实复杂的逻辑，或代表一个能起清楚名字的概念时才抽；只用一次的不抽
+4. **主函数只写正常流程**：校验与细节放到它下面的小函数里
+5. **自动生成的文件不手改**：改源头，再重新生成
+6. **测试测真实实现**：不把业务逻辑抄一份进测试；尽量少用 mock，只在外部边界用替身
+7. **按仓库现有流程走**：不引入仓库没在用的工具或流程
 
-4. **Plan**：参考技术栈和架构信息，生成来自 spec 规范的设计成果，包括具体的实施细节。
-   产物：`specs/<feature>/plan.md`。
-5. **Checklist**：生成一个自定义的质量检查清单，包括针对 spec 需求进行的单元测试，以便在工作进行分解前
-   确保需求描述完整、清晰且一致。这些自定义检查清单属于审核员所确定的需求质量审查成果；只有当审核员认为
-   某项检查标准得到满足时，才会标记该项检查为已通过。虽然某些自定义项已通过检查，但这并不意味着实施工作已经完成。
-   **审核员约束**：审核必须是独立会话（新开会话、与实施会话隔离），并使用与实施不同的模型；
-   至少配置 2 名审核员（A = claude-fable-5-1、B = gpt-6.1-sol）并行审核，各自产出勾选结果，
-   按共识取通过项；有分歧的项视为未通过并附说明。
-   **接入通道**：审核员 A 优先走 `claude-bridge` 通道（`--model claude-bridge/claude-fable-5-1`）；
-   该通道不可用时（额度耗尽、鉴权失败、launcher 异常等）改走 Anthropic API 通道
-   （`--model anthropic/claude-fable-5-1`）。两条通道同为 Claude 模型本身，只换接入路径，不改变审核员身份。
-   每轮 checklist 头部记录实际使用的通道（如 `A = claude-fable-5-1 via anthropic`）及切换原因。
-   产物：`specs/<feature>/checklist.md`（实施者不勾选）。
-6. **Tasks**：把方案拆成 0.5 到 2 小时可完成的任务，每个任务包含上下文、修改范围、完成标准和验证命令。
-   **完成标准必须引用 spec 的 AC 编号**（如“满足 AC-001-1”），验证命令与完成标准一一对应。
-   产物：`specs/<feature>/tasks.md`。
-7. **Analyze**：报告在 spec.md、plan.md 和 tasks.md 之间存在的冲突、差距和模糊之处。该报告是只读的；
-   如果发现了问题请进行修复，然后在实施之前重新运行该报告。
-8. **Implement**：按照依赖顺序执行 tasks.md 中的任务。在执行之前，会读取检查清单中的复选框状态作为前置条件，
-   并在继续之前确认所有检查清单项都已勾选；过程中不会修改任何检查清单文件或标记。可以一次性运行以构建整个系统，
-   或者将任务划分为多个阶段来处理大型功能。
-   **需求变更规则**：Implement 中途需求发生变化 → 回到 Clarify 重新走流水线（更新 spec → 重新过 Gate 1 →
-   更新 plan/tasks），不许直接改 tasks.md 偷跑。
-9. **Converge**：对比代码库与规范、计划以及任务列表进行检查。如果发现差距，就在 tasks.md 处添加新的任务，
-   然后运行 Implement 工作流再次进行比对，直到报告"已收敛"为止。否则任务完成，可以继续完成评审。
-10. **Review**：调用第三方 agent（新开独立会话，与实施会话隔离）参考 **spec.md + plan.md + tasks.md + 实际代码差异**
-    （git diff），按 bug、架构风险、测试缺口、目标是否对齐进行评审，禁止只做风格化总结。
+1. **Constitution**：固化项目原则与安全边界。载体：本文件（§3 红线、§4 工作约定）+ `docs/` + `docs/decisions/`。
+2. **Spec**：按 what / why 写需求，不写技术方案；每条需求都能映射到具体的验收规则。产物：`spec.md`。
+3. **Clarify**：追问不明确和有歧义的地方；能从仓库、文档、既有方案推断的不问用户；回答融入 spec。产物：更新 `spec.md`（歧义记录表）。
 
-**Gate 2（人工批准，硬闸门）**：Review 完成后，由用户确认评审结论（bug 修复 / 风险接受 / 缺口补齐），确认后方可进入 Handoff。
+**Gate 1（人工批准，硬闸门）**：Clarify 完成后、Plan 开始前，由用户批准 `spec.md`。批准后 spec 冻结；未批准不得进入 Plan。之后的需求变更按第 8 步的规则处理。
 
-11. **Handoff**：更新 feature 的 review.md，记录完成项、未完成项、风险和下一步任务，并附**验收证据**：
-    测试命令输出摘要、Converge 报告结论。然后**提交 PR 并 merge 到 main**；若出现 conflict，先 resolve 冲突
-    （涉及实现语义的冲突解决后回到 Analyze/Converge 复查），再完成 merge。
+4. **Plan**：参考技术栈与架构，由 spec 生成设计与实施细节。产物：`plan.md`。
+5. **Checklist**：审核员针对 spec 与 plan 检查需求是否完整、清晰、一致（需求的「单元测试」），在拆任务前完成；只有审核员认为满足的项才勾选，勾选不代表已经实现。
+   **审核员**：只设审核员 A（claude-fable-5-1），在独立会话中审核（新开会话、与实施会话隔离、模型与实施不同）。
+   接入通道优先 `claude-bridge`（`--model claude-bridge/claude-fable-5-1`），不可用时（额度耗尽、鉴权失败、launcher 异常等）改走 Anthropic API（`--model anthropic/claude-fable-5-1`）；两条通道同为 Claude 模型，只换接入路径。每轮在 checklist 中记录实际通道及切换原因。
+   产物：`checklist.md`（实施者不勾选）。
+6. **Tasks**：把方案拆成 0.5–2 小时的任务，每个任务写明上下文、修改范围、完成标准（必须引用 AC 编号，如「满足 AC-001-1」）和与之对应的验证命令。产物：`tasks.md`。
+7. **Analyze**：只读地检查 spec、plan、tasks 之间的冲突、缺口与模糊之处；发现问题先修复再重新检查，然后才实施。
+8. **Implement**：开始前确认 checklist 全部勾选；按依赖顺序执行任务，过程中不改 checklist。
+   **需求变更规则**：中途需求变化 → 回到 Clarify（更新 spec → 重新过 Gate 1 → 更新 plan / tasks），不许直接改 tasks.md 偷跑。
+9. **Converge**：对照 spec、plan、tasks 检查代码；有差距就在 tasks.md 加任务并继续实施，直到「已收敛」。
+10. **Review**：审核员 A 在独立会话中参考 spec、plan、tasks 与实际代码差异（git diff），按 bug、架构风险、测试缺口、目标是否对齐评审，禁止只做风格化总结。
 
-### 功能规格目录约定
+**Gate 2（人工批准，硬闸门）**：用户确认评审结论（bug 修复 / 风险接受 / 缺口补齐）后方可 Handoff。
 
-```
-specs/<feature>/          # 每个功能性 feature 一个独立规格目录（如 stitch-workbench）
-├── spec.md               # 需求：what/why + 验收规则（不含技术方案）
-├── plan.md               # 实施设计：技术方案与细节（Plan 阶段）
-├── tasks.md              # 任务分解（0.5–2h/任务，含验证命令）
-├── review.md             # 评审与交接记录（Handoff 阶段更新）
-└── checklist.md          # 质量检查清单（Checklist 阶段生成，有则必读）
-```
+11. **Handoff**：更新 `review.md`（完成项、未完成项、风险、下一步，附测试输出摘要与 Converge 结论等验收证据），提交 PR 并 merge 到 main；涉及实现语义的冲突解决后回到 Analyze / Converge 复查。
 
-### 多 feature 并行
+规格目录结构与多 feature 状态表见 `specs/README.md`；新建 feature 从 `templates/` 起稿。
 
-`specs/README.md` 维护一张**状态表**（feature / 状态 / 依赖 / 最近更新）。feature 开始、阻塞、完成时必须更新；
-依赖未满足的 feature 不得进入 Plan。
+## 3. 红线（实现不得偏离；全部决策见 plan.md §3 与 `docs/decisions/`）
 
-新建 feature 一律从 `templates/` 模板起稿，走完整个工作流。
-
-## 3. 已确认的关键决策（实现不得偏离）
-
-- **项目定位**：面向所有敦煌研究者的开放资源整理平台；Phase 1 只围绕现有写卷做标注、分类与命名规范，外部资源在后续阶段补充与链接（D-010）
-- **前后端分离**：后端以 API 提供数据与影像，前端独立（D-011）；渐进迁移，Phase 1 新功能直接按「API + 新前端」实现；数据库 PostgreSQL，前端 Vue 3 + Vite + TypeScript；影像服务方案另登 ADR（D-016）。迁移期间 v0 继续在线，以下 v0 决策照常生效
-- **开放范围与许可**：Phase 1 维持登录墙；每个影像记录收藏机构、获取渠道、许可、署名与展示策略，按来源套用默认规则；对外优先展示原机构 IIIF 影像，许可不明的本地影像不对外（D-012）
-- **命名**：只在目录层生成规范名称（「主编号 + 规范题名（卷次·品名）」，规范繁体，检索繁简互通），磁盘目录与文件名不改；原始名称逐字保留（D-013）
-- **标注**：Phase 1 必选字段为主编号、出处认定、载体类型、题名 / 文本、文献类型、时代、书体、形制；蓝本为国图《总目录》著录体例与饶宗颐《敦煌书法丛刊》十类；AI 预标 + 所有者审核（D-014）
-- **Phase 1 范围**：纳入全部现有材料（含备份分片、页图、PSB）；每件写卷有「出处认定」（已确认 / 待核 / 非敦煌），不从目录名继承；非敦煌与待核材料保留但默认不进入敦煌分类浏览（D-015）
-- **开放标准**：影像与清单向 IIIF 靠拢，标注采用 W3C Web Annotation（D-017）
-- **目录服务**：Python 3.12 + FastAPI；独立 compose 项目 `dunhuang-catalog`（`catalog-db` 384m、`catalog-api` 512m，硬上限、禁额外 swap）；原图目录、备份目录与 v0 `cache/` 只读挂载；Phase 1 只在局域网与 Tailscale 开放（端口 8504）；校验 v0 的登录状态，缺少 `AUTH_SECRET` 时拒绝全部请求（D-018）
-- **部署形态**：NAS（设备实例非公开）本机 Docker Compose 服务，直读 NAS 磁盘原图，不拷贝、不全量转码（D-001）
-- **技术栈**：Python 3.12（镜像 `python:3.12-slim`）+ FastAPI/uvicorn 单体 `app.py`；前端原生 HTML/CSS/JS + OpenSeadragon，无构建步骤（D-002、D-004）
-- **图像管线**：libvips（pyvips）流式解码 + DZI 图块（`dzsave`，JPEG）；tifffile 读元数据并对未压缩 TIFF 做按行/按区域流式读取；Pillow 只作无 libvips 时的兜底（D-003）
-- **图块生成**：在线按需（单并发）+ 后台全量生成器 `pyramid-builder` + 超巨卷专用 `pyramid-huge`，断点续跑状态在 `cache/pyramid_build_state.json`（D-006）
-- **内存安全红线**（2026-10-18 事故后）：容器硬上限且禁用额外 swap、`VIPS_CONCURRENCY=1`、`MEM_GUARD_MB` 内存守卫、超大卷降级为预览分辨率；只许收紧，放宽须先登记 ADR（D-005）
-- **原图目录写入**：本仓库代码对 `/srv/example/data` 的唯一写入是拼接工作台写回卷目录的 `合并长卷.tif`（临时文件 + 原子替换）（D-008）；原图目录另有外部写入方（2026-10-21 批量整理脚本、IDP 下载器，plan.md §1.4），治理规则待定（plan.md PD-02）
-- **ID 与缓存映射**：卷/文件 ID = 相对路径的 base64url，缓存键 = `sha1(file_id)[:16]`；`app.py`、`pyramid_worker.py`、`stitch_apply.py` 三处必须保持同一映射（architecture.md §3）
-- **访问与认证**：局域网 + Tailscale + 可选公网入口（私人地址及网关拓扑非公开）；因公网可达，登录墙必须开启（`.env` 的 `AUTH_USER`/`AUTH_PASS`/`AUTH_SECRET` 三项齐全，缺一项即全站匿名可访问）；用户表 `cache/users.json`（pbkdf2）（D-007）
-- **代码与部署通道**：GitHub 私有仓库 `contributor/dunhuang-viewer` 是代码权威；NAS 部署目录是 git 仓库（`receive.denyCurrentBranch=updateInstead`），只接收本机工作副本的推送（D-009）
+- **内存安全**（D-005）：容器硬上限且禁用额外 swap、`VIPS_CONCURRENCY=1`、`MEM_GUARD_MB` 内存守卫、超大卷降级为预览分辨率；只许收紧，放宽须先登记 ADR
+- **原图目录写入**（D-008）：本仓库代码对 `/srv/example/data` 的唯一写入是拼接工作台写回的 `合并长卷.tif`（临时文件 + 原子替换）；新增任何写原始数据的路径须先登记 ADR。外部写入方见 plan.md §1.4，治理待定（PD-02）
+- **ID 与缓存映射**（architecture.md §3）：卷 / 文件 ID = 相对路径的 base64url，缓存键 = `sha1(file_id)[:16]`；`app.py`、`pyramid_worker.py`、`stitch_apply.py` 三处保持同一映射
+- **登录墙**（D-007）：公网可达，`.env` 的 `AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` 必须齐全（缺一项即全站匿名可访问）；用户表 `cache/users.json`
+- **目录服务**（D-018）：独立 compose 项目 `dunhuang-catalog`，内存 384m + 512m 硬上限；原图、备份与 v0 `cache/` 只读挂载；只在局域网与 Tailscale 开放；缺少 `AUTH_SECRET` 时拒绝全部请求
+- **代码与部署通道**（D-009）：GitHub 私有仓库是代码权威；NAS 部署目录是 git 仓库（updateInstead），只接收本机工作副本的推送
 
 ## 4. 工作约定
 
-- 所有功能开发必须走 §2 spec-driven 工作流；`specs/<feature>/` 是实施的唯一入口
-- 决策先写 ADR（`docs/decisions/`）再改代码；方案变更先改 docs 再动实现
-- 数据与学术纪律（plan.md §5）：
-  - **许可合规**：每件资源记录来源机构、获取渠道、许可与署名；许可不明的影像不对外展示高清图（D-012）
-  - **可追溯**：每个字段、每条标注都记录来源（人工 / AI 预标 / 外部目录 / 文件名解析）、作者、时间与置信度，可查历史、可回滚
-  - **学术区分**：区分「转录自某目录」与「本项目判断」；定名、断代、书体、缀合、出处等判断都注明依据；程序规则只能提出建议，「非敦煌」等结论须人工确认
-  - **非破坏**：整理不丢失原始名称与原始文件；改动原图目录一律先备份、写计划、留日志
-  - **身份稳定**：内部 ID 与磁盘路径解耦；外部编号是属性，不是主键
-  - **先整理、后扩展**：Phase 1 只围绕现有材料，外部资源在 Phase 2 接入
-- 原始扫描件、缓存产物、私有数据、凭证永不入库；`.gitignore` 锚点（`.env`、`cache/`、`pyramids/`、`thumbs/`）不得移除
-- 凭证只在 NAS 部署目录的 `.env`（权限 600），代码零 fallback 字面量
-- 写原始数据目录只允许经拼接工作台（临时文件 + 原子替换）；新增任何写原始数据的路径必须先登记 ADR
-- 部署：只部署已 merge 到 main 的提交（`git push origin main` → `git push nas main`）；禁止在 NAS 上直接改代码（工作区不干净会让推送被拒）。`static/` 挂载进容器，推送即生效；改 `app.py`/`pyramid_worker.py`/`Dockerfile`/`requirements.txt` 须重建镜像，**重建/重启容器前必须先征得用户确认**（查看器会中断），且只针对目标服务（`docker-compose up -d --build dunhuang-viewer`；不带服务名会同时拉起两个图块生成器）
-- NAS 操作：文件用 `ssh nas`（operator），容器用 `ssh nasroot` + `/usr/local/bin/docker`、`/usr/local/bin/docker-compose`；禁止对 `cache/` 做全量遍历（`du`/`find` 会长时间占用 NAS IO）
+- 所有功能开发走 §2 工作流，`specs/<feature>/` 是实施的唯一入口；决策先写 ADR 再改代码，方案变更先改 docs
+- 数据与学术纪律见 plan.md §5（许可合规、可追溯、学术区分、非破坏、身份稳定、开放标准、先整理后扩展、NAS 安全）
+- 原始扫描件、缓存产物、私有数据、凭证永不入库；`.gitignore` 锚点（`.env`、`cache/`、`pyramids/`、`thumbs/`）不得移除；凭证只在 NAS 部署目录的 `.env`（权限 600），代码零 fallback 字面量
+- 部署：只部署已 merge 到 main 的提交（`git push origin main` → `git push nas main`），禁止在 NAS 上直接改代码。`static/` 挂载进容器，推送即生效；改 `app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 须重建镜像，**重建 / 重启容器前先征得用户确认**，且只针对目标服务（`docker-compose up -d --build dunhuang-viewer`；不带服务名会同时拉起两个图块生成器）
+- NAS 操作：文件用 `ssh nas`（operator），容器用 `ssh nasroot` + `/usr/local/bin/docker`、`/usr/local/bin/docker-compose`；禁止对 `cache/` 做全量遍历（`du` / `find` 会长时间占用 NAS IO）
 - 环境：本机开发（Windows 11 + Git Bash + Python 3.14，无 WSL），运行在 NAS 容器（Python 3.12 + libvips）；提交前跑测试（`tests/` 建立前至少 `python -m py_compile app.py pyramid_worker.py stitch_apply.py`）

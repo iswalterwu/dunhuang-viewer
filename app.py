@@ -1899,23 +1899,6 @@ def _stitch_queue_pyramid(rel: str) -> None:
         traceback.print_exc()
 
 
-def _stitch_wait_rescan(rel: str, timeout: int = 2400) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            path = _pyramid_state_path()
-            if path.exists():
-                state = json.loads(path.read_text(encoding="utf-8"))
-                if rel in state.get("done", {}):
-                    break
-        except Exception:
-            pass
-        time.sleep(6)
-    while INDEX.get("status") == "scanning":
-        time.sleep(2)
-    scan_index()
-
-
 def _stitch_build_worker(item_id: str, item: dict, plan: dict) -> None:
     with STITCH_SEMAPHORE:
         with STITCH_BUILDS_LOCK:

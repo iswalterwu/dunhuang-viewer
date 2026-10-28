@@ -13,9 +13,4 @@
 | Review | 评审结论 → 口头/会话 | — |
 | Handoff | `specs/<feature>/review.md` | [review.md](review.md) |
 
-使用规则：
-
-- 模板只作起点，按 feature 实际情况增删小节；四个固定文件（spec / plan / tasks / review）必须齐备
-- spec.md 只写 what/why 与验收规则，技术方案一律放 plan.md
-- checklist.md 由审核员生成并勾选；实施者不勾选
-- 新建 feature 目录后，用对应模板起稿，再走 Clarify → … → Handoff
+模板只作起点，按 feature 实际情况增删小节；四个固定文件（spec / plan / tasks / review）必须齐备。各步骤的规则见 AGENTS.md §2。

@@ -212,7 +212,7 @@ D-001 ～ D-008 为 2026-10-27 追认登记的既有决策（依据为当时的�
 [19] 二玄社：《敦煌書法叢刊》全 29 冊（饶宗颐编，伯希和写卷精选 150 件） — https://www.nigensha.co.jp/smp/book/b558468.html <br>
 [20] 豆瓣：《法藏敦煌书苑精华》（八册，广东人民出版社 1993，《敦煌书法丛刊》中文版） — https://m.douban.com/book/subject/4038690/
 
-## 5. 原则与红线（2026-10-27 确认，已写入 AGENTS.md §4）
+## 5. 原则与红线（2026-10-27 确认；AGENTS.md §4 引用本节）
 
 1. **许可合规**：每件资源记录来源机构、获取渠道、许可条款与署名文本；IDP 内容默认仅限个人或非商业复用 [6]，Gallica 允许免费非商业复用但须保留出处 [6]；许可不明的资源不对外展示高清影像
 2. **可追溯**：每个字段、每条标注都记录来源（人工 / AI 预标 / 外部目录 / 文件名解析）、作者、时间、置信度，可查历史、可回滚
@@ -352,25 +352,14 @@ PD-10、PD-11 → D-012；PD-12、PD-13 → D-013；PD-14、PD-15 → D-014；PD
 
 ## 11. 文档体系与目录结构
 
-原则：**单一作者、机读优先、决策留痕**。
-
-```
-docs/
-├── plan.md            # 本文档：总方案与路线图（唯一"当前状态"入口）
-├── architecture.md    # 系统架构（当前为 v0 查看器；目标架构在 PD-17 确认后补充）
-├── designUI.md        # 设计理念（当前为 v0 界面；新前端设计在 PD-17 确认后补充）
-└── decisions/         # ADR：YYYYMMDD-<slug>.md，编号 D-XXX；先登记再实现
-specs/<feature>/       # 功能规格目录：每功能一份 spec/plan/tasks/review（唯一实施入口）
-templates/             # spec-driven 工作流模板
-README-部署.md          # v0 部署与日常运维操作手册（人读）
-```
+原则：**单一作者、机读优先、决策留痕**。文档地图见 AGENTS.md §1。
 
 文档纪律：
 
 - 每份规范只有一个权威作者位置；README 只导航不复制数值（防双份漂移）
 - 所有"为什么"写进 ADR 或规范条目，不散落在会话里
 - 方案变更先改 docs 再改代码；实现与 docs 冲突以 docs 为准
-- **功能开发一律走 spec-driven 工作流**（AGENTS.md §2）：Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Tasks → Analyze → Implement → Converge → Review → 【Gate 2】 → Handoff
+- 功能开发一律走 spec-driven 工作流（AGENTS.md §2）
 - 运行参数的权威是 `docker-compose.yml`（环境变量）与代码默认值；文档引用参数名，不另抄数值
 - 本文的盘点数字都标明日期，只作为当日快照；外部事实注明出处（§4 参考）
 
