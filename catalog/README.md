@@ -2,7 +2,7 @@
 
 当前是开发中的独立后端，**尚未部署；目录 API、导入与历史代码已写成，真实数据库 / HTTP 集成尚未验证，不能作为生产可用证据**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
-已实现配置、只读清单与影像事实、编号解析、单元 / 备份映射、影像与写卷身份计算、谱系 / 许可 / 出处规则、共用会话认证、v0 快照 / 采样 / 链接。API 工厂已包含登录墙、受保护的文档 / OpenAPI、只读目录查询与管理员导入触发路由。国图清单 / 画布、派生白名单及导入计算阶段已完成本机测试；导入持久化、历史、报告代码以及数据库初始迁移、连接池和咨询锁均已写成，但尚未经过真实 PostgreSQL 验证。查询 / 触发 API 及 health 代码已写成；T-22 的 Dockerfile、独立 Compose、配置示例与构建排除规则现已编制，仅做本机静态契约检查，尚未校验 Compose 语法或构建镜像。正式验收入口留 T-23；SQL、后台线程和资源生命周期的真实集成留 T-24。阶段证据见 tasks.md，不以单元测试代替端到端验收。
+已实现配置、只读清单与影像事实、编号解析、单元 / 备份映射、影像与写卷身份计算、谱系 / 许可 / 出处规则、共用会话认证、v0 快照 / 采样 / 链接。API 工厂已包含登录墙、受保护的文档 / OpenAPI、只读目录查询与管理员导入触发路由。国图清单 / 画布、派生白名单及导入计算阶段已完成本机测试；导入持久化、历史、报告代码以及数据库初始迁移、连接池和咨询锁均已写成，但尚未经过真实 PostgreSQL 验证。查询 / 触发 API 及 health 代码已写成；T-22 的 Dockerfile、独立 Compose、配置示例与构建排除规则现已编制，仅做本机静态契约检查，尚未校验 Compose 语法或构建镜像。T-23 已提供固定基线、只读比较器与下文 A1～A7 验收入口；这些入口尚未在 NAS 执行，SQL、后台线程和资源生命周期的真实集成留 T-24。阶段证据见 tasks.md，不以单元测试代替端到端验收。
 
 ## 本机开发
 
@@ -38,7 +38,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 - `prepare_import(pool, triggered_by=..., code_version=..., session_cookie=..., v0_url=...)` 同步持连接与咨询锁并创建批次，返回含 run_id 的 PreparedImport；已在跑则抛 ImportBusy。管理员 API 先完成这一段再返回 202，ImportBusy 同步转 409。
 - 后台调用 `PreparedImport.execute(roots, cache_dir)`；派发失败则 `cancel()` 清理。内部复用真实 scan / nlc / derivation / identity / rules，附件读取即消费，不在内存保留全量原文。
 - `compute_import(...)` 是可本机验证的真实计算阶段；持久化、唯一约束互换、失败回滚与历史读取都仍需 T-24 的真实 PostgreSQL 验证，不能用本机 DTO 状态测试代替。
-- `read_report()` 读取已有批次。当前 `import_run.counts` 保存完整报告对象，其中的 `counts` 子键才是统计计数；API 将完整对象明确返回为 `report`，统计位于 `report.counts`；未来 compare 只消费这些计数，不再扫描原始材料重算业务判断。
+- `read_report()` 读取已有批次。当前 `import_run.counts` 保存完整报告对象，其中的 `counts` 子键才是统计计数；API 将完整对象明确返回为 `report`，统计位于 `report.counts`；`acceptance/compare.py` 只消费这些计数，不再扫描原始材料重算业务判断。
 
 只读 API 路径与查询参数见受保护的 `/api/v1/docs`（接口清单的设计权威在 feature plan §2.1）。编号查询只命中 current，历史 / pending 在详情展示；批次历史使用 `?run=`。GET 使用只读事务；附件返回保存的原字节。唯一写方法是管理员 `POST /api/v1/imports`，不提供目录内容修改、取消或回滚 API。
 
@@ -55,7 +55,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 ## 运行文件（T-22，仅源码与静态检查）
 
 - 构建上下文必须是 `catalog/`，不是仓库根。镜像只安装本目录固定依赖，pip 源与 v0 相同；无 apt、libvips 或图块管线。`src/` 放在 `/app/src`，迁移在 `/app/migrations`，与 `db.MIGRATIONS` 对齐。
-- 同一镜像包含真实 `tests/`、`pytest.ini`、`acceptance/`，以及静态测试读取的运行配置源文件。**T-23 尚未提供 acceptance 基线 / compare 文件，目前直接构建会在 COPY acceptance 处失败；必须先完成 T-23，再做 T-24。** 不用空目录或假成功绕过这一前置。
+- 同一镜像包含真实 `tests/`、`pytest.ini`、`acceptance/`，以及静态测试读取的运行配置源文件。**T-23 已提供 acceptance 基线、compare 与真实测试文件；镜像尚未构建，须完成本机复验后另获 T-24 许可。** 文件存在不是 COPY、构建或运行成功的证据。
 - 启动先执行 migrate，成功后才 exec uvicorn 工厂；健康检查调用 `python -m dh_catalog health`，不签 cookie、不走 HTTP。`DH_CODE_VERSION` 同时作为构建参数与运行环境传入，不在镜像里执行 git。
 - `docker-compose.yml` 只有 `catalog-db` / `catalog-api`；每次操作都指定 `-p dunhuang-catalog`。内存硬限额及 memswap、PostgreSQL 参数、外部 pgdata 和四项只读挂载以此文件为准。API 按计划以 root 读取 root:600 用户表，不增加宿主可写挂载。
 - API 仅绑定 NAS 的 LAN / Tailscale 显式地址；数据库没有宿主端口。配置变量不得改为 `0.0.0.0`、`::` 或其他公网 / 通配地址。不添加 nginx / frp 公网入口，不修改真实防火墙；T-25 还须检查实际端口绑定。
@@ -119,4 +119,348 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 5. 在 LAN / Tailscale 分别做只读冒烟：匿名 GET 拒绝；通过 v0 正常登录的普通账号可 GET、POST 导入被 403 拒绝；管理员只做 GET（如 `/api/v1/imports`、受保护文档）。**不执行管理员 POST，不删正式 secret，不触发任何正式导入**；缺 secret 的 fail-closed 与合成导入以 T-24 结果为证，不另签 cookie。
 6. 记录实际绑定、限额、只读挂载、health 和权限结果。异常先停止验收、报告；需要回滚时只停新项目（在本目录 `/usr/local/bin/docker-compose -p dunhuang-catalog down`），保留 pgdata，不影响 v0。代码修复回本机，重新 Review → Gate 2 → merge → 获准部署。
 
-T-26 的首次全量导入及无变化重跑只能由用户在接口文档页触发。A1～A7 的细步骤、基线与结果输出位置留 T-23 补齐；真实 SQL、镜像、原材料不变性、内存 / v0 连续健康、耗时、P95 和链接抽查在各自阶段取得证据前都仍为待验。
+T-26 的首次全量导入及无变化重跑只能由用户在接口文档页触发。下文 A1～A7 已提供入口；真实 SQL、镜像、原材料不变性、内存 / v0 连续健康、耗时、P95 和链接抽查在各自阶段取得证据前都仍为待验。
+
+## T-23：本机只读基线比较
+
+文件：`acceptance/baseline-2026-10-27.json`（34 项）、`acceptance/compare.py`、`acceptance/test_compare.py`。
+基线固定为 2026-10-27；6,096 是影像目录，不是写卷数。Q-024 新 A077 资料六个 txt 只能解释 477 → 483 的差异，不能改基线抵数。
+
+比较器只用标准库读取本地 JSON，向 stdout 输出 JSON，不连接服务、不加载 dh_catalog / 配置、不扫描材料、不写文件。接受：
+
+| 输入 | 统计路径 | 批次成功证据 |
+|---|---|---|
+| `python -m dh_catalog report --run ID` 导出的单批次整行 | `counts.counts` | 外层 `status == "succeeded"` |
+| `GET /api/v1/imports/{id}` 导出的单批次整行 | `report.counts` | 外层 `status == "succeeded"` |
+| `build_report` 的直接报告 | `counts` | 没有 status，只能比较，不能称完成验收 |
+
+不接受 `/imports` 的分页列表（应再 GET 指定批次）。逐项输出 `expected`、`actual`、`delta`、`result`、计数来源、后续核查入口和人工说明。`match` 只表示计数相同。标量缺失不填零；仅 `attachments_by_kind`、`anomalies_by_category`、`parts_by_parent`、`items_by_doubtful_number`、`directories_by_lineage` 这五个真实 Counter，在**容器存在且全部值为非负整数**时，缺键才表示零（输出 `sparse_zero`）。容器缺失为 `missing`，类型错误为无效输入。
+
+报告的 `excluded_jpg` 不能证明全是图块；比较器仅展示 observed，不冒充图块实际数。母号查询返回 5 件、12 个长卷逐条有派生或异常也不能由计数直接证明：这三项固定为 `unverified`。P.0901 件数、开宝藏/题名线索等虽有计数，仍须 A2 核对对象关系；不会把统计相同称为完整 AC 通过。
+
+在仓库根（`EVIDENCE` 是已批准的**外部**本机证据目录，不在本仓库内）：
+
+```bash
+python -I -X utf8 catalog/acceptance/compare.py "$EVIDENCE/A1-run.json" > "$EVIDENCE/A2-compare.json"
+# 查看并记录上一条退出码，不因非零就删除输出
+printf '%s\n' "$?" > "$EVIDENCE/A2-compare.exit"
+# 可选：人工在证据目录写 notes.json，例如 {"txt":"Q-024 六个新增附件，逐条证据见 A2-attachments.json"}
+python -I -X utf8 catalog/acceptance/compare.py "$EVIDENCE/A1-run.json" \
+  --notes "$EVIDENCE/notes.json" > "$EVIDENCE/A2-compare-with-notes.json"
+printf '%s\n' "$?" > "$EVIDENCE/A2-compare-with-notes.exit"
+```
+
+退出码：**0** 所选基线计数全部相同、状态成功且无缺证据（不表示完整 AC）；**1** 存在差异（可同时有缺证据）；**2** 无已知差异但缺计数/不可证明/直接报告无批次状态；**3** JSON 文件、字段类型或基线/说明无效；**4** 批次 running/failed（优先于差异）。命令行参数用法错误由 argparse 返回 2 并显示用法。默认完整基线有三项人工核查，因此不会得到 0；不要删指标求 0。`--baseline PATH` 只用于明确标注范围的其他对照/合成测试，不替换正式基线。说明只附加，不改变差异与退出码。
+
+本机完整非 DB 验证（现有 venv，不安装依赖）：
+
+```bash
+catalog/.venv/Scripts/python.exe -I -X utf8 -m pytest -c catalog/pytest.ini -m 'not db' catalog/tests catalog/acceptance/test_compare.py
+python -m py_compile app.py pyramid_worker.py stitch_apply.py
+# 历史命令（非公开历史记录，不可执行）：python -I -X utf8 private-audit-record .
+git diff --check
+```
+
+`-m 'not db'` 的 db 项是 deselected，不是通过；默认全套没有测试连接时才是 skipped。两者都不是数据库证据。
+
+## T-26：A1～A7 可执行验收入口（均未在 NAS 执行）
+
+### 前置与证据位置
+
+- T-24 测试许可、T-25 部署许可、T-26 全量验收许可分别取得；Gate 2 / merge 不能替代许可。低峰且宿主 `MemAvailable >= 2GB`，先保存 `grep '^MemAvailable:' /proc/meminfo`。不关闭或重启 v0，不恢复 Q-025 删除的暂停/中止、内容指纹等机制。
+- 宿主证据目录 `E` 由用户批准，例如 `/srv/example/acceptance/catalog/<本次时间戳>`；本机对应 `EVIDENCE` 例如 `/srv/example/private-audit/evidence/<本次时间戳>`。两者均必须在部署 git 工作区、pgdata、原材料与 cache **之外**，权限仅供验收人员；先 `umask 077` 再创建。不要将这些变量设为仓库子目录。所有真实报告、元数据、差异与截图不入库，不进入构建上下文。
+- 浏览器启用“每次下载询问保存位置”，以下 `save` 下载均存入本机 `EVIDENCE`。只用用户正常登录 v0 的真实会话；在同一 NAS 主机名的 catalog 受保护文档页操作。不能读取/复制 `.env` 或 users.json 来签发会话；不复制 cookie 到代码、脚本、命令、日志或 HAR，不使用“Copy as cURL”。
+- 先做 A5 前快照并启动资源采样，再由用户在 `/api/v1/docs` 手动触发 POST，记录返回批次 ID。本节没有 CLI 导入或自动 POST。无变化重跑也由用户自行触发，分别记录两批 ID。
+
+以下浏览器辅助片段均仅 GET，置于已登录 catalog 页控制台；没有会话字面量。定义一次后供 A1～A4、A6、A7 使用。任何非 200、重定向、非 JSON 均拒绝，不把登录页当结果：
+
+```javascript
+function save(name, data) {
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}));
+  a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+async function getJSON(path) {
+  const r = await fetch(path, {credentials:'same-origin', cache:'no-store', redirect:'error'});
+  if (r.status !== 200 || !r.headers.get('content-type')?.includes('application/json'))
+    throw new Error(`GET 未成功：${r.status}`);
+  return await r.json(); // 等待完整响应
+}
+async function allPages(path) {
+  const rows = []; let total;
+  for (let page=1; ; page++) {
+    const r = await getJSON(`${path}${path.includes('?')?'&':'?'}page=${page}&page_size=200`);
+    if (!Array.isArray(r.items) || !Number.isInteger(r.total) || r.page !== page)
+      throw new Error('分页响应无效');
+    if (total !== undefined && total !== r.total) throw new Error('分页期间数据变化，须重新取证');
+    total = r.total; rows.push(...r.items);
+    if (rows.length === total) return rows;
+    if (!r.items.length || rows.length > total) throw new Error('分页缺失或溢出');
+  }
+}
+```
+
+### A1：成功批次与本批 v0 覆盖（AC-001-1）
+
+在文档页 GET `/api/v1/imports` 选择用户刚触发的批次（不是随意找旧成功批次），输入该 ID：
+
+```javascript
+var runId = Number(prompt('刚完成的导入批次 ID'));
+if (!Number.isInteger(runId) || runId < 1) throw new Error('ID 无效');
+var run = await getJSON(`/api/v1/imports/${runId}`);
+save('A1-run.json', run);
+if (run.status !== 'succeeded' || !run.ended_at) throw new Error('批次未完成成功，待验');
+var report = run.report;
+save('A1-coverage.json', {run:run.id, started_at:run.started_at, ended_at:run.ended_at,
+  v0_snapshot_status:run.v0_snapshot_status, coverage:report.coverage});
+if (report.coverage?.status !== 'valid' || report.coverage.unmapped_existing_count !== 0)
+  throw new Error('本批覆盖不可验证或存在未对应目录');
+```
+
+分别保存 `coverage.disk_not_indexed`（磁盘已有、索引未收录）、`coverage.index_directory_absent`（索引有、磁盘无）及 `unmapped_existing`；前两项不是同一集合。无有效索引只能待验，`latest_valid_snapshot_available=true` 只是链接可用旧快照，不能冒充本批覆盖。另一种导出入口是获准后在 NAS catalog 工作目录执行只读 CLI：
+
+```bash
+# RUN_ID 填已经确认成功的本次批次 ID；不得省略而误取最新 running 批次
+/usr/local/bin/docker-compose -p dunhuang-catalog exec -T catalog-api \
+  python -m dh_catalog report --run "$RUN_ID" > "$E/A1-run-cli.json"
+```
+
+CLI 导出为整行，须保留 status。导出命令连接目录库，但不会导入；**当前本机任务不执行该命令**。
+
+### A2：全部基线与对象对应关系（AC-010-2 等）
+
+运行上节 compare，保存逐项比较与退出码；人工用 `id` 为键记录原因及证据文件，所有差异、缺指标和未验证项逐项处理，不以解释抹除差异。确认所用 `code_version` / `rule_version` 与候选一致，报告批次与 API 核查期间没有新导入；API 列表/详情是当前状态，不是指定批次快照，发生新导入须重新取证。
+
+```javascript
+var checks = {};
+for (const q of ['P.2002','P2002','Pelliot chinois 2002','P.2504','P.0901','WB 29']) {
+  const r = await getJSON('/api/v1/resolve?q='+encodeURIComponent(q));
+  checks[q] = {resolve:r, details:[]};
+  for (const item of r.items) checks[q].details.push(await getJSON('/api/v1/items/'+item.id));
+}
+save('A2-resolve-details.json', checks);
+save('A2-anomalies.json', await allPages(`/api/v1/anomalies?run=${run.id}`));
+save('A2-report-evidence.json', {excluded:report.excluded, unassigned_attachments:report.unassigned_attachments,
+  suggestion_unit_evidence:report.suggestion_unit_evidence});
+```
+
+人工核查并写 `A2-object-checks.json`（每项含期望、实际、对象 ID/路径、证据文件、结论/原因）：
+
+- P.2002 三种写法同一件，详情 `images[].lineage` 与 `relationship.source_directory` 包含 BnF 原图及第三方加工图两套；不能只看 resolve 的 total。
+- P.2504 `total=5` 且五个不同 ID；逐件详情 `identifiers` 的 current 主号/母号/分件、`parent` / `parts` 是母件加四分件。P.0901 `total=3`、三 ID 各对应绢画/梵文写经/坐佛像的原始位置，主号为空、不自动合并；WB 29 返回两件。
+- `report.excluded` 对照图块缓存 JPG 98 的逐项路径/原因；`counts.excluded_jpg` 还可能包含其他排除 JPG，不能直接当图块数。Q-024 六个 txt 核对 `unassigned_attachments` 的路径，必要时 GET `/api/v1/attachments/{id}` 取已保存原文；只有附件目录产生的缺少影像单列，与旧基线 0 的差异保留。
+- 目录计数/单元计数与基线单位不同或材料新增时，记录逐条对象证据，不发明名称解析规则。在 `A2-anomalies.json` 核查隐藏同目录 10、词表外 1、疑似 2、号段外两号码及备份分片对不上等异常；异常类别计数不是所有对象关系的证明。
+- 开宝藏 18、题名线索 6：按 `suggestion_unit_evidence` 既有目录证据标签定位列表/详情（`/items?category=...&batch=...` 可筛选，需遍历分页），确认每个对应写卷 `provenance.status=待核`、`suggestion=非敦煌`、依据齐全，不能直接定非敦煌。
+- 合并长卷 12：从实际列表逐页 GET `/items/{id}`，按影像 ID 去重，选 **已有** `relationship.role == '合并长卷'`（不要自行匹配文件名重做规则）。对每个 ID GET `/images/{id}`，逐条保存 `derivations` 中源 ID/方式/证据文件行号；没有派生的，须在本批 `派生来源不明` 异常中找到该根/路径。保存 `A2-merged-scrolls.json` 的 12 行对应表，不能把 `outputs_with_derivation` 与异常总数相加抵数。白名单文件本身读失败的全局异常不等于某个长卷已被逐条解释。
+
+### A3：目录谱系（AC-005-2）
+
+```javascript
+save('A3-lineages.json', {run:run.id, counts:report.counts.directories_by_lineage,
+  directories:report.directory_lineages});
+```
+
+对照基线 BnF 447 / 第三方 499 / 本地 12 / 国图 5,138；只读既有目录级汇总和 `directory_lineages`（含 root，基线只计 data），逐项记录混合、未判定与差异目录。不要以 `images_by_lineage` 文件数替代目录数，也不再读取文件头重算谱系。
+
+### A4：国图 TIFF 画布对应（AC-005-4）
+
+```javascript
+var n = report.counts.nlc_tiff, matched = report.counts.nlc_tiff_with_canvas;
+var rate = Number.isInteger(n) && n > 0 && Number.isInteger(matched) && matched >= 0 && matched <= n
+  ? matched/n : null;
+save('A4-canvas.json', {run:run.id, nlc_tiff:n, nlc_tiff_with_canvas:matched, rate,
+  anomalies:await allPages(`/api/v1/anomalies?run=${run.id}&category=${encodeURIComponent('画布对不上')}`)});
+```
+
+分母 0、字段缺失或不合法时不能算 100%。不是 100% 时逐个 TIFF 根/路径关联本批画布异常，并经 `/images/{id}` 保存 canvas_number / canvas_id；无对应异常的缺口不通过。允许列明异常，不伪造全部对应。
+
+### A5：只读、不影响 v0、内存与耗时（AC-012-1～4）
+
+**只有取得 T-26 许可后**，宿主原图/备份前后各一次只读元数据清单（路径、大小、mtime_ns），不读全文件/内容指纹，不遍历或列出 cache。先在导入前执行 `STAGE=before`，全量与无变化重跑完成后再执行 `STAGE=after`；中间不另扫描。若其他写入方活动导致重跑数据变化，则不把它称为无变化重跑，记录后另请用户安排。以下使用宿主已有 `python3`，若不可用先报告，不安装新依赖：
+
+```bash
+# 在已批准的 NAS 证据目录上下文；E 预先设为外部证据目录
+STAGE=before  # 完成两批导入后改为 after，再执行同一段
+python3 - "$E/$STAGE-metadata.jsonl" <<'PY'
+import json, os, pathlib, sys
+
+def fail(error):
+    raise error
+
+with open(sys.argv[1], 'x', encoding='utf-8', newline='\n') as out:
+    for root in ('/srv/example/data', '/srv/example/backup'):
+        for directory, _, files in os.walk(root, followlinks=False, onerror=fail):
+            for name in sorted(files):
+                path = pathlib.Path(directory) / name
+                st = path.stat(follow_symlinks=False)
+                out.write(json.dumps([root, str(path.relative_to(root)), st.st_size, st.st_mtime_ns], ensure_ascii=False)+'\n')
+PY
+```
+
+任何读取错误都使本次清单无效，不能拿半份清单验收。两次清单比较只读证据，不再扫描材料：
+
+```bash
+python3 - "$E" <<'PY'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+def load(name):
+    with (p/name).open(encoding='utf-8') as f:
+        return {tuple(r[:2]): r[2:] for r in map(json.loads, f)}
+a, b = load('before-metadata.jsonl'), load('after-metadata.jsonl')
+changes = [{'root':k[0], 'path':k[1], 'before':a.get(k), 'after':b.get(k), 'attribution':''}
+           for k in sorted(a.keys() | b.keys()) if a.get(k) != b.get(k)]
+with (p/'A5-metadata-differences.json').open('x', encoding='utf-8') as f:
+    json.dump(changes, f, ensure_ascii=False, indent=2)
+PY
+```
+
+每个变化另写归因及证据（v0 拼接/下载器等），不明变化不通过。`mtime` 不是内容不变的强证明，本验收不增加内容指纹。
+
+在 catalog 部署目录，用实际服务 ID 选择 inspect 字段，输出不含 Env：
+
+```bash
+API=$(/usr/local/bin/docker-compose -p dunhuang-catalog ps -q catalog-api)
+DB=$(/usr/local/bin/docker-compose -p dunhuang-catalog ps -q catalog-db)
+for C in "$API" "$DB"; do
+  /usr/local/bin/docker inspect --format '{{json .Id}} {{json .HostConfig.Memory}} {{json .HostConfig.MemorySwap}} {{json .Mounts}} {{json .NetworkSettings.Ports}} {{json .State.Status}} {{json .State.Running}} {{json .State.OOMKilled}} {{json .State.ExitCode}} {{json .State.FinishedAt}} {{json .RestartCount}}' "$C"
+done > "$E/A5-inspect-before.txt"
+```
+
+核实 API=536870912、DB=402653184 字节且各自 MemorySwap 相等；`/data`、`/backup`、`/v0cache`、`/run/v0.env` 的 RW=false；pgdata 在外部专用目录；DB 无宿主端口、API 仅 LAN/Tailscale。两批完成后重复同一限定 inspect 存 `A5-inspect-after.txt`，记录 OOMKilled、退出状态、RestartCount（重启可能掩盖前次 OOM，须核对本时段事件/运维记录）。不打印整份 inspect。
+
+导入前在**宿主另一个终端**运行以下采样，覆盖全量和重跑，完成后 Ctrl+C 只结束采样器，不停服务：
+
+```bash
+python3 - "$E/A5-stats.jsonl" "$API" "$DB" <<'PY'
+import datetime, json, subprocess, sys, time
+with open(sys.argv[1], 'x', encoding='utf-8') as out:
+    tick = time.monotonic()
+    try:
+        while True:
+            r = subprocess.run(['/usr/local/bin/docker', 'stats', '--no-stream', '--format', '{{json .}}', *sys.argv[2:]],
+                               capture_output=True, text=True, timeout=5)
+            out.write(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                  'returncode':r.returncode, 'stats':r.stdout.splitlines()})+'\n')
+            out.flush()
+            tick += 5
+            time.sleep(max(0, tick-time.monotonic()))
+    except KeyboardInterrupt:
+        pass
+PY
+```
+
+记录每 5 秒的样本、异常/超时与覆盖时间；样本缺口不能当“全部正常”。容器无 OOM/异常终止，API 在 512 MB 硬限内成功完成。停止/重启记录有疑问时保留待验，不通过重启 v0 来取得漂亮样本。
+
+报告核查：保存两批 A1 整行到 `A5-full-run.json` / `A5-repeat-run.json`；用 ended_at-started_at 计算耗时（全量 ≤3600 秒，无变化重跑 ≤600 秒），检查重跑 `counts.changes` 与实际数据变化。`report.health` 的真实字段是 **count / failures / max_seconds / samples**：count>0、samples 数与 count 一致、failures=0、max_seconds≤2、每条 sample.ok=true 且 seconds≤2，时间覆盖导入过程。任何零样本、失败或缺字段不得判通过。导入没有自动暂停/中止机制。在 catalog 浏览器页面保存并检查两批（`run` 是 A1 全量批次，重跑由用户另外触发）：
+
+```javascript
+var repeatId=Number(prompt('已完成的无变化重跑批次 ID'));
+if (!Number.isInteger(repeatId) || repeatId<1 || repeatId===run.id) throw new Error('重跑批次 ID 无效');
+var repeatRun=await getJSON('/api/v1/imports/'+repeatId);
+save('A5-full-run.json', run); save('A5-repeat-run.json', repeatRun);
+var resources=[];
+for (const [label, row, limit] of [['full',run,3600],['repeat',repeatRun,600]]) {
+  const seconds=(Date.parse(row.ended_at)-Date.parse(row.started_at))/1000, h=row.report?.health;
+  const healthOK=Number.isInteger(h?.count) && h.count>0 && h.failures===0 &&
+    typeof h.max_seconds==='number' && h.max_seconds>=0 && h.max_seconds<=2 &&
+    Array.isArray(h.samples) && h.samples.length===h.count &&
+    h.samples.every(s=>s.ok===true && typeof s.seconds==='number' && s.seconds>=0 && s.seconds<=2);
+  resources.push({label, run:row.id, seconds, limit, health:h, changes:row.report?.counts?.changes,
+    timingAndHealthOK:row.status==='succeeded' && Number.isFinite(seconds) && seconds>=0 && seconds<=limit && healthOK});
+}
+save('A5-timing-health.json', resources);
+save('A5-cache-access.json', {full:run.report.cache_access, repeat:repeatRun.report?.cache_access});
+```
+
+`timingAndHealthOK` 只表示耗时与健康字段检查；仍须查看原始样本时间是否覆盖导入、重跑变化是否为零，以及宿主采样/挂载/前后元数据，不能独自代表 A5 通过。
+
+`report.cache_access` 留为 `A5-cache-access.json`：与 feature plan §4.5 的 13 个白名单文件逐条核对（导入不得出现 users.json，也不得有列目录操作）；缺失/读失败同时保留异常。结合只读挂载和 T-24 `test_v0_cache_access` 的真实打开审计证明；接口请求另外只读 users.json 做认证。**不为验证 cache 不变而做 find/du/ls 或清单扫描**。
+
+### A6：列表与详情各自 P95（AC-011-3）
+
+全量数据成功导入后，catalog 浏览器同源真实登录态，先从列表取得一个真实 ID。列表与详情分别预热 10 次，再分别单并发顺序请求 100 次；等到完整响应和 JSON 读取完成才计时，保存全部原始耗时及结果。下列只读片段不打印凭证：
+
+```javascript
+var first = await getJSON('/api/v1/items?page=1&page_size=50');
+if (!first.items?.length) throw new Error('没有真实详情样本，待验');
+var detailId = first.items[0].id;
+var performanceEvidence = {};
+for (const [label, path] of Object.entries({list:'/api/v1/items?page=1&page_size=50', detail:'/api/v1/items/'+detailId})) {
+  const warmup=[], samples=[];
+  for (let i=0; i<110; i++) {
+    const start=performance.now(); let ok=false, error=null;
+    try {
+      const body=await getJSON(path);
+      ok=label==='list' ? Array.isArray(body.items) && body.total>0 : body.id===detailId && Array.isArray(body.images);
+      if (!ok) error='响应结构/对象不匹配';
+    } catch (_) { error='请求失败（非200、认证、重定向或响应无效）'; }
+    (i<10?warmup:samples).push({seconds:(performance.now()-start)/1000, ok, error});
+  }
+  const valid=warmup.length===10 && samples.length===100 && [...warmup,...samples].every(s=>s.ok);
+  const p95=valid ? samples.map(s=>s.seconds).sort((a,b)=>a-b)[94] : null;
+  performanceEvidence[label]={path, warmup, samples, p95, passed:valid && p95<=1};
+}
+save('A6-performance.json', {run:run.id, at:new Date().toISOString(), detailId, results:performanceEvidence});
+```
+
+P95 用 100 个成功样本排序后的第 95 个值（nearest-rank）；两类各自 ≤1 秒。失败/401/403/非200/样本不足不排除后再算通过；本段已将任一失败使 p95=null、passed=false。环境中有其他导入或异常活动时记录，不把测试夹具或小数据性能当全量证据。
+
+### A7：随机 20 个可用 v0 卷链接（AC-011-4）
+
+在 catalog 页枚举**已有 API 响应**中的链接，不扫描磁盘、不调用 v0 rescan、不加载影像图块。按卷 URL（去 query 的 origin+pathname）去重后随机抽 20；同时保存不能给链接的原因。遍历详情为单并发，只在获准低峰执行；不足 20 明确待验。
+
+```javascript
+var candidates=new Map(), noLinks=[];
+for (const item of await allPages('/api/v1/items')) {
+  const detail=await getJSON('/api/v1/items/'+item.id);
+  for (const image of detail.images) {
+    const link=image.v0_link;
+    if (!link.url) { noLinks.push({image:image.id, root:image.root, kind:image.kind, reason:link.reason}); continue; }
+    const url=new URL(link.url), key=url.origin+url.pathname;
+    if (!candidates.has(key)) candidates.set(key, {url:link.url, item:item.id, image:image.id,
+      directory:image.relative_path.slice(0,image.relative_path.lastIndexOf('/')),
+      filename:image.relative_path.slice(image.relative_path.lastIndexOf('/')+1)});
+  }
+}
+var pool=[...candidates.values()];
+// Fisher-Yates，仅随机抽样验收对象，不重做任何编目规则。
+for (let i=pool.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+save('A7-candidates.json', {run:run.id, available:pool.length, pending:pool.length<20, selected:pool.slice(0,20)});
+save('A7-no-links.json', noLinks);
+```
+
+由于 8503 与 8504 不同源，**不要从 catalog 页跨源 fetch 或绕过 CORS**。在同一主机已正常登录的 v0 页另开控制台，重新定义上文 `save` / `getJSON`（仍同源 GET），通过文件选择器读取刚保存的候选文件（不读取 cookie）：
+
+```javascript
+var selection=await new Promise(resolve=>{
+  const input=document.createElement('input'); input.type='file'; input.accept='.json';
+  input.onchange=async()=>resolve(JSON.parse(await input.files[0].text())); input.click();
+});
+var linkResults=[];
+for (const candidate of selection.selected) {
+  const url=new URL(candidate.url); let passed=false, response=null, error=null;
+  try {
+    if (url.origin!==location.origin) throw new Error('请在链接对应的同源 v0 页面执行');
+    const id=url.pathname.split('/').pop();
+    const page=await fetch(url.href, {credentials:'same-origin', cache:'no-store', redirect:'error'});
+    await page.text(); // 完整页面响应；单有200不够
+    if (page.status!==200) throw new Error('查看器页面失败');
+    response=await getJSON('/api/item/'+encodeURIComponent(id));
+    const encoded=response.id.replace(/-/g,'+').replace(/_/g,'/');
+    const directory=new TextDecoder().decode(Uint8Array.from(atob(encoded+'='.repeat((4-encoded.length%4)%4)),c=>c.charCodeAt(0)));
+    passed=response.id===id && directory===candidate.directory &&
+      response.category===candidate.directory.split('/')[0] &&
+      response.title===candidate.directory.split('/').pop() &&
+      response.files.some(f=>f.name===candidate.filename);
+  } catch (_) { error='页面/认证/同源/卷响应核查失败，人工调查'; }
+  linkResults.push({candidate, passed, response, error});
+}
+save('A7-link-checks.json', {run:selection.run, available:selection.available, results:linkResults,
+  passed:selection.available>=20 && linkResults.length===20 && linkResults.every(r=>r.passed)});
+```
+
+实际 v0 `/api/item/{id}` 返回 `id/title/category/files/notes`，没有 catalog 的 `images` 字段。核对 ID 解码出的相对目录及真实文件名，不能只见 HTTP 200（登录页也可能 200）就通过。散放链接 `?file=文件名` 仅提示，不会定位该文件；这里只核对该文件在卷内，不声称自动定位成功。备份、JPG、PSB、未收录、影像缺失/目录不存在、从未有有效索引均应无 URL 且有具体 reason，逐类在 `A7-no-links.json` 留证。
+
+### 证据汇总与待验状态
+
+在外部证据目录写 `A1-A7-summary.json`：每项记录批次、代码版本、开始/结束时间、证据文件、通过/差异/待验及原因；记录人工对象核查结论，不把 compare 的退出码替代全套验收。API 核查结束后重新 GET `/imports` 确认期间没有新批次影响对象状态。所有已解释差异仍保留 expected/actual；未覆盖项明确待验。任何业务缺口回主会话登记任务，修复须重新 Analyze/Converge → 独立 Review → Gate 2 → merge → 获准部署；本机 T-23 完成不代表 T-24～T-26、Gate 2 或 feature 验收完成。

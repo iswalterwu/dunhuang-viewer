@@ -217,7 +217,7 @@
 
 ### T-23 基线对照、验收入口与本机回归（1.5 小时）
 
-- **状态**：未开始
+- **状态**：本机完成（2026-10-28，P5 Astra，主会话已独立复核）。34 项固定日期基线、标准库只读比较器、42 项比较测试及 README A1～A7 操作/证据入口已提供。支持 CLI 的 counts.counts、API 的 report.counts 和缺批次状态的直接报告；Q-024 六个 txt 保留差异，不改 477 基线；图块 JPG、母号查询结果、长卷逐条派生覆盖三项明确未验证，不以总数冒充对象级证据。主会话非 DB 回归 360 passed / 42 deselected / 1 条原有警告；显式包含 acceptance 的全套回归 360 passed / 42 db skipped / 1 条原有警告，比较测试单独运行 42 passed。v0 三文件编译、31 个 catalog Python 文件的 3.12 AST 语法、README 12 段 Bash/9 段 JavaScript/3 段 Python 语法、UTF-8 LF、文档一致性及差异空白检查通过；均非 NAS/浏览器/Compose/容器/SQL 运行证据。真实 A1～A7、T-24～T-26 仍未执行且待许可
 - **上下文**：M7；用一份基线与现有 CLI 承载验收，避免多份统计规则和重复命令。
 - **依赖**：T-19、T-22
 - **修改范围**：`catalog/acceptance/baseline-2026-10-27.json`、`catalog/acceptance/compare.py`、`catalog/acceptance/test_compare.py`、`catalog/README.md`、`specs/catalog-foundation/tasks.md`。
@@ -261,8 +261,9 @@
 | P2-fix | P2 集成修复 | GPT 6 Astra / openai（gpt-6-astra） | 仅 importer.py、test_import.py | 15:29～15:33，新增四个真实文件回归并修复；指定测试 51 通过 / 30 db 跳过；主会话完整复验 303 通过 / 30 db 跳过 / 1 条原有警告 |
 | P3 | T-20 → T-21 | GPT 6 Astra / openai（gpt-6-astra） | api.py、config.py、__main__.py、test_api.py / test_config.py；importer.py / test_import.py 仅补合并建议双端对象关联 | 16:15～16:33 串行完成；子 agent 指定文件 73 通过 / 27 db 跳过；主会话完整复验 311 通过 / 42 db 跳过 / 1 条原有警告，真实 DB 未验 |
 | P4 | T-22 | GPT 6 Astra / openai（gpt-6-astra） | catalog/Dockerfile、docker-compose.yml、.env.example、.dockerignore、test_runtime.py、README.md | 16:53:17～17:01:12 自然完成 exit=0，随暂停 WIP 保存；21:26 恢复后主会话复核并完整回归：318 passed / 42 db skipped / 1 条原有警告，其中静态运行契约 7 通过；文档一致性与差异空白检查通过，Compose / 镜像 / 运行仍待验 |
+| P5 | T-23 | GPT 6 Astra / openai（gpt-6-astra） | acceptance/baseline-2026-10-27.json、compare.py、test_compare.py、catalog/README.md | 当前安全点 private-candidate-031；独立进程 21:28:27～21:45:32，exit=0，仅写四个分配文件。子 agent 非 DB 回归 360 passed / 42 deselected / 1 warning；主会话同命令复验一致，另跑完整回归 360 passed / 42 db skipped / 1 warning、比较测试独立 42 passed；源码与文档语法/一致性通过，未连接 NAS 或启动服务 |
 
-P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
+P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用警告。P2 集成修复后：303 passed / 30 db skipped / 1 条原有警告（test_import.py 37 通过、15 db 跳过；test_db.py 15 db 跳过）。P4 恢复复验为 318 passed / 42 db skipped；P5 后显式包含 acceptance 的最新完整回归为 360 passed / 42 db skipped / 1 条原有警告。本机默认 pytest.ini 的 testpaths 仍只有 tests，验收比较测试须显式加入 acceptance/test_compare.py（README 与 T-24 命令已包含）。没有执行真实数据库、Python 3.12 容器或 NAS 部署验收。本次恢复完全未连接 NAS；早先前置资料仅按名只读抽查三个国图卷的 JSON 和 13 个白名单执行记录，没有遍历 cache。
 
 ## Handoff 文档（实施与评审完成后）
 
