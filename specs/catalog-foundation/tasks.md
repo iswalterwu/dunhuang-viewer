@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
-> 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8拆分；用户批准S0设计修订后，独立Checklist12先核plan9，现据此新增/细化T31/T32，待Analyze。
-> 状态：P8/P9候选private-candidate-042在NAS Python3.12/真PG **412 passed/0 skipped**；T29/T30实现/真库回归完成但未独立重审。T28第一版共享仍未证明资源目标：6k真库重导RSS175.71MiB、两点36k趋势668.83MiB（非全量实测），A4时按约定停下；用户本轮已同意T31小幅S0设计修订，plan9独立Checklist12无阻断（10通过/2因新Tasks待补评），现已拆T31/T32待Analyze，未派实施。R1仍需修复重审，未发R2/未Gate2；spec和512MiB未改，T25/T26待单独许可。
+> 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8拆分；用户批准S0设计修订后，独立Checklist12先核plan9，现据此新增/细化T31/T32，独立Analyze13全12项通过允许仅这两项实施。
+> 状态：P8/P9候选private-candidate-042在NAS Python3.12/真PG **412 passed/0 skipped**；T29/T30实现/真库回归完成但未独立重审。T28第一版共享仍未证明资源目标：6k真库重导RSS175.71MiB、两点36k趋势668.83MiB（非全量实测），A4时按约定停下；用户本轮已同意T31小幅S0设计修订，plan9独立Checklist12无阻断（10通过/2因新Tasks待补评），独立Analyze13现已12项全通过，允许派发T31，仅两文件Astra实施；T32依赖代码/本机就绪。R1仍需修复重审，未发R2/未Gate2；spec和512MiB未改，T25/T26待单独许可。
 
 ## 执行约定
 
@@ -282,10 +282,10 @@
 - **完成标准**：满足AC-003-5/AC-010-1及plan §4.2.3 C；两件/多件同号及级联回退可定位参与者，身份/主号/归并结果与顺序无关性不变。
 - **验证命令**：完整 `test_identity.py` 与全套回归；与其他修复集成后新候选真库复验与独立Review-R2。
 
-### T-31 S0有界服务端游标与真库生命周期回归（1.5小时，已获准，待Analyze）
+### T-31 S0有界服务端游标与真库生命周期回归（1.5小时，已获准Analyze通过，准备P10）
 
-- **状态/上下文**：R1 P1/T28第一版最小共享后仍缺512MiB余量，用户回复「同意」小幅S0读取修订；plan9的独立Checklist12为10通过/0不通过/2本轮不评，无阻断，可拆Tasks，尚不能实施。本任务只实现plan §4.1.1，估时不含模型等待/目标环境；旧412不是本版证据。
-- **依赖**：Checklist12完成；独立Analyze补评CHK04/07且全项通过后才派Astra。T28整体资源目标继续打开。T31代码/本机集成通过即可标实现就绪进入T32，真库结论由T32补齐；不以T31须先真库通过形成循环。
+- **状态/上下文**：R1 P1/T28第一版最小共享后仍缺512MiB余量，用户回复「同意」小幅S0读取修订；plan9的独立Checklist12为10通过/0不通过/2本轮不评，无阻断后拆Tasks；Analyze13在private-candidate-045全12项通过允许实施（12:00:38～12:09:43，Anthropic Claude、exit0）。本任务只实现plan §4.1.1，估时不含模型等待/目标环境；旧412不是本版证据。
+- **依赖**：Checklist12及独立Analyze13已完成，后者12项全通过，现准备P10 Astra。T28整体资源目标继续打开。T31代码/本机集成通过即可标实现就绪进入T32，真库结论由T32补齐；不以T31须先真库通过形成循环。
 - **修改范围**：独立Astra仅 `catalog/src/dh_catalog/importer.py` 的load_catalog_state及复用游标上下文、`catalog/tests/test_import.py`。不改db.py/autocommit/row_factory、rules/编号归并/事务编排、schema/依赖/配置/v0；主会话负责集成与记录。
 - **完成标准**：支持AC-012-3/AC-012-4并保持AC-003-1/AC-008-1/AC-009-3/AC-013-1/AC-013-3。六查询原列/过滤/顺序完整，命名ServerCursor itersize=128、不fetchall/list、不WITH HOLD；每查询显式关闭。loader内transaction在外事务仅保存点，无外事务则短读事务；返回S0全量/值类型/编号顺序、依据/历史不变，沿用只读叶池，无额外cache/校验机制。不得逐批commit/新连接、当空S0吞异常/缩列/流式全流水线/扩限；达不到预算再停。
 - **真实验证**：按plan §5四个固定测试名覆盖≥257影像及六种S0集合与普通SELECT逐字段等价；Linux临时psycopg协议trace确认实际FETCH上界/多批（正常路径可CLOSE），trace关闭删除不归档，不mock连接/业务。autocommit直调、外事务两路径同连接pg_cursors无残留；双连接验证加载后外事务未提前提交、rollback后无新持久化。真实DDL改名引发加载SQL失败时保存点rollback后游标清空/外事务可用，无需错误路径CLOSE；必要行处理异常用真实测试行JSON null触发已有异常，验证正常事务下显式关闭，不新增生产防御规则。保留现有正式导入失败/锁归还/历史等价全部断言。
@@ -295,7 +295,7 @@
 
 - **状态/上下文**：仅已批准的合成隔离测试，不是T25部署/T26真实验收；主会话执行操作/诊断，不由主会话写业务修复。需要新候选完整SHA和T31本机集成通过；不沿用A4通过数。
 - **修改范围**：仅任务/收敛/评审/交接状态及 `handoff/` 本轮脱敏证据，外部标准操作探针；任何业务修复派回独立Astra且保持T31范围。用新批次路径/标签，不覆盖A4原件；不改spec/plan/checklist或运行配置。
-- **完成标准**：AC-012-3/AC-012-4的软件资源证据及AC-003-1/AC-013-3等价。512m=memswap构建/API、384m=memswap PG，无真实材料/v0/正式pgdata挂载，无宿主端口/正式Compose，MemAvailable≥2GB且低峰。完整目标3.12/PG所有db项实际执行；A4同口径S0-only原探针与2k/6k真实prepare/execute二次加载对比，另做差异化TIFF头维度/事实摘要检查；有余量再约36k首轮/真实库重导。所有值/ID/basis/事实摘要/history/计数稳定，进程RSS/cgroup/退出/失败/OOM明确留证，临时文件位于容器磁盘非tmpfs；不以两点外推当通过、不保证cursor足够，仍不足则停止讨论设计。
+- **完成标准**：AC-012-3/AC-012-4的软件资源证据及AC-003-1/AC-013-3等价。512m=memswap构建/API、384m=memswap PG，无真实材料/v0/正式pgdata挂载，无宿主端口/正式Compose，MemAvailable≥2GB且低峰。完整目标3.12/PG所有db项实际执行；A4同口径S0-only原探针与2k/6k真实prepare/execute二次加载对比，另做差异化TIFF头维度/事实摘要检查；放大操作安全条件先固定：同质2k/6k重导RSS两点投影36k≤480MiB（给512留32MiB，只用于是否尝试合成规模、不新增产品AC），差异6k按其基线线性投影也≤480MiB，才跑约36k首轮/真实库重导；否则停止讨论，不宣称已发生全量失败。所有值/ID/basis/事实摘要/history/计数稳定，进程RSS/cgroup/退出/失败/OOM明确留证，临时文件位于容器磁盘非tmpfs；不以两点外推当通过、不保证cursor足够，仍不足则停止讨论设计。
 - **验证命令/证据**：沿T24已批准git archive候选/受限docker build与一次性PG/API命令；完整pytest显式acceptance。保持 `/srv/example/private-audit/converge/T28-s0-load-probe.py` 不变；规模操作探针 `T31-pg-scale-probe.py <2000|6000|36000> <same|varied>` 仅在受限临时容器/新 `dh_catalog_test_*` 数据库，第二次重新加载S0而非DTO。源/归档哈希、实际完整命令/资源/结果与清理保存本轮新目录，不提交tar/.env/口令/trace/raw；删除所有本轮资源/凭据、v0状态前后不变。目标证据形成后Claude独立Review-R2；设计通过/测试绿均不代实现审核或Gate2。
 
 CR1-03（扩展名紧邻裸号，未证实）与CR1-04（备份散放，低概率）现在不改代码或冻结编号规则；留T-26按实际材料核查，必要时先澄清/登记。评审范围、全部发现与Gate2待验风险见review.md，原文按哈希归档，不勾改设计checklist。

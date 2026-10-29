@@ -22,6 +22,25 @@
 
 ## 当前结果
 
+第13轮（2026-10-29，审阅`private-candidate-045`，plan9/spec7，Tasks后的Analyze；A = anthropic/claude-fable-5-1）：**12通过 / 0不通过 / 0不评，无阻断，允许仅T31/T32进入Implement**。12:00:38～12:09:43 （原始时刻；时区非公开），自然exit0，工作区无修改。首选桥仍是已证实的接入不可用状态，本轮未调用；实际Anthropic。原文/提示词/meta/status/哈希在 Plan9-R13（非公开历史记录），本段仅机械记录，不代CodeReview-R2/Gate2。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [x] CHK-04：通过
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [x] CHK-07：通过
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+非阻断建议机械记录：1 DDL失败不用第二连接读被锁表；2 辅助上下文产出游标、不是yield from行生成器；3 FETCH上界/多批断言容纳整批后的空FETCH，trace仅临时Linux，非支持平台明确skip不冒充目标验证；4 先真实导入再UPDATE JSON null造行错误；5 T32开跑前明确放大安全条件与非tmpfs证据。已交派发/操作约束，不因此扩生产逻辑或新增需求。实施期间本清单不改；新代码仍须实际回归/资源/CodeReview-R2。
+
+### 第12轮历史（Plan→Checklist）
+
 第12轮（2026-10-29，审阅`private-candidate-044`，plan9；A = anthropic/claude-fable-5-1）：**10通过 / 0不通过 / 2本轮不评，无阻断，可进入Tasks，尚不能Implement**。11:42:37～11:50:51 （原始时刻；时区非公开），自然exit0/仓库无修改。首选claude-bridge仍在R1已证实的接入不可用状态，引用 CodeReview-R1 bridge.err（非公开历史记录），本轮未重试；实际Anthropic，不伪称桥审阅。
 
 - [x] CHK-01：通过
@@ -104,7 +123,7 @@ NAS 测试与部署仍需单独许可；实现期间不改本清单，Review 阶
 
 ## 历史
 
-第12轮为plan9的Plan/Checklist核对，10通过、2因新Tasks未拆不评；原文单独按哈希归档（见上），不重放1～11轮。后续Analyze补评尚未发生。
+第12轮为plan9的Plan/Checklist核对，10通过、2因新Tasks未拆不评；原文单独按哈希归档（见上），不重放1～11轮。随后第13轮已补评全12项通过、进入仅T31/T32的Implement；原文见上，不代实际代码Review。
 
 | 轮次 | 审阅提交 | 审核员与通道 | 结果（通过 / 未通过） | 去向 |
 |---|---|---|---|---|
