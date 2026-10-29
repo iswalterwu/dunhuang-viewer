@@ -1,6 +1,6 @@
 # catalog-foundation 实际实现评审记录
 
-> 2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。主会话已由P8/P9实施最小优化及两处语义修复，候选private-candidate-042真实NAS/PG全412项通过；但真PG规模趋势仍缺乏512MiB余量，P1未关闭，A4时按约定停止；用户现已同意小幅S0读取修订，plan9草案待独立核对，未经Checklist/Analyze不实施。未启动R2或变更spec需求。
+> 2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。主会话已由P8/P9实施最小优化及两处语义修复，候选private-candidate-042真实NAS/PG全412项通过；但真PG规模趋势仍缺乏512MiB余量，P1未关闭，A4时按约定停止；用户现已同意小幅S0读取修订，plan9已独立Analyze13全12项通过，P10仅两文件实施且本机369通过/54skip，423项；新目标PG/资源T32待验。未启动R2或变更spec需求。
 
 ## 1. 独立审核与通道
 
@@ -63,6 +63,12 @@ P8/P9均openai/gpt-6-astra、自然exit0，分别在共享文件串行处理T28/
 **T-28目标未完成，P1保持打开；已按用户停止条件暂停继续扩大/实施，未派Review-R2。** 两个P3只有实现与真库回归完成，不冒充独立关闭。用户本轮回复「同意」，T31已获准先回Plan/Checklist/Tasks/Analyze，plan9补有界服务端游标128行抓取S0，所有字段/最终全量内存计算/事务锁和持久化JSON不变；验证游标关闭、调用方事务、连接释放与充分规模，仍不足再讨论。plan8现仅在获准范围回修为9版草案，不缩列/全流水线重构/扩限/加swap，不恢复Q-025机制。
 
 新A4前检、构建/资源、完整回归、两点JSONL、S0探针与源码、清理证据：**T28-scale-A4（非公开历史记录）**（先读README/manifest）。四个API/诊断容器、PG/匿名卷/网络/镜像/快照/.env/raw已清理，v0 ID/启动/restarts未变；无当前资源或子agent。旧R1原文不变、Gate2仍未批准。
+
+### Plan9与P10新进度（不是独立实现Review）
+
+用户同意后先Checklist12（10通过/2Tasks未评，无阻断）再拆T31/T32；Analyze13于private-candidate-045全12项通过（Anthropic Claude，12:00:38～12:09:43，自然exit0），允许仅这两任务实施。桥仍在已证实的接入不可用状态，本轮实际Anthropic，原文见 Plan9-R12（非公开历史记录） 和 `Plan9-R13/`。
+
+P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import（12:12:32～12:21:09，exit0），原六SQL不变，显式cursor上下文/128批次/短读事务与保存点；四测试11参数项。主会话本机完整369 passed/54 skipped/1原有警告，423 collected，跳过均未当通过；54新目标db项/3.12运行与规模待T32，不能沿用A4旧412作为本版证据。P1仍打开、未R2/未Gate2。证据 P10-T31（非公开历史记录）。
 
 ## 5. 部署后待验与风险
 

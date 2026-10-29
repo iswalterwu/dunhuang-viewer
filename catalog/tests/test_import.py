@@ -1,17 +1,23 @@
 """真实文件流水线及 PostgreSQL 集成；只有 HTTP 边界用 MockTransport。"""
 
 import base64
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime, timedelta
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import struct
 import subprocess
 import sys
+import tempfile
 from uuid import uuid4
 
 import httpx
+import psycopg
 import pytest
+from psycopg.pq import TransactionStatus
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from dh_catalog import rules
@@ -704,6 +710,223 @@ def test_loaded_basis_sharing_json_and_history_unchanged(connection, import_runn
     for image in images:
         assert value_at_run(connection, "image", image["id"], second)["run_id"] == first
         assert value_at_run(connection, "image", image["id"], first)["field_basis"] == image["field_basis"]
+
+
+@contextmanager
+def _state_load_protocol(connection, enabled):
+    """只留下协议命令摘要；原始行数据仅在临时文件中，失败也 untrace / 关闭。"""
+    commands = []
+    if not enabled:
+        yield commands
+        return
+    with tempfile.TemporaryFile(mode="w+b") as trace:
+        connection.pgconn.trace(trace.fileno())
+        try:
+            yield commands
+        finally:
+            connection.pgconn.untrace()
+        trace.seek(0)
+        for line in trace.read().decode("utf-8").splitlines():
+            if "\tF\t" in line:
+                command = re.search(
+                    r"\b(DECLARE|FETCH FORWARD (?:ALL|\d+)|CLOSE|BEGIN|COMMIT|ROLLBACK|RELEASE)\b", line,
+                )
+                if command:
+                    commands.append(command[1])
+
+
+_PROTOCOL_CASES = [
+    False,
+    pytest.param(True, marks=pytest.mark.skipif(
+        sys.platform != "linux", reason="真实 libpq 协议 trace 仅在 Linux 目标环境验证",
+    ), id="linux-protocol-trace"),
+]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("protocol", _PROTOCOL_CASES)
+def test_state_load_batches_match_all_rows_and_json(connection, import_runner, roots, cache, make_image, protocol):
+    run, _, _ = import_runner
+    base = roots["data"] / "敦煌003"
+    for n in range(253):
+        make_image(base / "P2002" / f"native({n}).tif")
+    make_image(base / "P2003/source.psb")
+    make_image(base / "P2003/合并长卷.tif")
+    (base / "P2003/原文.txt").write_bytes(b"\xff\x00 original\r\n")
+    make_image(base / "P2004/native.tif")
+    nlc = roots["data"] / "中国国博馆藏/bd12345"
+    make_image(nlc / "BD12345_0000_0.tif", dpi=(180, 180))
+    (nlc / "manifest.json").write_bytes(_manifest())
+    (cache / "psb_convert.log").write_text(
+        "===== 11:00:00 转换: 敦煌003/P2003 =====\nPSBNAME: source.psb\n"
+        "TIFF 完成: /data/敦煌003/P2003/合并长卷_psb.tif  7 x 5\n已替换合并长卷.tif\n退出码: 0\n",
+        encoding="utf-8",
+    )
+    run()
+    # 由真实归并/持久化产生 current、pending、historical，不在测试中复制编号算法。
+    (base / "P2002").rename(base / "副本 P2003")
+    (base / "P2004").rename(base / "P2005")
+    run()
+    assert {r["state"] for r in connection.execute("SELECT DISTINCT state FROM identifier")} == {
+        "current", "pending", "historical",
+    }
+    with _state_load_protocol(connection, protocol) as commands:
+        loaded = load_catalog_state(connection)
+    assert connection.info.transaction_status == TransactionStatus.IDLE
+    assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+    assert len(loaded.images) == 257
+    # 普通只读 SQL 逐字段对照；这些容器仅用于测试期望，不模拟读取实现。
+    assert loaded.images == {r["id"]: r for r in connection.execute("SELECT * FROM image")}
+    assert loaded.items == {r["id"]: r for r in connection.execute("SELECT * FROM item")}
+    identifiers = {}
+    for row in connection.execute("SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id"):
+        identifiers.setdefault(row["item_id"], []).append(row)
+    assert loaded.identifiers == identifiers  # 包括每件的数据库 id 顺序。
+    assert loaded.links == {(r["item_id"], r["image_id"]): r for r in connection.execute("SELECT * FROM item_image")}
+    assert loaded.derivations == {(r["image_id"], r["source_image_id"]): r for r in connection.execute("SELECT * FROM derivation")}
+    attachments = {}
+    for row in connection.execute("SELECT * FROM item_attachment"):
+        attachments.setdefault(row["item_id"], set()).add(row["attachment_id"])
+    assert loaded.attachments == attachments
+    assert all((loaded.items, loaded.identifiers, loaded.links, loaded.derivations, loaded.attachments))
+    # JSON 序列化还区分 Python 相等比较会混同的 bool/int/float；嵌套列表不转 tuple。
+    for table, rows, json_fields in (
+        ("image", loaded.images.values(), ("facts", "field_basis")),
+        ("item", loaded.items.values(), ("original_positions", "provenance", "clues", "field_basis")),
+        ("identifier", [r for group in loaded.identifiers.values() for r in group], ("field_basis",)),
+        ("item_image", loaded.links.values(), ("field_basis",)),
+        ("derivation", loaded.derivations.values(), ("field_basis",)),
+    ):
+        stored = list(connection.execute(f"SELECT * FROM {table}"))
+        for row in rows:
+            raw = next(r for r in stored if all(r[key] == row[key] for key in (
+                ("id",) if "id" in row else ("item_id", "image_id") if table == "item_image"
+                else ("image_id", "source_image_id")
+            )))
+            for name in json_fields:
+                assert json.dumps(row[name], sort_keys=True) == json.dumps(raw[name], sort_keys=True)
+    for image in loaded.images.values():
+        assert type(image["facts"]["pixel_size"]["value"]) is list
+    for item in loaded.items.values():
+        assert type(item["original_positions"]) is type(item["clues"]) is list
+        assert type(item["provenance"]["evidence"]) is list
+        assert type(item["field_basis"]["grouping_key"]["identifier_sources"]) is list
+    output, = [r for r in loaded.images.values() if r["lineage"] == "本地合成"]
+    assert type(output["field_basis"]["license"]["source_images"]) is list
+    if protocol:
+        # 六个显式 DECLARE/FETCH/CLOSE 顺序；容许整批后的空 FETCH，不凑总次数。
+        assert commands[0] == "BEGIN" and commands[-1] == "COMMIT"
+        cursor_commands = commands[1:-1]
+        counts = (len(loaded.images), len(loaded.items), sum(map(len, loaded.identifiers.values())),
+                  len(loaded.links), len(loaded.derivations), sum(map(len, loaded.attachments.values())))
+        for count in counts:
+            assert cursor_commands[0] == "DECLARE"
+            end = cursor_commands.index("CLOSE")
+            fetches = cursor_commands[1:end]
+            assert len(fetches) >= max(1, (count + 127) // 128)
+            assert set(fetches) == {"FETCH FORWARD 128"}
+            cursor_commands = cursor_commands[end + 1:]
+        assert cursor_commands == []
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("outer_transaction", [False, True])
+@pytest.mark.parametrize("populated", [False, True])
+def test_state_load_preserves_caller_transaction_and_cursors(
+    connection, test_database_url, import_runner, roots, make_image, outer_transaction, populated,
+):
+    run, _, _ = import_runner
+    if populated:
+        make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    run_id, _ = run()
+    with psycopg.connect(test_database_url, autocommit=True, row_factory=dict_row) as observer:
+        with connection.transaction(force_rollback=True) if outer_transaction else nullcontext():
+            if outer_transaction:
+                connection.execute("UPDATE import_run SET code_version='uncommitted-marker' WHERE id=%s", (run_id,))
+            state = load_catalog_state(connection)
+            assert len(state.images) == int(populated)
+            assert connection.info.transaction_status == (
+                TransactionStatus.INTRANS if outer_transaction else TransactionStatus.IDLE
+            )
+            assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+            assert connection.execute("SELECT 1 AS n").fetchone()["n"] == 1
+            assert connection.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == (
+                "uncommitted-marker" if outer_transaction else "synthetic-code"
+            )
+            assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+        assert connection.info.transaction_status == TransactionStatus.IDLE
+        assert connection.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+        assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+    assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+
+
+@pytest.mark.db
+def test_state_load_sql_failure_rolls_back_savepoint(connection, test_database_url, import_runner, roots, make_image):
+    run, _, _ = import_runner
+    make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    run_id, _ = run()
+    with psycopg.connect(test_database_url, autocommit=True, row_factory=dict_row) as observer:
+        with connection.transaction(force_rollback=True):
+            connection.execute("UPDATE import_run SET code_version='uncommitted-marker' WHERE id=%s", (run_id,))
+            connection.execute("ALTER TABLE derivation RENAME TO synthetic_renamed_derivation")
+            with pytest.raises(psycopg.errors.UndefinedTable) as failure:
+                load_catalog_state(connection)
+            # 保持真实异常及 traceback 存活，不能靠生成器 GC 关闭游标。
+            assert failure.value.sqlstate == "42P01" and failure.value.__traceback__ is not None
+            assert connection.info.transaction_status == TransactionStatus.INTRANS
+            assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+            assert connection.execute("SELECT 1 AS n").fetchone()["n"] == 1
+            assert connection.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "uncommitted-marker"
+            # 不在第二连接读被 DDL 持有 ACCESS EXCLUSIVE 锁的表。
+            assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+        assert connection.info.transaction_status == TransactionStatus.IDLE
+        assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+    assert connection.execute("SELECT count(*) AS n FROM derivation").fetchone()["n"] == 0
+    assert len(load_catalog_state(connection).images) == 1
+    assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("outer_transaction", [False, True])
+@pytest.mark.parametrize("protocol", _PROTOCOL_CASES)
+def test_state_load_row_failure_closes_cursor(
+    connection, test_database_url, import_runner, roots, make_image, outer_transaction, protocol,
+):
+    run, _, _ = import_runner
+    make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    run_id, _ = run()
+    image = connection.execute("SELECT id, field_basis FROM image").fetchone()
+    with psycopg.connect(test_database_url, autocommit=True, row_factory=dict_row) as observer:
+        try:
+            with connection.transaction(force_rollback=True) if outer_transaction else nullcontext():
+                connection.execute("UPDATE image SET field_basis='null'::jsonb WHERE id=%s", (image["id"],))
+                if outer_transaction:
+                    connection.execute("UPDATE import_run SET code_version='uncommitted-marker' WHERE id=%s", (run_id,))
+                with _state_load_protocol(connection, protocol) as commands:
+                    with pytest.raises(AttributeError, match="items") as failure:
+                        load_catalog_state(connection)
+                assert failure.value.__traceback__ is not None
+                assert connection.info.transaction_status == (
+                    TransactionStatus.INTRANS if outer_transaction else TransactionStatus.IDLE
+                )
+                assert list(connection.execute("SELECT name FROM pg_cursors")) == []
+                assert connection.execute("SELECT 1 AS n").fetchone()["n"] == 1
+                assert connection.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == (
+                    "uncommitted-marker" if outer_transaction else "synthetic-code"
+                )
+                assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+                if protocol:
+                    assert commands.count("DECLARE") == commands.count("CLOSE") == 1
+                    assert "FETCH FORWARD 128" in commands
+                    assert commands.index("CLOSE") < commands.index("ROLLBACK")
+                    assert "COMMIT" not in commands
+        finally:
+            # autocommit 分支的合成坏行已经提交，显式还原；外事务分支已回滚。
+            connection.execute("UPDATE image SET field_basis=%s WHERE id=%s", (Jsonb(image["field_basis"]), image["id"]))
+        assert connection.info.transaction_status == TransactionStatus.IDLE
+        assert observer.execute("SELECT code_version FROM import_run WHERE id=%s", (run_id,)).fetchone()["code_version"] == "synthetic-code"
+    assert len(load_catalog_state(connection).images) == 1
+    assert list(connection.execute("SELECT name FROM pg_cursors")) == []
 
 
 @pytest.mark.db

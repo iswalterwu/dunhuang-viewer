@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8拆分；用户批准S0设计修订后，独立Checklist12先核plan9，现据此新增/细化T31/T32，独立Analyze13全12项通过允许仅这两项实施。
-> 状态：P8/P9候选private-candidate-042在NAS Python3.12/真PG **412 passed/0 skipped**；T29/T30实现/真库回归完成但未独立重审。T28第一版共享仍未证明资源目标：6k真库重导RSS175.71MiB、两点36k趋势668.83MiB（非全量实测），A4时按约定停下；用户本轮已同意T31小幅S0设计修订，plan9独立Checklist12无阻断（10通过/2因新Tasks待补评），独立Analyze13现已12项全通过，允许派发T31，仅两文件Astra实施；T32依赖代码/本机就绪。R1仍需修复重审，未发R2/未Gate2；spec和512MiB未改，T25/T26待单独许可。
+> 状态：P8/P9候选private-candidate-042在NAS Python3.12/真PG **412 passed/0 skipped**；T29/T30实现/真库回归完成但未独立重审。T28第一版共享仍未证明资源目标：6k真库重导RSS175.71MiB、两点36k趋势668.83MiB（非全量实测），A4时按约定停下；用户本轮已同意T31小幅S0设计修订，plan9独立Checklist12无阻断（10通过/2因新Tasks待补评），独立Analyze13现已12项全通过，P10仅两文件实施/主会话本机就绪（369通过/54skip/1警告，423项），现待T32真PG/受限规模；无运行子agent/NAS资源。R1仍需修复重审，未发R2/未Gate2；spec和512MiB未改，T25/T26待单独许可。
 
 ## 执行约定
 
@@ -282,10 +282,10 @@
 - **完成标准**：满足AC-003-5/AC-010-1及plan §4.2.3 C；两件/多件同号及级联回退可定位参与者，身份/主号/归并结果与顺序无关性不变。
 - **验证命令**：完整 `test_identity.py` 与全套回归；与其他修复集成后新候选真库复验与独立Review-R2。
 
-### T-31 S0有界服务端游标与真库生命周期回归（1.5小时，已获准Analyze通过，准备P10）
+### T-31 S0有界服务端游标与真库生命周期回归（1.5小时，P10实现/本机就绪，真库待T32）
 
-- **状态/上下文**：R1 P1/T28第一版最小共享后仍缺512MiB余量，用户回复「同意」小幅S0读取修订；plan9的独立Checklist12为10通过/0不通过/2本轮不评，无阻断后拆Tasks；Analyze13在private-candidate-045全12项通过允许实施（12:00:38～12:09:43，Anthropic Claude、exit0）。本任务只实现plan §4.1.1，估时不含模型等待/目标环境；旧412不是本版证据。
-- **依赖**：Checklist12及独立Analyze13已完成，后者12项全通过，现准备P10 Astra。T28整体资源目标继续打开。T31代码/本机集成通过即可标实现就绪进入T32，真库结论由T32补齐；不以T31须先真库通过形成循环。
+- **状态/上下文**：P10仅两文件实现/本机就绪（2026-10-29），生产loader+26/-9、测试+223；主会话完整369 passed/54 skipped/1原有警告，423项（51无DB/3Linux协议trace）。目标真库/资源待T32，跳过不算通过。R1 P1/T28第一版最小共享后仍缺512MiB余量，用户回复「同意」小幅S0读取修订；plan9的独立Checklist12为10通过/0不通过/2本轮不评，无阻断后拆Tasks；Analyze13在private-candidate-045全12项通过允许实施（12:00:38～12:09:43，Anthropic Claude、exit0）。本任务只实现plan §4.1.1，估时不含模型等待/目标环境；旧412不是本版证据。
+- **依赖**：Checklist12及独立Analyze13已完成，后者12项全通过，P10 Astra已结束并主会话本机复验，T32可开始。T28整体资源目标继续打开。T31代码/本机集成通过即可标实现就绪进入T32，真库结论由T32补齐；不以T31须先真库通过形成循环。
 - **修改范围**：独立Astra仅 `catalog/src/dh_catalog/importer.py` 的load_catalog_state及复用游标上下文、`catalog/tests/test_import.py`。不改db.py/autocommit/row_factory、rules/编号归并/事务编排、schema/依赖/配置/v0；主会话负责集成与记录。
 - **完成标准**：支持AC-012-3/AC-012-4并保持AC-003-1/AC-008-1/AC-009-3/AC-013-1/AC-013-3。六查询原列/过滤/顺序完整，命名ServerCursor itersize=128、不fetchall/list、不WITH HOLD；每查询显式关闭。loader内transaction在外事务仅保存点，无外事务则短读事务；返回S0全量/值类型/编号顺序、依据/历史不变，沿用只读叶池，无额外cache/校验机制。不得逐批commit/新连接、当空S0吞异常/缩列/流式全流水线/扩限；达不到预算再停。
 - **真实验证**：按plan §5四个固定测试名覆盖≥257影像及六种S0集合与普通SELECT逐字段等价；Linux临时psycopg协议trace确认实际FETCH上界/多批（正常路径可CLOSE），trace关闭删除不归档，不mock连接/业务。autocommit直调、外事务两路径同连接pg_cursors无残留；双连接验证加载后外事务未提前提交、rollback后无新持久化。真实DDL改名引发加载SQL失败时保存点rollback后游标清空/外事务可用，无需错误路径CLOSE；必要行处理异常用真实测试行JSON null触发已有异常，验证正常事务下显式关闭，不新增生产防御规则。保留现有正式导入失败/锁归还/历史等价全部断言。
@@ -318,6 +318,8 @@ P1 主会话完整回归：266 passed / 15 db skipped / 1 条原有依赖弃用�
 P7：GPT 6 Astra / openai（gpt-6-astra），派发 HEAD `private-candidate-037`，2026-10-29 00:00:58～00:03:35（meta/status 原始记录），exit=0。只改 scan.py、test_scan.py、test_import.py；一处具体异常处理及两条真实文件回归。子 agent 指定文件56通过/15 db跳过，完整本机362通过/42 db跳过/1原有警告；主会话完整本机复验一致，并在新候选private-candidate-038的NAS/3.12/真库全404项通过、0跳过后关闭C1。未由子agent访问NAS。
 
 P8/P9（2026-10-29，均openai/gpt-6-astra，派发HEAD private-candidate-041）：P8 08:08:58～08:19:49，exit=0，仅importer/rules/test_import/test_rules/test_api，T28/T29共享文件串行；子agent分配测试78通过/28 db跳过/1警告。P9 08:08:58～08:11:09，exit=0，仅identity/test_identity，与P8并行无共享修改；子agent38通过，主会话38通过。主会话集成全套 **369 passed/43 db skipped/1原有警告，412 collected**；这是本机证据。随后主会话以候选private-candidate-042在NAS Python3.12/真PG完整 **412 passed/0 skipped/1原有警告，46.08秒**，并实测2k/6k真实库重导及S0定位；未达成36k资源证明，按停止条件待设计讨论、未发R2。全部NAS资源/临时凭据已清理，P8/P9均自然结束、无子agent访问NAS；旧404保留原候选证据。
+
+P10：openai/gpt-6-astra，派发private-candidate-046，meta/status 12:12:32～12:21:09 （原始时刻；时区非公开）、exit0。仅importer.py/test_import.py，显式contextmanager产cursor、128行命名游标、短读事务/嵌套保存点。四新测试参数化11项，子agent完整369通过/54skip/1原有警告，主会话同全套369/54/1（423项）复验一致；54中51无DB/3Linux trace。原函数AST除loader外未改、3.12 AST/UTF8LF/差异通过；不代PG运行。证据 P10-T31（非公开历史记录），未由子agent访问NAS/提交；T32真实证据待验。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 

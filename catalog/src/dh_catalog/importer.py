@@ -8,7 +8,7 @@ compute_import 是真实的扫描到预备写入阶段；attachment_sink 在每�
 
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -169,15 +169,32 @@ def latest_valid_snapshot(connection: Connection) -> IndexSnapshot | None:
 def load_catalog_state(connection: Connection) -> CatalogState:
     state = CatalogState()
     basis = _BasisPool()
-    state.images = {row["id"]: basis.share_row(row) for row in connection.execute("SELECT * FROM image")}
-    state.items = {row["id"]: basis.share_row(row) for row in connection.execute("SELECT * FROM item")}
-    for row in connection.execute("SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id"):
-        state.identifiers.setdefault(row["item_id"], []).append(basis.share_row(row))
-    state.links = {(row["item_id"], row["image_id"]): basis.share_row(row) for row in connection.execute("SELECT * FROM item_image")}
-    state.derivations = {(row["image_id"], row["source_image_id"]): basis.share_row(row) for row in connection.execute("SELECT * FROM derivation")}
-    for row in connection.execute("SELECT * FROM item_attachment"):
-        state.attachments.setdefault(row["item_id"], set()).add(row["attachment_id"])
+    # 已有正式事务时只建立保存点；autocommit 直调时结束短读事务。
+    with connection.transaction():
+        with _state_cursor(connection, "SELECT * FROM image") as cursor:
+            state.images = {row["id"]: basis.share_row(row) for row in cursor}
+        with _state_cursor(connection, "SELECT * FROM item") as cursor:
+            state.items = {row["id"]: basis.share_row(row) for row in cursor}
+        with _state_cursor(connection, "SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id") as cursor:
+            for row in cursor:
+                state.identifiers.setdefault(row["item_id"], []).append(basis.share_row(row))
+        with _state_cursor(connection, "SELECT * FROM item_image") as cursor:
+            state.links = {(row["item_id"], row["image_id"]): basis.share_row(row) for row in cursor}
+        with _state_cursor(connection, "SELECT * FROM derivation") as cursor:
+            state.derivations = {(row["image_id"], row["source_image_id"]): basis.share_row(row) for row in cursor}
+        with _state_cursor(connection, "SELECT * FROM item_attachment") as cursor:
+            for row in cursor:
+                state.attachments.setdefault(row["item_id"], set()).add(row["attachment_id"])
     return state
+
+
+@contextmanager
+def _state_cursor(connection, query):
+    # 消费者退出时立即关闭，不把关闭留给持有行生成器的 traceback / GC。
+    with connection.cursor(name="catalog_state", scrollable=False, withhold=False) as cursor:
+        cursor.itersize = 128
+        cursor.execute(query)
+        yield cursor
 
 
 def compute_import(
