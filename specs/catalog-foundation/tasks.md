@@ -306,10 +306,10 @@
 - **完成标准**：服务既有AC-012-3/AC-012-4，保持AC-003-1/AC-013-1/AC-013-3；核验二次导入ID/JSON/事实/history不变、阶段和对象证据/开销/限制可复核。比较压紧内部只读状态、减少S0/当前结果双份驻留（及若证据支持的更小生命周期改法），给代码触及面/复杂度/可预期收益与必要验证，不许凭估计声明512MiB达标。报告建议后由用户决定，任何新设计先Plan/Analyze再Astra。
 - **验证/证据与清理**：在新批次候选快照构建原代码，原T31材生成器不改以保持可比。全新dh_catalog_test_*临时库/容器，无真实材料/v0/正式pgdata绑定、无宿主端口/正式Compose/global prune；对照和插桩分进程/新库，标准JSONL留源哈希、方法及资源/清理。所有本轮库/容器/卷/网络/镜像/快照/凭据删除，v0状态前后核对；不提交env/tar/trace/private raw。不重新计算全量或将本轮诊断冒充423测试的新实现证据。
 
-### T-34 C：移除影像策略解析自环（0.5～1小时，Analyze15通过，准备P12）
+### T-34 C：移除影像策略解析自环（0.5～1小时，P12实现/本机就绪，真库待T36）
 
-- **上下文/状态**：T33明确普通路径存在局部递归policy自捕获，独占4.108MiB/6k且自然GC回收点变化；用户现同意C独立拆项、A为主。Checklist14为10通过/2新Tasks待补评、无阻断可拆任务，随后独立Analyze15在private-candidate-053全12项通过（21:56:02～22:08:52，Anthropic Claude，exit0）允许仅T34～36实施，现准备P12；目标支持AC-012-3/AC-012-4，保持AC-005-2/AC-005-3/AC-006-1/AC-006-2/AC-013-1。
-- **依赖/分工**：独立Analyze15已全项通过，由Astra P12实施；与T35共享importer/test_import，必须先C后A串行。C仅本机/代码就绪即可进入T35，真库由T36补齐，C不能独立关闭P1。
+- **上下文/状态**：T33明确普通路径存在局部递归policy自捕获，独占4.108MiB/6k且自然GC回收点变化；用户现同意C独立拆项、A为主。Checklist14为10通过/2新Tasks待补评、无阻断可拆任务，随后独立Analyze15在private-candidate-053全12项通过（21:56:02～22:08:52，Anthropic Claude，exit0）允许仅T34～36实施，P12已实现/主会话本机375 passed/54 skipped/1原有警告、429项；新6个许可/无环/异常生命周期用例通过。真PG/目标3.12/资源待T36；目标支持AC-012-3/AC-012-4，保持AC-005-2/AC-005-3/AC-006-1/AC-006-2/AC-013-1。
+- **依赖/分工**：独立Analyze15已全项通过，Astra P12于22:13:07～22:18:27 （原始时刻；时区非公开） exit0，仅两文件，主会话全本机复验通过；与T35共享importer/test_import，必须先C后A串行。C仅本机/代码就绪即可进入T35，真库由T36补齐，C不能独立关闭P1。
 - **修改范围**：仅`catalog/src/dh_catalog/importer.py`的策略解析/调用和`catalog/tests/test_import.py`，不动rules/derivation/身份/编排/SQL/依赖/配置/v0，不强制GC/调GC或新增恢复机制。短小私有解析器无自捕获/不缓存自身bound method、实例可弱引用，不用方法lru_cache/cached_property钉住self。
 - **完成标准/真实测试**：按plan§4.1.3保留源先于输出、memo命中、本批来源、最严格许可/署名等全部值；普通NLC/BnF/真实执行记录的派生源继承均测试。固定`test_image_policy_lifetime_without_gc`沿sys.setprofile实际返回事件登记weakref（不保frame/f_locals、不替换业务），在下一阶段实际进入时确认解析器无环释放；小测试期间可gc.disable并finally恢复原状态，防旧环被自然GC假绿，生产及资源探针不变。异常traceback持帧不误断必释放，保留所有失败回滚/历史/许可断言。
 - **验证命令**：本机完整`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_import.py`，再完整`catalog/tests catalog/acceptance/test_compare.py`；无DB如实skip不计通过，AST3.12/UTF8LF/原警告保留/限定diff检查。后T36真实PG全套。
@@ -353,6 +353,8 @@ P7：GPT 6 Astra / openai（gpt-6-astra），派发 HEAD `private-candidate-037`
 P8/P9（2026-10-29，均openai/gpt-6-astra，派发HEAD private-candidate-041）：P8 08:08:58～08:19:49，exit=0，仅importer/rules/test_import/test_rules/test_api，T28/T29共享文件串行；子agent分配测试78通过/28 db跳过/1警告。P9 08:08:58～08:11:09，exit=0，仅identity/test_identity，与P8并行无共享修改；子agent38通过，主会话38通过。主会话集成全套 **369 passed/43 db skipped/1原有警告，412 collected**；这是本机证据。随后主会话以候选private-candidate-042在NAS Python3.12/真PG完整 **412 passed/0 skipped/1原有警告，46.08秒**，并实测2k/6k真实库重导及S0定位；未达成36k资源证明，按停止条件待设计讨论、未发R2。全部NAS资源/临时凭据已清理，P8/P9均自然结束、无子agent访问NAS；旧404保留原候选证据。
 
 P10：openai/gpt-6-astra，派发private-candidate-046，meta/status 12:12:32～12:21:09 （原始时刻；时区非公开）、exit0。仅importer.py/test_import.py，显式contextmanager产cursor、128行命名游标、短读事务/嵌套保存点。四新测试参数化11项，子agent完整369通过/54skip/1原有警告，主会话同全套369/54/1（423项）复验一致；54中51无DB/3Linux trace。原函数AST除loader外未改、3.12 AST/UTF8LF/差异通过；不代PG运行。证据 P10-T31（非公开历史记录），未由子agent访问NAS/提交；T32真实证据在T32-A1补齐423 passed/0 skipped/1原有警告，54db全部通过；校准资源有改善但未过36k放大条件，按约定停止，未R2。
+
+P12/T34 C：openai/gpt-6-astra，派发private-candidate-054，2026-10-29 22:13:07～22:18:27 （原始时刻；时区非公开），exit0。仅importer/test_import，生产+26/-12改为weakrefable slots解析器，无自捕获/方法缓存/生产GC；新6个测试包括NLC有无署名/BnF/真实多层派生/memo/读失败/异常traceback释放。主会话完整375 passed/54 skipped/1原有警告（429项，51无DB/3Linux），旧函数AST除_image_rows外不改，UTF8LF/3.12 AST/diff检查通过；真库待T36，P1未关，不代Review。证据 P12-T34（非公开历史记录），无子agent/NAS资源，现可串行P13。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 

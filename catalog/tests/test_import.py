@@ -3,6 +3,7 @@
 import base64
 from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime, timedelta
+import gc
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -12,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 from uuid import uuid4
+import weakref
 
 import httpx
 import psycopg
@@ -20,7 +22,7 @@ from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from dh_catalog import rules
+from dh_catalog import importer, rules
 from dh_catalog.db import ImportBusy, create_pool
 from dh_catalog.derivation import CACHE_FILES
 from dh_catalog.importer import (
@@ -161,6 +163,130 @@ def test_derivation_license_and_unknown_source_not_inherited_from_old_state(root
     assert second.images[output["id"]]["license"] == "未知"
     assert not second.derivations
     assert "派生来源不明" in {a["category"] for a in second.anomalies}
+
+
+@contextmanager
+def _observe_image_policy():
+    """只留弱引用/标量；真实帧与 f_locals 不跨 profile 回调保存。"""
+    observed = {"refs": [], "image_returns": [], "item_calls": [], "calls": [], "resolved": []}
+    init_code = importer._ImagePolicyResolver.__init__.__code__
+    call_code = importer._ImagePolicyResolver.__call__.__code__
+
+    def profile(frame, event, arg):
+        if event == "return" and frame.f_code is init_code:
+            observed["refs"].append(weakref.ref(frame.f_locals["self"]))
+        elif event == "call" and frame.f_code is call_code:
+            observed["calls"].append(str(frame.f_locals["file"].relative_path))
+        elif event == "return" and frame.f_code is rules.source_policy.__code__:
+            observed["resolved"].append(str(frame.f_locals["file"].relative_path))
+        elif event == "return" and frame.f_code is importer._image_rows.__code__:
+            # return 事件时帧仍活；正常返回不能误要求解析器此刻已死。
+            observed["image_returns"].append(observed["refs"][-1]() is not None)
+        elif event == "call" and frame.f_code is importer._item_rows.__code__:
+            observed["item_calls"].append(all(ref() is None for ref in observed["refs"]))
+
+    previous_profile, gc_enabled = sys.getprofile(), gc.isenabled()
+    try:
+        gc.disable()  # 只限小型真实 compute，旧自环不能靠自动 GC 假绿。
+        sys.setprofile(profile)
+        yield observed
+    finally:
+        sys.setprofile(previous_profile)
+        if gc_enabled:
+            gc.enable()
+        else:
+            gc.disable()
+
+
+def _write_policy_stitches(cache, directory, steps):
+    # 合成同形执行记录，仍由生产 derivation 解析，不直接构造派生边。
+    (cache / "merge_all.log").write_text("".join(
+        f"===== 10:00:00 开始: {directory} =====\n分片 {len(sources)} 个\n"
+        + "".join(f"{source} x0= 0 w= 7\n" for source in sources)
+        + f"完成: /data/{directory}/{output}  7 x 5\n退出码: 0\n"
+        for output, sources in steps
+    ), encoding="utf-8")
+
+
+@pytest.mark.parametrize("case", ["nlc", "nlc-default", "bnf", "derived", "unreadable"])
+def test_image_policy_lifetime_without_gc(roots, cache, make_image, case):
+    directory = "中国国博馆藏/BD12345" if case.startswith("nlc") else "敦煌003/P2002"
+    name = "BD12345_0000_0.tif" if case.startswith("nlc") else "native.tif"
+    path = make_image(roots["data"] / directory / name)
+    if case == "nlc":
+        (path.parent / "manifest.json").write_bytes(_manifest())
+    elif case == "derived":
+        for filename in ("a-final.tif", "b-middle.tif", "processed.tif"):
+            make_image(path.parent / filename, software="Photoshop synthetic")
+        _write_policy_stitches(cache, directory, [
+            ("b-middle.tif", ["native.tif"]),
+            ("a-final.tif", ["b-middle.tif", "native.tif", "processed.tif"]),
+        ])
+    elif case == "unreadable":
+        path.write_bytes(b"broken TIFF")
+
+    previous_profile, gc_enabled = sys.getprofile(), gc.isenabled()
+    with _observe_image_policy() as observed:
+        result = _compute(roots, cache)
+        assert len(observed["refs"]) == 1
+        assert observed["image_returns"] == [True]
+        assert observed["item_calls"] == [True]
+        assert observed["refs"][0]() is None  # result 仍活，普通字段不能钉住解析器。
+    assert sys.getprofile() is previous_profile and gc.isenabled() == gc_enabled
+    rows = {PurePosixPath(row["relative_path"]).name: row for row in result.images.values()}
+    assert sorted(observed["resolved"]) == sorted(row["relative_path"] for row in rows.values())
+    image = rows[name]
+    item, = result.items.values()
+    if case.startswith("nlc"):
+        assert image["lineage"] == "国图 IDP 下载" and image["license"] == rules.IDP_LICENSE
+        assert image["attribution"] == ("Synthetic Library" if case == "nlc" else "The National Library of China")
+        assert image["field_basis"]["attribution"]["source"] == ("外部清单" if case == "nlc" else "默认规则")
+        assert image["collection"] == "中国国家图书馆" and image["acquisition"] == rules.DOWNLOAD_EVENT
+    elif case == "unreadable":
+        assert not image["read_ok"] and image["lineage"] == "未判定"
+        assert image["license"] == rules.UNKNOWN_LICENSE and image["display_policy"] == "仅供研究使用"
+        assert any(a["category"] == "读不了的文件" for a in result.anomalies)
+    else:
+        assert image["lineage"] == "BnF 原图" and image["license"] == rules.GALLICA_LICENSE
+        assert image["attribution"] == "Source gallica.bnf.fr / BnF"
+        assert image["acquisition"] == rules.TRANSFER_EVENT
+    assert item["display_policy"] == ("仅供研究使用" if case in {"derived", "unreadable"} else "登录墙内可展示")
+    if case == "derived":
+        final, middle, processed = (rows[name] for name in ("a-final.tif", "b-middle.tif", "processed.tif"))
+        assert observed["calls"][0] == final["relative_path"]  # 输出先扫描，确实走多层递归。
+        assert observed["calls"].count(image["relative_path"]) == 3  # 递归与外层再次调用命中 memo。
+        assert observed["resolved"] == [image["relative_path"], middle["relative_path"],
+                                         processed["relative_path"], final["relative_path"]]
+        assert not result.derivation.issues and len(result.derivations) == 4
+        assert middle["license"] == rules.GALLICA_LICENSE and middle["display_policy"] == "登录墙内可展示"
+        assert final["license"] == processed["license"] == rules.PROCESSED_LICENSE
+        assert final["display_policy"] == "仅供研究使用" and final["external_policy"] == "不对外"
+        assert final["attribution"] == middle["attribution"] == image["attribution"]
+        assert final["collection"] == processed["collection"] == "法国国家图书馆"
+        assert processed["field_basis"]["collection"]["confidence"] == "推断"
+        for output, sources in ((middle, [image]), (final, [middle, image, processed])):
+            assert output["lineage"] == "本地合成" and output["acquisition"] == rules.LOCAL_EVENT
+            assert output["field_basis"]["lineage"]["source"] == "执行记录"
+            assert output["field_basis"]["license"]["source_images"] == sorted(str(row["id"]) for row in sources)
+            assert output["field_basis"]["license"]["author"] == "rule:license-local-inherit@" + rules.RULE_VERSION
+
+
+def test_image_policy_exception_releases_after_traceback(roots, cache, make_image):
+    directory = "敦煌003/P2002"
+    for name in ("a.tif", "b.tif"):
+        make_image(roots["data"] / directory / name)
+    # 真实记录形成互相依赖，原递归异常必须传播；不增加生产循环恢复规则。
+    _write_policy_stitches(cache, directory, [("a.tif", ["b.tif"]), ("b.tif", ["a.tif"])])
+    previous_profile, gc_enabled = sys.getprofile(), gc.isenabled()
+    with _observe_image_policy() as observed:
+        with pytest.raises(RecursionError) as failure:
+            _compute(roots, cache)
+        assert len(observed["refs"]) == 1 and not observed["item_calls"]
+        assert failure.value.__traceback__ is not None
+        assert observed["refs"][0]() is not None  # traceback 合法持帧，不误判泄漏。
+        del failure  # 释放测试持有的异常/帧，不用 gc.collect 制造通过。
+        assert observed["refs"][0]() is None
+    assert sys.getprofile() is previous_profile and gc.isenabled() == gc_enabled
 
 
 def test_attachments(roots, cache, make_image):

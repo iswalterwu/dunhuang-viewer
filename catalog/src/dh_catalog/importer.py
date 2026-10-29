@@ -349,6 +349,30 @@ def _basis(values, semantic, old, pool):
     return result
 
 
+@dataclass(slots=True, weakref_slot=True)
+class _ImagePolicyResolver:
+    """本批源先于输出解析；memo 不捕获解析器，不依赖循环 GC 释放。"""
+
+    by_file: dict
+    unit_by_file: dict
+    lineages: dict
+    sources: dict
+    pelliot_images: set
+    nlc: dict
+    policies: dict = field(default_factory=dict)
+
+    def __call__(self, file):
+        if file not in self.policies:
+            unit = self.unit_by_file[file]
+            self.policies[file] = rules.source_policy(
+                file, self.lineages[file].value,
+                has_pelliot=self.by_file[file].id in self.pelliot_images,
+                attribution=self.nlc[unit.key].attribution if unit.key in self.nlc else None,
+                sources=[self(source) for source in self.sources[file]],
+            )
+        return self.policies[file]
+
+
 def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at, basis):
     by_file = {image.file: image for image in images.images if image.missing_since is None}
     unit_by_file = {image.file: unit for unit in units.units for image in unit.images}
@@ -359,18 +383,8 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at,
     pelliot_images = {image_id for item in items.items
                       if item.grouping_key is not None and item.grouping_key.startswith("pelliot:")
                       for image_id in item.image_ids}
-    policies = {}
-    # 执行记录的源先求许可，再求本地合成；不拿旧来源冒充本批次的源。
-    def policy(file):
-        if file not in policies:
-            unit = unit_by_file[file]
-            policies[file] = rules.source_policy(
-                file, lineages[file].value,
-                has_pelliot=by_file[file].id in pelliot_images,
-                attribution=nlc[unit.key].attribution if unit.key in nlc else None,
-                sources=[policy(source) for source in sources[file]],
-            )
-        return policies[file]
+    # 只传本批次的源；实例不保存自身的 bound method。
+    policy = _ImagePolicyResolver(by_file, unit_by_file, lineages, sources, pelliot_images, nlc)
 
     rows, links, edges = {}, dict(prior.links), dict(prior.derivations)
     item_images = {item.id: item.image_ids for item in items.items}
