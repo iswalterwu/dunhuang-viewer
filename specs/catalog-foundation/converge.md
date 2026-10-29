@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准spec7、原plan8及本轮独立核对后的plan9、tasks、实际源码/测试与T24/T32证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，待用户是否批准受限内存归因/方案讨论；spec、plan9/checklist及硬限额未再改。
+> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，T33已获准并完成受限归因，报告memory-diagnosis.md推荐A为主/C小任务辅选、待用户设计选择；spec、plan9/checklist及硬限额未再改。
 
 ## 1. 范围与证据边界
 
@@ -113,5 +113,7 @@ R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=
 独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** 用户现已批准T31小幅设计调整：先Plan9/独立Checklist/Tasks/Analyze核对有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
 
 T31/P10及T32最新结果：候选private-candidate-047全423真库通过，54db项/协议trace实际执行；same2k/6k重导RSS102.37/153.01MiB，varied6k160.58，原S0同口径峰值143.17→109.02MiB且文本大小不变。读取缓冲确有改善，但残余完整S0/扫描/读取与当前结果的对象/阶段占用尚未精确归因。事前放大判据要求same两点及varied6k投影均≤480MiB，实际532.8164/586.5352MiB，false；这是操作安全门槛非新AC，未做36k/未OOM。**再次按约定停止新实施与放大，未发R2；T33仅建议受限归因/方案对比，待用户决定，不先重构/改plan9。** T32五API自然exit0，临时库/PG卷/网络/镜像/快照/.env/raw全清理，v0状态不变；完整证据见T32-A1/README。
+
+T33仅诊断返回：无hook6k160.48MiB、阶段160.99（CPU耗时3.63倍）；对象图去重71.677MiB，双状态四类影像外层25.269、策略循环独占4.108，图观察器seen约33MiB额外。生效S0读取后主增量是当前行构造。容量/可达子集不是RSS节省，未改业务/冻结计划；方案对比在memory-diagnosis.md，全部本轮资源清理，P1未闭。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。
