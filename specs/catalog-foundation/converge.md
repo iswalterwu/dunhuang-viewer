@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准 spec 第 7 版、plan 第 8 版、tasks、实际源码/测试及 T-24 证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：P8/P9最小修复候选private-candidate-042在NAS全412项通过、0跳过；T29/T30实现/真库回归完成、待独立R2。**P1未关闭：真实PG 6k重导RSS175.71MiB，两点36k趋势668.83MiB仅外推，未做全量/未OOM。按用户停止条件暂停扩大/实施，待批准T31回Plan/Analyze讨论S0读取。** Converge仍打开，不进入Gate2、不发R2冲通过；冻结spec/plan/checklist未改。
+> 当前结论：P8/P9最小修复候选private-candidate-042在NAS全412项通过、0跳过；T29/T30实现/真库回归完成、待独立R2。**P1未关闭：真实PG 6k重导RSS175.71MiB，两点36k趋势668.83MiB仅外推，未做全量/未OOM。A4按停止条件暂停后，用户现批准T31小幅S0读取修订，先plan9独立Checklist/Tasks/Analyze，未进入新实施。** Converge仍打开，不进入Gate2、不发R2冲通过；spec需求不变，plan9及checklist仅按本轮许可回到设计核对，不预填新通过。
 
 ## 1. 范围与证据边界
 
@@ -107,6 +107,6 @@ R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=
 
 真实PG prepare/execute两次：2k首轮/重导RSS94.72/109.96MiB，6k133.24/175.71MiB；第二次全部事实复用、ID/basis摘要/history不变、变化为零。TIFF属性高度同质、仅外部HTTP替身，非真实材料吞吐/并发API/连续v0健康。两点RSS斜率16.832KiB/影像，36k线性约668.83MiB，不是全量实测/OOM；cgroup有可回收页缓存，不能当匿名内存外推。
 
-独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** T31只是待批准讨论：先Plan/Analyze评估有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
+独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** 用户现已批准T31小幅设计调整：先Plan9/独立Checklist/Tasks/Analyze核对有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。

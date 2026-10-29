@@ -22,6 +22,8 @@
 
 ## 当前结果
 
+2026-10-29：用户同意T31小幅S0读取修订，plan9草案回到Checklist阶段；新独立核对尚未返回。下列第11轮勾选只是plan8的历史结果，**不得据此实施plan9**。主会话不预填新勾选；计划核对后才正式拆新任务并Analyze。
+
 第 11 轮（2026-10-28，审阅提交 `private-candidate-022`；A = claude-fable-5-1 via anthropic（claude-bridge 接入不可用））：通过 12 项，不通过 0 项，本轮不评 0 项。
 
 - [x] CHK-01：通过
