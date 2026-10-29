@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准spec7、原plan8及本轮独立核对后的plan9、tasks、实际源码/测试与T24/T32证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前软件候选：Plan10按Checklist14→Tasks→Analyze15（12项全通过）后P12(C)/P13(A)串行实现，private-candidate-056在NAS **442 passed/0 skipped/1原有警告，64.37秒**。门槛通过后**36k差异化合成原512限额首轮/真实PG重导均实际成功，RSS341.98/435.05MiB、cgroup含缓存触512/exit0无OOM**，ID/JSON/事实/history稳定，资源全清理/v0未重启。主会话软件Converge候选证据具备，**独立R2未做、P1/02/05关闭交审核员，不是Gate2/实际材料验收**。spec7/plan10/checklist实施后未改，真实材料/并发/连续v0健康等仍N。
+> 当前软件候选：Plan10按Checklist14→Tasks→Analyze15（12项全通过）后P12(C)/P13(A)串行实现，private-candidate-056在NAS **442 passed/0 skipped/1原有警告，64.37秒**。门槛通过后**36k差异化合成原512限额首轮/真实PG重导均实际成功，RSS341.98/435.05MiB、cgroup含缓存触512/exit0无OOM**，ID/JSON/事实/history稳定，资源全清理/v0未重启。主会话软件Converge候选证据具备，**独立R2已软件通过，CR1-01代码级/02/05关闭；新N1/P3旧基线问题待用户决定修复时机，未Gate2/实际材料验收**。spec7/plan10/checklist实施后未改，真实材料/并发/连续v0健康等仍N。
 
 ## 1. 范围与证据边界
 
@@ -17,7 +17,7 @@
 
 历史P10/T32的423结果仍属旧候选；Plan10 A+C本机387通过/55skip与T36目标442全通过分开记录。下表软件路径现经T36完整复验，并有36k差异化实际两轮资源证据；S或设计/主会话收敛仍不能代独立R2/实际材料或Gate2。
 
-Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有警告（64.37秒，55db实际）；无hook校准投影423.41/465.30过480后，36k varied/6000写卷首轮与PG重导实际成功，RSS341.98/435.05MiB、343.115/307.414秒、history42000/全部事实复用与ID/JSON稳定。cgroup含页缓存达512，未OOM，不能据此称实际材料/并发/v0健康通过；间接opentelemetry解析1.45.2漂移记录，源头未改。下表软件S路径经新候选再验；独立R2及Gate2未过。证据T36-A1/README，全部本轮资源清理。
+Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有警告（64.37秒，55db实际）；无hook校准投影423.41/465.30过480后，36k varied/6000写卷首轮与PG重导实际成功，RSS341.98/435.05MiB、343.115/307.414秒、history42000/全部事实复用与ID/JSON稳定。cgroup含页缓存达512，未OOM，不能据此称实际材料/并发/v0健康通过；间接opentelemetry解析1.45.2漂移记录，源头未改。下表软件S路径经新候选再验且独立R2软件通过；N1/P3用户待决、Gate2未批。证据T36-A1/README，全部本轮资源清理。
 
 ## 2. 58 条 AC 的实际映射
 
@@ -41,7 +41,7 @@ Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有�
 | AC-003-2 | 先签名后位置的两阶段认领、image_path_history；test_identity::test_rename_move_and_swap；API历史详情测试 | S；真实改名/移动/互换，不复制算法 |
 | AC-003-3 | UUIDv4 分配；test_identity::test_ids_not_path_derived、schema稳定UUID | S；相同路径独立初建不同ID |
 | AC-003-4 | S0 同时决策与编号历史；test_identity::test_number_change_keeps_id；test_import::test_number_swap_end_to_end | S；ID保持、旧号历史化 |
-| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | P9已补全部参与ID/稳定顺序，38项identity及A4全套通过；待独立R2，不改算法 |
+| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | P9已补全部参与ID/稳定顺序，38项identity及最新442全套通过；R2关闭，不改算法 |
 | AC-003-6 | 旧影像数量/serial确定新影像归属；test_identity::test_new_images_assignment、test_new_images_assignment_between_unkeyed_items、test_multi_number_new_images_shared | S；数量并列取较早登记 |
 | AC-003-7 | 改号提案同时生效、临时唯一值释放；test_identity::test_swap_and_rotation_order_independent、test_import::test_number_swap_end_to_end | S；两件互换/三件轮换含真实SQL |
 | AC-003-8 | 新增号与单号改写分开处理；test_identity::test_multi_number_add_and_rewrite | S；原ID/共享关联不丢 |
@@ -80,7 +80,7 @@ Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有�
 | AC-012-2 | derivation.open_cache_record仅13名，导入不读users；test_import::test_v0_cache_access 实际open审计 | S+N；A5正式访问记录/ro核对，不遍历cache |
 | AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | Plan10 A+C/T36原限额36k varied两轮实际成功（RSS341.98/435.05、cgroup512含缓存、exit0无OOM），软件瓶颈修复证据具备待R2；真实材料/并发/连续v0仍N，不以442全绿掩盖 |
 | AC-012-4 | 成功未变事实复用、失败重读；test_scan复用回归 | N；A5全量≤1小时、无变重跑≤10分钟未证明 |
-| AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者非字段作者；P8共享/版本时间隔离/真PG JSON历史等价回归在A4通过，待独立R2 |
+| AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者非字段作者；P8共享/版本时间隔离/真PG JSON历史等价回归在A4及新442通过，R2核对通过 |
 | AC-013-2 | file-header/外部清单为确定，谱系/默认规则为推断；test_import::test_field_basis_and_author、test_rules及nlc依据断言 | S；confidence实际断言在综合用例中 |
 | AC-013-3 | history变化快照、value_at_run、API history；test_import::test_changed_file_history_and_value_at_any_run、test_rule_version_change_recorded_at_batch；API详情历史测试 | S；含任意后续无变化批次取最近已存值 |
 
@@ -114,8 +114,10 @@ R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=
 
 独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** 用户现已批准T31小幅设计调整：先Plan9/独立Checklist/Tasks/Analyze核对有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
 
-T31/P10及T32最新结果：候选private-candidate-047全423真库通过，54db项/协议trace实际执行；same2k/6k重导RSS102.37/153.01MiB，varied6k160.58，原S0同口径峰值143.17→109.02MiB且文本大小不变。读取缓冲确有改善，但残余完整S0/扫描/读取与当前结果的对象/阶段占用尚未精确归因。事前放大判据要求same两点及varied6k投影均≤480MiB，实际532.8164/586.5352MiB，false；这是操作安全门槛非新AC，未做36k/未OOM。**再次按约定停止新实施与放大，未发R2；T33仅建议受限归因/方案对比，待用户决定，不先重构/改plan9。** T32五API自然exit0，临时库/PG卷/网络/镜像/快照/.env/raw全清理，v0状态不变；完整证据见T32-A1/README。
+历史T31/P10及T32当时结果（不覆盖最新T36/R2）：候选private-candidate-047全423真库通过，54db项/协议trace实际执行；same2k/6k重导RSS102.37/153.01MiB，varied6k160.58，原S0同口径峰值143.17→109.02MiB且文本大小不变。读取缓冲确有改善，但残余完整S0/扫描/读取与当前结果的对象/阶段占用尚未精确归因。事前放大判据要求same两点及varied6k投影均≤480MiB，实际532.8164/586.5352MiB，false；这是操作安全门槛非新AC，未做36k/未OOM。**再次按约定停止新实施与放大，未发R2；T33仅建议受限归因/方案对比，待用户决定，不先重构/改plan9。** T32五API自然exit0，临时库/PG卷/网络/镜像/快照/.env/raw全清理，v0状态不变；完整证据见T32-A1/README。
 
 T33仅诊断返回：无hook6k160.48MiB、阶段160.99（CPU耗时3.63倍）；对象图去重71.677MiB，双状态四类影像外层25.269、策略循环独占4.108，图观察器seen约33MiB额外。生效S0读取后主增量是当前行构造。容量/可达子集不是RSS节省，未改业务/冻结计划；方案对比在memory-diagnosis.md，全部本轮资源清理，P1未闭。
+
+独立R2（审private-candidate-057，Anthropic Claude，23:09:04～23:26:07、exit0）已软件通过：R1主要三项关闭，无新P0/P1/P2；N1/P3为规则版本变化重插同号/重置since_run的旧问题，待T37用户决定。主会话真实compute/源码复核，不新PG模拟或偷修。R2原文/范围/哈希在CodeReview-R2归档；当前软件收敛候选可请求Gate2，但不能代用户接受N1或真实材料风险。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。

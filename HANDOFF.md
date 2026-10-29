@@ -1,12 +1,12 @@
 # 会话交接 — catalog-foundation
 
-> **当前（2026-10-29）：Plan10 A+C候选private-candidate-056已在NAS全442项通过、0跳过；原512MiB硬限额内36k差异化合成影像首轮/真PG重导均成功，RSS峰值341.98/435.05MiB、343.12/307.41秒。** cgroup峰值达到512MiB（含页缓存），exit0无OOM，不等于实际材料/并发API/真实v0健康已验。T36资源/凭据已全清理，v0未重启；现准备独立CodeReview-R2，P1/两个P3待审核员判断关闭，未Gate2/merge/部署。
+> **当前（2026-10-29）：Plan10 A+C候选private-candidate-056已在NAS全442项通过、0跳过；原512MiB硬限额内36k差异化合成影像首轮/真PG重导均成功，RSS峰值341.98/435.05MiB、343.12/307.41秒。** cgroup峰值达到512MiB（含页缓存），exit0无OOM，不等于实际材料/并发API/真实v0健康已验。T36资源/凭据已全清理，v0未重启；独立CodeReview-R2已软件通过、CR1-01代码级/02/05关闭，可以请求Gate2；新N1/P3为旧基线规则升级重插未变编号，待用户决定先修或登记接受，当前未擅修/未Gate2/merge/部署。
 
 ## 1. 安全点与唯一仓库
 
 - **`/srv/example/project`**，`feat/catalog-foundation`→`origin/feat/catalog-foundation`；C盘旧目录已在6,049文件SHA一致/环境入口重生后移除，不再使用。
 - 最新实际NAS验证源码 **`private-candidate-056`**，442 passed/0 failed/0 skipped/1原有Starlette/httpx警告，**64.37秒**，55db项全实际执行。其后只状态/证据；当前HEAD用git查，不写未知自引用SHA。
-- R1已审`private-candidate-039`对应旧private-candidate-038/404项。P8/P9 private-candidate-042/412、P10 private-candidate-047/423和P12/P13 private-candidate-056/442为不同候选，**尚无新独立代码R2通过**，不要沿用旧数或设计结论冒充。
+- R1已审`private-candidate-039`对应旧private-candidate-038/404项。P8/P9 private-candidate-042/412、P10 private-candidate-047/423和P12/P13 private-candidate-056/442为不同候选，最新独立R2已审private-candidate-057（源码private-candidate-056）软件通过；旧数/设计结论仍不得冒充不同候选证据。
 - GitHub功能分支持续同步已获准，每个验证阶段及时commit/push，不重复问普通分支push。**未合并main、未push nas、未正式Compose/部署或真实导入**，main/origin-main仍private-candidate-023（git核对）。
 
 ## 2. 许可/工作流
@@ -23,9 +23,9 @@ R1桥00:23:13～00:35:20 exit1/无输出/接入失败；Anthropic00:37:10～01:1
 
 | 发现 | 候选当前状态（待R2） |
 |---|---|
-| CR1-01/P1 正常规模内存 | P8叶/文本/规则共享、P10 128行S0游标、P12消策略自环、P13四类影像紧凑映射已实现。现有36k差异化合成实测原硬限完成；不以此代实际材料/并发证明，不由主会话代审核关闭 |
-| CR1-02/P3 撤销候选误作曾用号 | P8删除撤销pending当前identifier行，保留过去history；真正current曾用仍历史化，不新增withdrawn。当前/过去PG/API断言在442全套通过 |
-| CR1-05/P3 同号说明缺ID | P9现有说明加本轮全部参与ID并排序，不改归并；38项identity在442全套通过 |
+| CR1-01/P1 正常规模内存 | 独立R2判代码级关闭：A+C足规模原硬限实测；实际材料/并发余量转Gate2明确待验，不将RSS差值当容器空余 |
+| CR1-02/P3 撤销候选误作曾用号 | P8删除撤销pending当前identifier行，保留过去history；真正current曾用仍历史化，不新增withdrawn。当前/过去PG/API断言在442全套通过，R2关闭；N1版本升级另列待决 |
+| CR1-05/P3 同号说明缺ID | P9现有说明加本轮全部参与ID并排序，不改归并；38项identity在442全套通过，R2关闭 |
 | CR1-03 裸号紧邻扩展名 | 未证实，spec明确排除紧邻点，不改规则，T26按真实材料核查 |
 | CR1-04 备份根散放映射 | 低概率且原925片不触发/影像不丢，不加机制，T26核查 |
 
@@ -62,8 +62,9 @@ C1/T27 P7具体捕获JPEG DecompressionBombError仍保留Pillow保护，新442�
 
 - **先读 T36-A1 README（非公开历史记录）**：完整442输出、3校准/36k/S0 JSONL、判据字节/实际命令/漂移/资源清理/源码/manifest。外部原件`/srv/example/private-audit/t36/20261029-223407-private-candidate-056/`；仅LF/行尾规范化/远程口令掩码，不提交env/tar/private raw/真实材料/协议trace。
 - 实施原文/派发/meta/status/本机：P12-T34（非公开历史记录）、`P13-T35/`；设计原文`review/Plan10-R14/`、`Plan10-R15/`。旧诊断方法/观察器开销/候选比较保留memory-diagnosis.md与logs/T33-A1、analysis/P11-T33及诊断校读；不把旧分析改成新实测。
-- **下一步独立CodeReview-R2**：源码+实际diff（private-candidate-039/R1到新候选）、P8/P9/P10/P12/P13修复、所有新旧回归及T36足规模与风险，判断P1/02/05关闭及其余缺口。主会话不能代审，R2期间固定HEAD/干净、不新NAS操作。桥在已证实的接入不可用状态时引用证据回退Anthropic并记录。
-- Gate2尚未批准，不merge/部署；R2通过后请用户确认review与实际材料待验风险。T25正式挂载/pgdata/端口/默认CMD/v0认证、T26真实基线/对象/全量资源与连续v0健康/耗时/P95/20链接仍需单独许可。固定34指标不改，6096是影像目录非写卷，txt477/Q024新增6保留差异；related-project未动。
+- **独立CodeReview-R2已结束**：Anthropic Claude 23:09:04～23:26:07 （原始时刻；时区非公开）、exit0，审HEADprivate-candidate-057/源码private-candidate-056、前后干净固定，无NAS操作；桥已证实的接入不可用状态引用原证据未调用。软件通过、可请求Gate2，无新P0/P1/P2，R1-01代码级/02/05关闭；但N1/P3须用户决定，不能代用户Gate2。实际本机387/55skip/1警告（12.10秒），仅核NAS原件未亲跑，实际阅读/未通读范围详原文。原文/哈希 CodeReview-R2（非公开历史记录）。
+- **当前先请用户决定N1/P3修复时机**（T37仅登记，未实施）：规则版本变化但编号值不变会历史化旧current并重插同号current、since_run重置，旧基线已有，resolve/UUID/快照不丢。主会话真实compute无DB复核1→3，并核源码，非新PG证明。建议先约6～10行最小Astra修+真库+重审再Gate2；也可用户明确登记首次规则升级前修。不能擅自修或接受风险。
+- Gate2尚未批准，不merge/部署；风险摘要在review.md：cgroup已触512，435与512差77只RSS算术非总余量；审核员真实450～480MiB/6～9分钟估计只是推理，T26实测；规则升级history/WAL/附件重写、间接依赖浮动/账号只读挂载默认CMD等仍待。T25正式挂载/pgdata/端口/默认CMD/v0认证、T26真实基线/对象/全量资源与连续v0健康/耗时/P95/20链接仍需单独许可。固定34指标不改，6096是影像目录非写卷，txt477/Q024新增6保留差异；related-project未动。
 - 调度仍`/srv/example/private-audit/implement/run_task.sh`，固定Astra/D盘/2400秒；新任务新HEAD新批次不重放。审核实际通道/状态原件在`/srv/example/private-audit/review/`。所有已派进程自然结束。
 
 ```bash
