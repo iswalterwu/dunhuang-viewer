@@ -7,6 +7,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Literal
 
@@ -179,7 +180,13 @@ def item_display_policy(policies: Sequence[SourcePolicy]) -> str:
 
 
 def _basis(rule: str, source: SourceKind, confidence: Confidence = "推断") -> RuleBasis:
-    return RuleBasis(source, f"rule:{rule}@{RULE_VERSION}", confidence)
+    return _versioned_basis(rule, source, confidence, RULE_VERSION)
+
+
+@lru_cache(maxsize=128)
+def _versioned_basis(rule: str, source: SourceKind, confidence: Confidence, version: str) -> RuleBasis:
+    # 仅缓存冻结对象；版本显式入键，不能沿用旧部署的作者。
+    return RuleBasis(source, f"rule:{rule}@{version}", confidence)
 
 
 def _acquisition(file: FileEntry) -> str:

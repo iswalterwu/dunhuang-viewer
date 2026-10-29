@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from functools import lru_cache
 import json
 from pathlib import Path, PurePosixPath
 from uuid import UUID, uuid4
@@ -167,12 +168,13 @@ def latest_valid_snapshot(connection: Connection) -> IndexSnapshot | None:
 
 def load_catalog_state(connection: Connection) -> CatalogState:
     state = CatalogState()
-    state.images = {row["id"]: row for row in connection.execute("SELECT * FROM image")}
-    state.items = {row["id"]: row for row in connection.execute("SELECT * FROM item")}
+    basis = _BasisPool()
+    state.images = {row["id"]: basis.share_row(row) for row in connection.execute("SELECT * FROM image")}
+    state.items = {row["id"]: basis.share_row(row) for row in connection.execute("SELECT * FROM item")}
     for row in connection.execute("SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id"):
-        state.identifiers.setdefault(row["item_id"], []).append(row)
-    state.links = {(row["item_id"], row["image_id"]): row for row in connection.execute("SELECT * FROM item_image")}
-    state.derivations = {(row["image_id"], row["source_image_id"]): row for row in connection.execute("SELECT * FROM derivation")}
+        state.identifiers.setdefault(row["item_id"], []).append(basis.share_row(row))
+    state.links = {(row["item_id"], row["image_id"]): basis.share_row(row) for row in connection.execute("SELECT * FROM item_image")}
+    state.derivations = {(row["image_id"], row["source_image_id"]): basis.share_row(row) for row in connection.execute("SELECT * FROM derivation")}
     for row in connection.execute("SELECT * FROM item_attachment"):
         state.attachments.setdefault(row["item_id"], set()).add(row["attachment_id"])
     return state
@@ -198,8 +200,9 @@ def compute_import(
     derivation = resolve_derivations(cache_dir, inventory.images)
     images = resolve_images([_image_state(row) for row in prior.images.values()], inventory.images, run_id, now)
     items = resolve_items(_item_states(prior), units.units, images.images)
-    image_rows, link_rows, edge_rows = _image_rows(images, items, units, readings, nlc, derivation, prior, run_id, now)
-    item_rows, identifiers, item_attachments = _item_rows(items, units, nlc, image_rows, attachments, prior, run_id, now)
+    basis = _BasisPool(run_id, now)
+    image_rows, link_rows, edge_rows = _image_rows(images, items, units, readings, nlc, derivation, prior, run_id, now, basis)
+    item_rows, identifiers, item_attachments = _item_rows(items, units, nlc, image_rows, attachments, prior, run_id, now, basis)
     result = ImportComputation(
         inventory, units, images, items, readings, nlc, derivation, image_rows, item_rows,
         identifiers, link_rows, edge_rows, attachments, item_attachments, [],
@@ -271,10 +274,51 @@ def _read_attachments(units, roots, sink):
 
 
 def _rule(name, source="默认规则", confidence="推断"):
-    return {"source": source, "author": f"rule:{name}@{rules.RULE_VERSION}", "confidence": confidence}
+    return asdict(rules._basis(name, source, confidence))
 
 
-def _basis(values, semantic, old, run, at):
+class _BasisPool:
+    """一次计算或 DB 加载内复用 JSON 依据/事实叶；不共享可写的字段映射。
+
+    叶及其内嵌列表按只读消费，修改须替换字段引用。缓存有界，结束后释放；
+    键为完整 JSON（含版本、run/at、位置及来源列表），不省略任何语义。
+    """
+
+    def __init__(self, run=None, at=None):
+        self.run = run
+        self.at = at.isoformat() if at is not None else None
+        # 不用全局 intern：旧库可含任意历史作者/位置，不能永久保留。
+        text = self.text = lru_cache(maxsize=512)(lambda value: value)
+
+        @lru_cache(maxsize=4096)
+        def leaf(encoded):
+            return {text(key): text(value) if isinstance(value, str) else value
+                    for key, value in json.loads(encoded).items()}
+
+        self._leaf = leaf
+
+    def share(self, value):
+        return self._leaf(json.dumps(value, ensure_ascii=False, sort_keys=True))
+
+    def share_fields(self, values):
+        return {self.text(name): self.share(value) for name, value in values.items()}
+
+    def share_row(self, row):
+        # 在游标逐行反序列化后立即处理，不能先积累全表重复 JSON。
+        row["field_basis"] = {
+            self.text(name): self.share_fields(value) if name == "facts" else self.share(value)
+            for name, value in row["field_basis"].items()
+        }
+        if "facts" in row:
+            row["facts"] = self.share_fields(row["facts"])
+        # 只复用不可变文本；行、字段映射、业务列表仍各自独立。
+        for name, value in row.items():
+            if isinstance(value, str):
+                row[name] = self.text(value)
+        return row
+
+
+def _basis(values, semantic, old, pool):
     """值与语义依据都相同则沿用旧 run/time；批次本身不是变化。"""
     result = {}
     old_basis = old.get("field_basis", {})
@@ -284,11 +328,11 @@ def _basis(values, semantic, old, run, at):
         if _json_value(values[name]) == _json_value(old.get(name)) and meaning == old_meaning:
             result[name] = previous
         else:
-            result[name] = dict(meaning, run=run, at=at.isoformat())
+            result[name] = pool.share(dict(meaning, run=pool.run, at=pool.at))
     return result
 
 
-def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at):
+def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at, basis):
     by_file = {image.file: image for image in images.images if image.missing_since is None}
     unit_by_file = {image.file: unit for unit in units.units for image in unit.images}
     lineages = {file: rules.detect_lineage(reading, derivation.outputs) for file, reading in readings.items()}
@@ -320,7 +364,7 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
             row = dict(old, state="missing", missing_since=image.missing_since)
             row["field_basis"] = dict(old["field_basis"], **_basis(
                 row, {"state": _rule("image-presence", "文件头", "确定"),
-                      "missing_since": _rule("image-presence", "文件头", "确定")}, old, run, at))
+                      "missing_since": _rule("image-presence", "文件头", "确定")}, old, basis))
             rows[image.id] = row
             continue
         reading, lineage, source = readings[file], lineages[file], policy(file)
@@ -331,7 +375,8 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
             original_name=old.get("original_name", file.relative_path.name),
             original_path=old.get("original_path", str(file.relative_path)), hidden=file.hidden, kind=file.kind,
             size=file.size, mtime_ns=file.mtime_ns, inode=file.inode, read_ok=reading.error is None,
-            read_error=reading.error, facts=_json_value(reading.facts), lineage=lineage.value,
+            read_error=reading.error,
+            facts=basis.share_fields(_json_value(reading.facts)), lineage=lineage.value,
             collection=source.collection, acquisition=source.acquisition, license=source.license,
             attribution=source.attribution, display_policy=source.display, external_policy=source.external,
             canvas_number=canvas.number if canvas else None, canvas_id=canvas.id if canvas else None,
@@ -340,9 +385,9 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
         semantic = {name: _rule("file-facts", "文件头", "确定") for name in row
                     if name not in {"id", "first_seen", "last_seen", "facts"}}
         semantic["lineage"] = asdict(lineage.basis)
-        for name, basis in source.basis.items():
+        for name, rule_basis in source.basis.items():
             column = {"display": "display_policy", "external": "external_policy"}.get(name, name)
-            semantic[column] = asdict(basis)
+            semantic[column] = asdict(rule_basis)
             if lineage.value == "本地合成":
                 semantic[column]["source_images"] = sorted(str(by_file[source_file].id) for source_file in sources[file])
         for name in ("root", "relative_path", "original_name", "original_path", "hidden", "kind"):
@@ -353,10 +398,10 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
                               if unit.key in nlc else _rule("canvas-not-applicable"))
         semantic["state"] = _rule("image-presence", "文件头", "确定")
         semantic["missing_since"] = _rule("image-presence", "文件头", "确定")
-        row["field_basis"] = _basis(row, semantic, old, run, at)
+        row["field_basis"] = _basis(row, semantic, old, basis)
         # 七个事实各有依据，不把整个 facts 的变化扩散为全部字段变化。
         fact_basis = _basis(row["facts"], {name: _rule("file-header", "文件头", "确定") for name in row["facts"]},
-                            dict(old.get("facts", {}), field_basis=old.get("field_basis", {}).get("facts", {})), run, at)
+                            dict(old.get("facts", {}), field_basis=old.get("field_basis", {}).get("facts", {})), basis)
         row["field_basis"]["facts"] = fact_basis
         rows[image.id] = row
     for unit in units.units:
@@ -374,7 +419,7 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
                     "role": _rule("image-role", "文件名解析"),
                     "source_directory": _rule("image-location", "文件名解析", "确定"),
                     "unit_key": _rule("unit-membership", "文件名解析"),
-                }, prior.links.get(key, {}), run, at)
+                }, prior.links.get(key, {}), basis)
                 links[key] = values
     # 本批次在场的输出重算派生边，缺失输出保留原关系。
     present_ids = {image.id for image in by_file.values()}
@@ -385,7 +430,7 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at)
                       evidence_file=edge.evidence_file, evidence_line=edge.evidence_line)
         meaning = dict(_rule("derivation", "执行记录", "确定"),
                        location=f"{edge.evidence_file}:{edge.evidence_line}")
-        values["field_basis"] = _basis(values, {name: meaning for name in values}, prior.derivations.get(key, {}), run, at)
+        values["field_basis"] = _basis(values, {name: meaning for name in values}, prior.derivations.get(key, {}), basis)
         edges[key] = values
     return rows, links, edges
 
@@ -396,7 +441,7 @@ def _provenance(value):
                             tuple(value["suggestion_evidence"]), value["evidence_conflict"])
 
 
-def _item_rows(items, units, nlc, images, attachments, prior, run, at):
+def _item_rows(items, units, nlc, images, attachments, prior, run, at, basis):
     unit_map = {unit.key: unit for unit in units.units}
     by_owner = defaultdict(list)
     for key, owners in items.unit_items.items():
@@ -434,22 +479,22 @@ def _item_rows(items, units, nlc, images, attachments, prior, run, at):
             semantic["provenance"] = {"source": "人工" if provenance.judge.startswith("user:") else "默认规则",
                                       "author": provenance.judge,
                                       "confidence": "确定" if provenance.judge.startswith("user:") else "推断"}
-            row["field_basis"] = _basis(row, semantic, old, run, at)
-            identifiers[item.id] = _identifier_rows(item, items, unit_map, nlc, prior, run, at)
+            row["field_basis"] = _basis(row, semantic, old, basis)
+            identifiers[item.id] = _identifier_rows(item, items, unit_map, nlc, prior, run, at, basis)
         row.update(parent_id=item.parent_id, original_positions=positions,
                    display_policy=rules.item_display_policy(policies))
         row["field_basis"] = dict(row["field_basis"], **_basis(row, {
             "parent_id": _rule("item-parent", "文件名解析"),
             "original_positions": _rule("original-positions", "文件名解析", "确定"),
             "display_policy": _rule("item-display-policy"),
-        }, old, run, at))
+        }, old, basis))
         if _changed(row, old, {"updated_run"}):
             row["updated_run"] = run
         rows[item.id] = row
     return rows, identifiers, item_attachments
 
 
-def _identifier_rows(item, resolution, unit_map, nlc, prior, run, at):
+def _identifier_rows(item, resolution, unit_map, nlc, prior, run, at, basis):
     old_rows = prior.identifiers.get(item.id, [])
     candidates = [(s, "current") for s in item.identifiers]
     candidates += [(s, "pending") for s in resolution.pending_identifiers.get(item.id, ())]
@@ -486,7 +531,7 @@ def _identifier_rows(item, resolution, unit_map, nlc, prior, run, at):
         semantic = {name: meaning for name in values if name != "item_id"}
         for name in ("raw", "source", "source_path"):
             semantic[name] = dict(meaning, confidence="确定")
-        values["field_basis"] = _basis(values, semantic, old, run, at)
+        values["field_basis"] = _basis(values, semantic, old, basis)
         if old and values["field_basis"] == old["field_basis"]:
             result.append(old)
         else:
@@ -548,7 +593,11 @@ def _persist_identifiers(connection, run, previous, result):
         retained = {row["id"] for row in rows if "id" in row}
         for old in previous.identifiers.get(owner, []):
             if old["id"] not in retained:
-                connection.execute("UPDATE identifier SET state = 'historical', until_run = %s WHERE id = %s", (run, old["id"]))
+                if old["state"] == "pending":
+                    # 候选号从未持有，撤销不冒充曾用号；过去批次的独立 JSON 快照仍保留。
+                    connection.execute("DELETE FROM identifier WHERE id = %s", (old["id"],))
+                else:
+                    connection.execute("UPDATE identifier SET state = 'historical', until_run = %s WHERE id = %s", (run, old["id"]))
         for row in rows:
             if "id" not in row:
                 columns = list(row)

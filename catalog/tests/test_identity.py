@@ -160,7 +160,10 @@ def _catalog(roots, previous=None, reverse=False):
     files = list(reversed(inventory.images)) if reverse else inventory.images
     images = resolve_images(previous.images.images if previous else [], files, run, NOW + timedelta(minutes=run))
     ordered_units = list(reversed(units.units)) if reverse else units.units
-    items = resolve_items(previous.items.items if previous else [], ordered_units, images.images)
+    prior_items = previous.items.items if previous else []
+    if reverse:
+        prior_items = list(reversed(prior_items))
+    items = resolve_items(prior_items, ordered_units, images.images)
     return CatalogSnapshot(images, items, units, run)
 
 
@@ -412,8 +415,25 @@ def test_collision_rollback_propagates(roots, make_image):
     (base / "P2603").rename(base / "副本 P2604")
     second = _catalog(roots, first)
     assert {i.id: i.grouping_key for i in second.items.items} == {i.id: i.grouping_key for i in first.items.items}
-    assert set(second.items.pending) == {first.by_key["pelliot:2602"].id, first.by_key["pelliot:2603"].id}
+    a, b, c = (first.by_key[f"pelliot:{number}"].id for number in (2602, 2603, 2604))
+    ab_ids = ", ".join(sorted(map(str, (a, b))))
+    bc_ids = ", ".join(sorted(map(str, (b, c))))
+    assert second.items.pending == {
+        a: (f"拟用编号 pelliot:2603 与其他写卷同号，退回原主编号（本轮同号写卷 ID：{ab_ids}）",),
+        b: (f"拟用编号 pelliot:2604 与其他写卷同号，退回原主编号（本轮同号写卷 ID：{bc_ids}）",),
+    }
     assert not second.items.number_changes
+    for owner, old in first.by_id.items():
+        current = second.by_id[owner]
+        assert (current.serial, current.image_ids, current.identifiers) == (
+            old.serial, old.image_ids, old.identifiers,
+        )
+    reverse = _catalog(roots, first, reverse=True)
+    assert reverse.items == second.items
+    assert {i.id: i for i in reverse.images.images} == {i.id: i for i in second.images.images}
+    assert {i.file.inode: i.id for i in second.images.images} == {
+        i.file.inode: i.id for i in first.images.images
+    }
 
 
 def test_image_sets_distinguishable(roots, make_image):
@@ -427,18 +447,40 @@ def test_image_sets_distinguishable(roots, make_image):
     assert all(owners == {item.id} for owners in snapshot.items.unit_items.values())
 
 
-def test_two_items_renamed_to_one_new_number_stay_separate(roots, make_image):
+@pytest.mark.parametrize("count", [2, 3])
+@pytest.mark.parametrize("existing_target", [False, True])
+def test_items_renamed_to_one_number_stay_separate(roots, make_image, count, existing_target):
     base = roots["data"] / "敦煌003"
-    for name in ("P2002", "P2003"):
-        make_image(base / name / "1.tif")
+    numbers = list(range(2002, 2002 + count))
+    for number in numbers:
+        make_image(base / f"P{number}" / "1.tif")
+    if existing_target:
+        make_image(base / "P2005" / "1.tif")
+    make_image(base / "P2010" / "1.tif")  # 无关写卷不应出现在同号说明中。
     first = _catalog(roots)
-    (base / "P2002").rename(base / "甲 P2004")
-    (base / "P2003").rename(base / "乙 P2004")
+    for number in numbers:
+        (base / f"P{number}").rename(base / f"副本{number} P2005")
     second = _catalog(roots, first)
-    assert set(second.by_key) == {"pelliot:2002", "pelliot:2003"}
-    assert set(second.items.pending) == set(first.by_id)
+    changing = {first.by_key[f"pelliot:{number}"].id for number in numbers}
+    participants = changing | ({first.by_key["pelliot:2005"].id} if existing_target else set())
+    participant_ids = ", ".join(sorted(map(str, participants)))
+    assert second.items.pending == {
+        owner: (f"拟用编号 pelliot:2005 与其他写卷同号，退回原主编号（本轮同号写卷 ID：{participant_ids}）",)
+        for owner in changing
+    }
+    assert set(second.by_id) == set(first.by_id)
     assert not second.items.number_changes
-    assert {i.id: i.image_ids for i in second.items.items} == {i.id: i.image_ids for i in first.items.items}
+    for owner, old in first.by_id.items():
+        current = second.by_id[owner]
+        assert (current.grouping_key, current.serial, current.image_ids, current.identifiers) == (
+            old.grouping_key, old.serial, old.image_ids, old.identifiers,
+        )
+    reverse = _catalog(roots, first, reverse=True)
+    assert reverse.items == second.items
+    assert {i.id: i for i in reverse.images.images} == {i.id: i for i in second.images.images}
+    assert {i.file.inode: i.id for i in second.images.images} == {
+        i.file.inode: i.id for i in first.images.images
+    }
 
 
 def test_unkeyed_item_can_gain_number_without_changing_id(roots, make_image):

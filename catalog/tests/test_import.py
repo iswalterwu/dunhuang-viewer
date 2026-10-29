@@ -1,6 +1,7 @@
 """真实文件流水线及 PostgreSQL 集成；只有 HTTP 边界用 MockTransport。"""
 
 import base64
+from datetime import UTC, datetime, timedelta
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -17,7 +18,8 @@ from dh_catalog import rules
 from dh_catalog.db import ImportBusy, create_pool
 from dh_catalog.derivation import CACHE_FILES
 from dh_catalog.importer import (
-    CatalogState, build_report, compute_import, latest_valid_snapshot, prepare_import,
+    CatalogState, _BasisPool, _basis, build_report, compute_import, latest_valid_snapshot,
+    load_catalog_state, prepare_import,
     read_report, value_at_run,
 )
 from dh_catalog.v0 import IndexFetch, V0Client
@@ -291,6 +293,101 @@ def test_field_basis_and_author(roots, cache, make_image):
     assert all(b["run"] == 1 for b in second.links[next(iter(second.links))]["field_basis"].values())
 
 
+def test_basis_and_fact_leaves_shared_but_field_maps_independent(roots, cache, make_image):
+    paths = [make_image(roots["data"] / f"敦煌003/P2002/native({n}).tif") for n in range(2)]
+    at = datetime(2026, 10, 29, tzinfo=UTC)
+    first = compute_import(roots, cache, run_id=1, at=at, attachment_sink=lambda file, raw: uuid4())
+    left, right = first.images.values()
+    expected = {"source": "文件头", "author": "rule:file-header@" + rules.RULE_VERSION,
+                "confidence": "确定", "run": 1, "at": at.isoformat()}
+    assert json.loads(json.dumps(left["field_basis"]["facts"]["pixel_size"])) == expected
+    assert left["field_basis"]["facts"]["pixel_size"] is right["field_basis"]["facts"]["channels"]
+    assert left["facts"]["pixel_size"] is right["facts"]["pixel_size"]
+    assert type(left["facts"]["pixel_size"]["value"]) is list
+    assert left["field_basis"] is not right["field_basis"]
+    assert left["field_basis"]["facts"] is not right["field_basis"]["facts"]
+    assert left["facts"] is not right["facts"]
+    before = {
+        key: json.dumps(row, default=str, sort_keys=True) for key, row in first.images.items()
+    }
+    unchanged = _compute(roots, cache, previous=_state(first), run=2)
+    assert _report(unchanged, _state(first))["counts"]["changes"]["images"]["metadata_changed"] == 0
+    # 真实改一个文件；未变字段仍用原依据，变化不得污染另一影像或 S0。
+    replacement = make_image(paths[0].parent / "replacement.tif", software="Photoshop synthetic")
+    os.replace(replacement, paths[0])
+    changed = _compute(roots, cache, previous=_state(first), run=3)
+    row = next(r for r in changed.images.values() if r["relative_path"].endswith(paths[0].name))
+    assert row["field_basis"]["facts"]["software"]["run"] == 3
+    assert row["field_basis"]["facts"]["channels"]["run"] == 1
+    assert row["facts"]["channels"] == first.images[row["id"]]["facts"]["channels"]
+    assert {key: json.dumps(value, default=str, sort_keys=True) for key, value in first.images.items()} == before
+    other = next(r for r in changed.images.values() if r["id"] != row["id"])
+    assert other["facts"]["software"]["status"] == "missing"
+    row["field_basis"]["facts"]["channels"] = dict(expected, author="user:synthetic")
+    row["facts"]["channels"] = {"status": "value", "value": 99}
+    assert other["field_basis"]["facts"]["channels"] == expected
+    assert first.images[row["id"]]["field_basis"]["facts"]["channels"] == expected
+    assert other["facts"]["channels"]["value"] == 3
+    assert first.images[row["id"]]["facts"]["channels"]["value"] == 3
+
+
+def test_basis_run_time_and_rule_version_isolation(roots, cache, make_image):
+    make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    at = datetime(2026, 10, 29, tzinfo=UTC)
+    def compute(run, time, previous=None):
+        return compute_import(roots, cache, run_id=run, at=time, previous=previous,
+                              attachment_sink=lambda file, raw: uuid4())
+    first = compute(1, at)
+    original, = first.images.values()
+    for run, time in ((2, at), (1, at + timedelta(seconds=1))):
+        fresh, = compute(run, time).images.values()
+        assert fresh["field_basis"]["lineage"]["run"] == run
+        assert fresh["field_basis"]["lineage"]["at"] == time.isoformat()
+        assert fresh["field_basis"]["lineage"] != original["field_basis"]["lineage"]
+    version = rules.RULE_VERSION
+    try:
+        # 改真实规则配置而非替换规则算法；缓存必须读取当前版本。
+        rules.RULE_VERSION = version + ".test"
+        changed = compute(3, at + timedelta(seconds=2), _state(first))
+        row = changed.images[original["id"]]
+        for leaf in (row["field_basis"]["lineage"], row["field_basis"]["facts"]["channels"],
+                     row["field_basis"]["collection"]):
+            assert leaf["author"].endswith("@" + rules.RULE_VERSION)
+            assert leaf["run"] == 3 and leaf["at"] == (at + timedelta(seconds=2)).isoformat()
+        assert original["field_basis"]["lineage"]["author"].endswith("@" + version)
+    finally:
+        rules.RULE_VERSION = version
+    restored, = compute(4, at).images.values()
+    assert restored["field_basis"]["lineage"]["author"].endswith("@" + version)
+
+
+def test_basis_pool_full_semantics_and_bounded_lifetime():
+    at = datetime(2026, 10, 29, tzinfo=UTC)
+    pool = _BasisPool(1, at)
+    meaning = {"source": "执行记录", "author": "rule:synthetic@v1", "confidence": "确定",
+               "unit_key": "data:甲", "location": "log:1", "location_field": "name",
+               "source_images": ["image-a", "image-b"], "identifier_sources": ["data:甲"]}
+    leaf = _basis({"value": 1}, {"value": meaning}, {}, pool)["value"]
+    assert leaf == dict(meaning, run=1, at=at.isoformat())
+    assert leaf is pool.share(json.loads(json.dumps(leaf)))
+    for name, value in {"author": "rule:synthetic@v2", "run": 2, "at": "another-time",
+                        "unit_key": "data:乙", "location": "log:2", "location_field": "Pressmark",
+                        "source_images": ["image-b", "image-a"], "identifier_sources": ["data:乙"],
+                        "source": "人工", "confidence": "推断"}.items():
+        changed = dict(leaf, **{name: value})
+        assert pool.share(changed) == changed and pool.share(changed) is not leaf
+    assert type(leaf["source_images"]) is type(leaf["identifier_sources"]) is list
+    assert type(pool.share({"status": "value", "value": 1})["value"]) is int
+    assert type(pool.share({"status": "value", "value": 1.0})["value"]) is float
+    # 连续加载不同位置不会把任意历史依据永久积存在缓存中。
+    for n in range(4200):
+        pool.share(dict(leaf, location=f"log:{n}"))
+    assert pool._leaf.cache_info().currsize == 4096
+    assert pool.text.cache_info().currsize <= 512
+    assert _BasisPool().share(leaf) is not leaf
+    assert leaf == dict(meaning, run=1, at=at.isoformat())
+
+
 def test_rule_version_change_is_field_history_not_forced_value_change(roots, cache, make_image):
     make_image(roots["data"] / "敦煌003/P2002/native.tif")
     first = _compute(roots, cache)
@@ -558,6 +655,58 @@ def test_full_repeat_import_and_new_files_appear(connection, import_runner, root
 
 
 @pytest.mark.db
+def test_loaded_basis_sharing_json_and_history_unchanged(connection, import_runner, roots, cache, make_image):
+    run, _, _ = import_runner
+    for number in (2002, 2003):
+        directory = roots["data"] / f"敦煌003/P{number}"
+        make_image(directory / "source.psb")
+        make_image(directory / "合并长卷.tif")
+    (cache / "psb_convert.log").write_text("".join(
+        f"===== 11:00:00 转换: 敦煌003/P{number} =====\nPSBNAME: source.psb\n"
+        f"TIFF 完成: /data/敦煌003/P{number}/合并长卷_psb.tif  7 x 5\n已替换合并长卷.tif\n退出码: 0\n"
+        for number in (2002, 2003)), encoding="utf-8")
+    first, _ = run()
+    loaded = load_catalog_state(connection)
+    raw_images = {r["id"]: r for r in connection.execute("SELECT * FROM image")}
+    assert loaded.images == raw_images
+    assert loaded.items == {r["id"]: r for r in connection.execute("SELECT * FROM item")}
+    assert loaded.links == {(r["item_id"], r["image_id"]): r for r in connection.execute("SELECT * FROM item_image")}
+    assert len(loaded.derivations) == 2
+    assert loaded.derivations == {(r["image_id"], r["source_image_id"]): r
+                                  for r in connection.execute("SELECT * FROM derivation")}
+    for row in connection.execute("SELECT * FROM identifier WHERE state='current'"):
+        assert row in loaded.identifiers[row["item_id"]]
+    images = list(loaded.images.values())
+    assert len({id(r["field_basis"]) for r in images}) == 4
+    assert len({id(r["field_basis"]["facts"]) for r in images}) == 4
+    assert len({id(r["facts"]) for r in images}) == 4
+    assert len({id(r["field_basis"]["facts"]["channels"]) for r in images}) == 1
+    assert len({id(r["field_basis"]["root"]) for r in images}) == 1
+    psbs = [r for r in images if r["kind"] == "psb"]
+    assert psbs[0]["facts"]["pixel_size"] is psbs[1]["facts"]["pixel_size"]
+    for edge in loaded.derivations.values():
+        output = loaded.images[edge["image_id"]]
+        assert output["field_basis"]["license"]["source_images"] == [str(edge["source_image_id"])]
+        assert edge["field_basis"]["method"]["location"] == f"psb_convert.log:{edge['evidence_line']}"
+    for owner, identifiers in loaded.identifiers.items():
+        for ident in identifiers:
+            assert ident["field_basis"]["raw"]["unit_key"] == ident["source_path"]
+        assert loaded.items[owner]["field_basis"]["grouping_key"]["identifier_sources"] == [identifiers[0]["source_path"]]
+    # 新加载使用新池；不让上次返回的只读叶被本次加载修改。
+    reloaded = load_catalog_state(connection)
+    assert reloaded == loaded
+    assert reloaded.images[images[0]["id"]]["field_basis"]["root"] is not images[0]["field_basis"]["root"]
+    history = list(connection.execute("SELECT * FROM history ORDER BY object_kind, object_id, run_id"))
+    second, report = run()
+    assert list(connection.execute("SELECT * FROM history ORDER BY object_kind, object_id, run_id")) == history
+    assert report["counts"]["changes"]["items"] == {"new": 0, "changed": 0}
+    assert report["counts"]["changes"]["images"]["metadata_changed"] == 0
+    for image in images:
+        assert value_at_run(connection, "image", image["id"], second)["run_id"] == first
+        assert value_at_run(connection, "image", image["id"], first)["field_basis"] == image["field_basis"]
+
+
+@pytest.mark.db
 @pytest.mark.parametrize("count", [2, 3])
 def test_number_swap_end_to_end(connection, import_runner, roots, make_image, count):
     run, _, _ = import_runner
@@ -738,14 +887,36 @@ def test_pending_numbers_and_original_primary_remain_current(connection, import_
         make_image(base / name / "native.tif")
     run()
     owner = connection.execute("SELECT id FROM item WHERE grouping_key='pelliot:2002'").fetchone()["id"]
+    original = connection.execute("SELECT * FROM identifier WHERE item_id=%s", (owner,)).fetchone()
     (base / "P2002").rename(base / "副本 P2003")
-    run()
+    pending_run, _ = run()
     rows = list(connection.execute("SELECT * FROM identifier WHERE item_id=%s AND state != 'historical'", (owner,)))
     assert {(r["normalized"], r["state"], r["is_primary"]) for r in rows} == {("P.2002", "current", True), ("P.2003", "pending", False)}
+    pending, = [r for r in rows if r["state"] == "pending"]
+    past = value_at_run(connection, "item", owner, pending_run)
+    past_pending, = [r for r in past["snapshot"]["identifiers"] if r["state"] == "pending"]
+    assert past_pending["normalized"] == "P.2003" and past_pending["raw"] == "P2003"
+    assert past_pending["source"] == "文件名解析"
+    assert past_pending["source_path"] == "data:敦煌003/副本 P2003"
+    assert past_pending["since_run"] == pending_run
+    assert past_pending["field_basis"] == pending["field_basis"]
+    assert all(b["run"] == pending_run and b["at"] for b in past_pending["field_basis"].values())
     (base / "副本 P2003").rename(base / "P2002")
     run_id, _ = run()
     assert connection.execute("SELECT count(*) AS n FROM identifier WHERE state='pending'").fetchone()["n"] == 0
     assert connection.execute("SELECT count(*) AS n FROM anomaly WHERE run_id=%s AND category='身份待确认'", (run_id,)).fetchone()["n"] == 0
+    assert list(connection.execute("SELECT * FROM identifier WHERE item_id=%s", (owner,))) == [original]
+    assert connection.execute("SELECT * FROM identifier WHERE id=%s", (pending["id"],)).fetchone() is None
+    assert value_at_run(connection, "item", owner, pending_run) == past
+    assert not any(r["state"] == "pending" for r in value_at_run(connection, "item", owner, run_id)["snapshot"]["identifiers"])
+    # 真正改号仍历史化，而不是跟撤销候选一起删除。
+    (base / "P2002").rename(base / "P2004")
+    changed_run, _ = run()
+    rows = list(connection.execute("SELECT * FROM identifier WHERE item_id=%s", (owner,)))
+    assert {(r["normalized"], r["state"]) for r in rows} == {("P.2002", "historical"), ("P.2004", "current")}
+    historical, = [r for r in rows if r["state"] == "historical"]
+    assert historical == dict(original, state="historical", until_run=changed_run)
+    assert value_at_run(connection, "item", owner, pending_run) == past
 
 
 @pytest.mark.db

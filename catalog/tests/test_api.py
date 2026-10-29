@@ -231,7 +231,7 @@ def test_resolve(api_db, roots, make_image):
     assert nlc["images"][0]["field_basis"]["attribution"]["source"] == "外部清单"
     (roots["data"] / "敦煌003/P2006").rename(roots["data"] / "敦煌003/P2008")
     (roots["data"] / "敦煌003/P2007").rename(roots["data"] / "敦煌003/副本 P2002")
-    api.run()
+    pending_run, _ = api.run()
     assert not _resolve(api, "P2006")
     assert len(_resolve(api, "P2008")) == 1
     assert _resolve(api, "P2002")[0]["id"] == expected[0]["id"]
@@ -242,6 +242,31 @@ def test_resolve(api_db, roots, make_image):
     assert any(i["normalized"] == "P.2006" and i["state"] == "historical" for i in changed["identifiers"])
     assert _resolve(api, "not-a-number") == []
     assert _resolve(api, "' OR TRUE --") == []
+    history_url = f"/api/v1/items/{pending['id']}/history"
+    response = api.client.get(history_url, params={"run": pending_run})
+    assert response.status_code == 200
+    past = response.json()
+    past_pending, = [i for i in past["snapshot"]["identifiers"] if i["state"] == "pending"]
+    current_pending, = [i for i in pending["identifiers"] if i["state"] == "pending"]
+    assert past_pending["normalized"] == "P.2002"
+    assert past_pending["source_path"] == "data:敦煌003/副本 P2002"
+    assert past_pending["source"] == "文件名解析"
+    assert past_pending["field_basis"] == current_pending["field_basis"]
+    assert past_pending["since_run"] == pending_run
+    (roots["data"] / "敦煌003/副本 P2002").rename(roots["data"] / "敦煌003/P2007")
+    restored_run, _ = api.run()
+    restored = _item(api, "P2007")
+    assert restored["id"] == pending["id"]
+    assert {(i["normalized"], i["state"]) for i in restored["identifiers"]} == {("P.2007", "current")}
+    assert api.client.get(history_url, params={"run": pending_run}).json() == past
+    latest = api.client.get(history_url, params={"run": restored_run})
+    assert latest.status_code == 200
+    assert not any(i["state"] == "pending" for i in latest.json()["snapshot"]["identifiers"])
+    assert _resolve(api, "P2002")[0]["id"] == expected[0]["id"]
+    assert len(_resolve(api, "P2002")) == 1
+    assert not _resolve(api, "P2006")
+    assert any(i["normalized"] == "P.2006" and i["state"] == "historical"
+               for i in _item(api, "P2008")["identifiers"])
 
 
 @pytest.mark.db

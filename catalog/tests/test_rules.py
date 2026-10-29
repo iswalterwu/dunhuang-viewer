@@ -1,9 +1,10 @@
-from dataclasses import replace
+from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
 
 import pytest
 
+from dh_catalog import rules
 from dh_catalog.rules import (
     GALLICA_LICENSE, IDP_LICENSE, RULE_VERSION, Provenance, detect_lineage, initial_provenance,
     item_display_policy, source_policy, summarize_lineages,
@@ -105,6 +106,29 @@ def test_nlc_attribution_from_manifest_or_explicit_default(roots, make_image):
     fallback = source_policy(file, "国图 IDP 下载")
     assert fallback.attribution == "The National Library of China"
     assert fallback.basis["attribution"].source == "默认规则"
+
+
+def test_shared_rule_basis_is_frozen_but_policy_maps_are_independent(roots, make_image):
+    make_image(roots["data"] / "中国国博馆藏/BD00001/1.tif")
+    file = scan(roots).images[0]
+    first = source_policy(file, "国图 IDP 下载")
+    second = source_policy(file, "国图 IDP 下载", attribution="Synthetic Library")
+    assert first.basis is not second.basis
+    assert first.basis["collection"] is second.basis["collection"]
+    assert first.basis["attribution"].source == "默认规则"
+    assert second.basis["attribution"].source == "外部清单"
+    with pytest.raises(FrozenInstanceError):
+        first.basis["collection"].author = "user:must-not-mutate"
+    version = rules.RULE_VERSION
+    try:
+        rules.RULE_VERSION = version + ".test"
+        changed = source_policy(file, "国图 IDP 下载")
+        assert changed.basis["collection"].author.endswith("@" + rules.RULE_VERSION)
+        assert changed.basis["collection"] is not first.basis["collection"]
+    finally:
+        rules.RULE_VERSION = version
+    assert source_policy(file, "国图 IDP 下载").basis["collection"] is first.basis["collection"]
+    assert rules._versioned_basis.cache_info().maxsize == 128
 
 
 def test_item_policy_most_restrictive(roots, make_image):

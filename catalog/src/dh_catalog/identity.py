@@ -222,9 +222,13 @@ def _rollback_collisions(prior, keys, pending) -> None:
         if not conflicts:
             return
         for owners in conflicts:
+            participant_ids = ", ".join(sorted(str(owner) for owner in owners))
             for owner in owners:
                 if keys[owner] != prior[owner].grouping_key:
-                    reason = f"拟用编号 {keys[owner]} 与其他写卷同号，退回原主编号"
+                    reason = (
+                        f"拟用编号 {keys[owner]} 与其他写卷同号，退回原主编号"
+                        f"（本轮同号写卷 ID：{participant_ids}）"
+                    )
                     keys[owner] = prior[owner].grouping_key
                     pending.setdefault(owner, set()).add(reason)
 
