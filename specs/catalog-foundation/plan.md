@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-29）：第10版设计草案，spec7仍冻结（13 R/58 AC不变）。用户本轮回复「好的」，同意A紧凑私有状态为主、C生命周期修正独立拆项的下一版设计/独立核对后Astra实施；新增§4.1.2/4.1.3，保留§4.1.1。现在回Plan→独立Checklist，之后再正式拆Tasks/Analyze，未新实施。旧plan9/Analyze13与T33诊断校读不代本版设计或实现Review通过；512m/384m、字段/JSON/历史/身份/事务锁不变。
+> 状态（2026-10-29）：第10版设计草案，spec7仍冻结（13 R/58 AC不变）。用户本轮回复「好的」，同意A紧凑私有状态为主、C生命周期修正独立拆项的下一版设计/独立核对后Astra实施；新增§4.1.2/4.1.3，保留§4.1.1。独立Checklist14已10通过/2因新Tasks不评、无阻断，允许进入Tasks；现拆T34/T35/T36待独立Analyze补齐，全项通过前不新实施。旧plan9/Analyze13与T33诊断校读不代本版设计或实现Review通过；512m/384m、字段/JSON/历史/身份/事务锁不变。
 
 ## 1. 技术方案
 
@@ -111,7 +111,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 **针对已测正常规模**：T33的6k varied联合数据图71.677MiB，S0+当前image行/field_basis/fact basis/facts四类外层dict25.269MiB；旧6k重导约160.5MiB，36k仅投影586.54。理想tuple载荷容量上界105.47MiB/36k未扣包装/索引/转换，余量薄，不是实施收益；详见memory-diagnosis.md。本次不改全量内存计算，不缩SQL列、不换事务/锁、不流式重写。
 
-**表示与容量边界**：在私有`_compact.py`实现一个小型只读`collections.abc.Mapping`（下称CompactMap），`__slots__`仅保存共享形状和按顺序的值tuple；形状含完整keys tuple及只读使用的key→index，不给每行再造hash索引。提供getitem/iter/len及Mapping的get/items/values/contains/dict()读契约，不继承dict、不提供写接口/隐式解冻。每次loader/compute各自有独立形状池（可由BasisPool持有），LRU最多64种精确key顺序；按实际mapping的**全部keys**构造，不硬编码27/23/7或只取白名单，额外/缺失/不同顺序keys均完整保留，缓存淘汰只影响复用、不丢已返回映射的形状/值。无全局任意数据缓存、不存shape之外的行值、不以值字符串化或元组化JSON列表换内存。
+**表示与容量边界**：在私有`_compact.py`实现一个小型只读`collections.abc.Mapping`（下称CompactMap），`__slots__`仅保存共享形状和按顺序的值tuple；形状含完整keys tuple及只读使用的key→index，不给每行再造hash索引。提供getitem/iter/len及Mapping的get/items/values/contains/dict()读契约，不继承dict、不提供写接口/隐式解冻。每次loader/compute各自有独立形状池（可由BasisPool持有），LRU最多64种精确key顺序；按实际mapping的**全部keys**构造，不硬编码27/23/7或只取白名单，额外/缺失/不同顺序keys均完整保留，缓存淘汰只影响复用、不丢已返回映射的形状/值。形状构造缓存不得因保存绑定自身的方法而产生池的自环；活映射只引用形状/值，不引用池。无全局任意数据缓存、不存shape之外的行值、不以值字符串化或元组化JSON列表换内存。
 
 **四类与转换时点**：仅`CatalogState.images`和`ImportComputation.images`每行外层、该行facts外层、field_basis外层及其facts外层采用CompactMap。UUID→行索引仍dict。loader沿现有128行游标逐行复用叶后立即压紧；compute每影像先在局部可写dict完成赋值/来源依据，再逐行压紧存入结果，不先建完全表dict再转换。missing分支也在状态/依据更新后压紧。item/identifier/link/derivation记录和rules.SourcePolicy.basis仍为原可写dict；P8只读叶与其内部JSON列表按现有约定消费，事实value/source_images等list仍list，不深冻/就地改共享叶。
 
@@ -123,11 +123,13 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 | `_basis`的old.get、previous.items、old facts对照 | 完整Mapping读契约；逐字段run/at沿用与版本变化逻辑不变 |
 | `_image_rows` present/missing | builder为新dict，所有写入结束才冻结；missing用dict(old)，不改旧映射 |
 | `_item_rows`更新updated_run；`_identifier_rows/_persist_identifiers`更新is_primary/id | 继续普通dict，不扩大紧凑范围 |
-| `_snapshot`的dict(rows[id])及JSON比较/报告 | 单对象浅展开影像，嵌套CompactMap由统一JSON默认转换展开，不能保留全库展开副本 |
+| `_snapshot`的dict(rows[id])及JSON比较 | 单对象浅展开影像，嵌套CompactMap由统一JSON默认转换展开，不能保留全库展开副本 |
+| `_persist_history`遍历rows.items/读取row[field_basis] | 完整Mapping读取，snapshot与独立field_basis的Jsonb都走正确边界；只item分支更新updated_run |
+| `build_report`的present及state/kind/lineage/path/canvas读取 | 保持Mapping读契约和逐对象对照，不累计展开影像 |
 | `_upsert`及history直接`Jsonb(row[field_basis])` | 通过同一私有JSON编码边界支持Mapping/list；不依赖Jsonb默认支持自定义Mapping，也不全局修改psycopg适配器 |
 | API/history读取数据库行 | 原SQL/JSON返回，保持外部object/array、所有key、数值类型与过去批次原样 |
 
-**JSON单一边界**：把现有`_json_value`的default转换提为复用的私有编码函数：UUID/PurePosixPath→str、datetime→iso、CompactMap/Mapping→临时dict，其余既有dataclass→asdict。`_json_value`继续JSON往返得到普通结构；Jsonb显式使用同一dumps或先局部展开，逐对象处理。核对importer全部Jsonb入口，尤其_upsert、_persist_identifiers、_persist_history的snapshot和独立field_basis、provenance、_finish_run；普通dict/list输入语义相同，禁止default=str吞类型或改jsonb持久化内容。无新依赖/ORM/通用序列化框架。
+**JSON单一边界**：把现有`_json_value`的default转换提为复用的私有编码函数：UUID/PurePosixPath→str、datetime→iso、CompactMap/Mapping→临时dict，其余既有dataclass→asdict。`_json_value`继续JSON往返得到普通结构；_upsert按`isinstance(value, (Mapping, list))`选择Jsonb，显式使用同一dumps或先局部展开，逐对象处理；不调用全局set_json_dumps。identifier行仍普通dict，其现有判定可保持不动。核对importer全部Jsonb入口，尤其_upsert、_persist_identifiers、_persist_history的snapshot和独立field_basis、provenance、_finish_run；普通dict/list输入语义相同，禁止default=str吞类型或改jsonb持久化内容。无新依赖/ORM/通用序列化框架。
 
 **测试契约公开变化**：现有`test_basis_and_fact_leaves_shared_but_field_maps_independent`的文件变更/另一影像及S0不污染断言保留；最后两处直接外层赋值改为TypeError断言，并对显式展开的新副本赋值证明旧/其他值不污染。`test_rule_version_change_is_field_history_not_forced_value_change`改为在独立S0 builder中替换旧规则依据，不修改冻结输出；真实PG版本/历史测试继续原断言。直接json.dumps内部影像映射的测试改为同一JSON边界规范化再比较，不用repr/default=str。旧叶复用、list类型、run/time隔离、数据库原值/作者/历史等价、原有真实文件回归都不删除；新增只读/完整key/容量及序列化测试。
 
@@ -135,7 +137,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 T33源码与weakref确认_image_rows局部递归policy自捕获，额外可达容量4.108MiB/6k；回收阶段随GC/插桩改变，不能把它预减当RSS收益。将该递归解析改为无自捕获环的短小私有解析器（例如拥有显式输入和memo的可调用对象，递归经self方法，实例不缓存自身bound method）。保留源先于输出、本批源/许可最严格、NLC署名、缓存命中/异常传播算法，不改rules/派生规则。解析器/临时索引最后消费后随_image_rows返回正常释放，不新增全局cache/强制gc.collect/GC调参/中止恢复。
 
-验证普通NLC、BnF、具有真实合成执行记录的多层源继承及读取失败/异常清理。只用weakref观察实际对象：在_image_rows返回事件当下其帧仍活不要求已死，**进入下一阶段后**应无自环残留；异常traceback仍持帧时不假称对象必须已释放，释放测试自己持有的异常/帧后验证无环，不靠显式GC。完整JSON/来源/许可/history和事务锁回归不变，C不能单独关闭P1。
+验证普通NLC、BnF、具有真实合成执行记录的多层源继承及读取失败/异常清理。解析器实例支持weakref；只沿真实setprofile观察实际对象，不monkeypatch业务。测试可仅在小型compute期间暂禁循环GC并finally恢复原状态，防止旧环被自动回收导致假绿；生产/资源对照仍不调GC。只用weakref观察实际对象：在_image_rows返回事件当下其帧仍活不要求已死，**进入下一阶段后**应无自环残留；异常traceback仍持帧时不假称对象必须已释放，释放测试自己持有的异常/帧后验证无环，不靠显式GC。完整JSON/来源/许可/history和事务锁回归不变，C不能单独关闭P1。
 
 ### 4.2 身份与归并（R-002、R-003）
 
@@ -341,7 +343,7 @@ T33源码与weakref确认_image_rows局部递归policy自捕获，额外可达�
 | AC-011-5 | `api.py` | `test_api.py::test_no_mutating_routes`（检查路由表） |
 | AC-012-1 | 只读挂载 | NAS A5 |
 | AC-012-2 | `derivation.py` 统一打开函数、`api.py` | `test_import.py::test_v0_cache_access`（记录导入期间打开的全部路径：只有白名单文件，没有 `users.json`，没有列目录） |
-| AC-012-3 | 512m上限、`v0.py`健康采样、§4.1.1 S0有界读取 | `test_import.py::test_state_load_batches_match_all_rows_and_json` / `test_state_load_preserves_caller_transaction_and_cursors` / `test_state_load_sql_failure_rolls_back_savepoint` / `test_state_load_row_failure_closes_cursor`；plan10新增 `test_compact.py`完整只读Mapping/有界shape/JSON，`test_import.py::test_image_policy_lifetime_without_gc` / `test_compact_images_keep_history_and_json`；§6.2无hook受限规模；真实材料/连续健康仍NAS A5 |
+| AC-012-3 | 512m上限、`v0.py`健康采样、§4.1.1 S0有界读取 | `test_import.py::test_state_load_batches_match_all_rows_and_json` / `test_state_load_preserves_caller_transaction_and_cursors` / `test_state_load_sql_failure_rolls_back_savepoint` / `test_state_load_row_failure_closes_cursor`；plan10新增 `test_compact.py`完整只读Mapping/有界shape/JSON，`test_import.py::test_image_policy_lifetime_without_gc` / `test_compact_images_keep_history_and_json`；compact单测覆盖完整key/顺序/形状淘汰/双向相等/拒写与嵌套JSON未知类型拒绝；§6.2无hook受限规模；真实材料/连续健康仍NAS A5 |
 | AC-012-4 | 沿用未变事实、§4.1.1有界读取 | 上述加载回归及§6.2首轮/真PG二次加载重导规模；真实耗时仍NAS A5 |
 | AC-013-1 | `importer.py` 字段依据 | `test_import.py::test_field_basis_and_author`（规则字段的作者是规则名与版本，不是触发者） |
 | AC-013-2 | `importer.py` | `test_import.py::test_confidence_labels` |
