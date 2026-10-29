@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
-> 2026-10-29，主会话对照已批准 spec 第 7 版、plan 第 8 版、tasks、实际源码/测试及 T-24 证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：P8/P9最小修复候选private-candidate-042在NAS全412项通过、0跳过；T29/T30实现/真库回归完成、待独立R2。**P1未关闭：真实PG 6k重导RSS175.71MiB，两点36k趋势668.83MiB仅外推，未做全量/未OOM。A4按停止条件暂停后，用户现批准T31小幅S0读取修订，plan9独立Checklist12/Analyze13已完成（后者12项全通过），P10仅两文件本机实现就绪，369通过/54skip（423项），T32新PG/资源待验。** Converge仍打开，不进入Gate2、不发R2冲通过；spec需求不变，plan9及checklist仅按本轮许可回到设计核对，不预填新通过。
+> 2026-10-29，主会话对照已批准spec7、原plan8及本轮独立核对后的plan9、tasks、实际源码/测试与T24/T32证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
+> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，待用户是否批准受限内存归因/方案讨论；spec、plan9/checklist及硬限额未再改。
 
 ## 1. 范围与证据边界
 
@@ -11,10 +11,11 @@
 - P7 修复后主会话本机：362 passed / 42 db skipped / 1 原有警告（404 collected）；本机 Python 3.14.2，不能冒充 Python 3.12/SQL 新证据。源输出归档随 P7 记录。
 - 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 T24-A3（非公开历史记录），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
 - 新候选A4：private-candidate-042的 **412 passed/0 skipped/1原有警告，46.08秒**，43个db项实际执行。2k/6k真实PG二次加载/重导等价通过，但资源目标尚未完成；无36k实测。源码/探针/结果/清理见 T28-scale-A4（非公开历史记录），先读README。所有临时资源/凭据已清理、v0 ID/启动/restarts未变。
-- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由A4全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
+- 最新T32-A1：候选private-candidate-047在NAS **423 passed/0 skipped/1警告，59.66秒**，54db全执行；游标/外事务/两异常路径的新11项实际通过。2k/6k/差异6k真库等价与S0定位通过，但未满足放大条件，未36k；资源全清理，v0不变。证据 T32-A1（非公开历史记录）。
+- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由T32-A1全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
 - S 不表示学术认定、生产配置或全部 AC 已验收。T-25/T-26 未获许可；没有因此启动正式服务或扫描真实材料。
 
-P10仅改loader读法及真实PG测试，plan9先Checklist12后Tasks再Analyze13已全通过；本机423项369通过/54skip/1原有警告，仅语法/非DB集成就绪，**下表S仍是A4旧代码/功能证据，不替代新游标的目标PG验证**。T32待执行，仍不收敛/P1未关闭；独立设计核对不代代码Review。
+P10仅改loader读法及真实PG测试，plan9按顺序核对后才实施；本机369通过/54skip与T32目标423全通过分开记录。下表软件路径现经T32完整复验，但P1资源目标仍未关闭，不能将S或设计核对当独立实现Review/规模收敛。
 
 ## 2. 58 条 AC 的实际映射
 
@@ -75,7 +76,7 @@ P10仅改loader读法及真实PG测试，plan9先Checklist12后Tasks再Analyze13
 | AC-011-5 | 唯一写方法仅POST imports；test_api::test_no_mutating_routes | S；无目录写/取消/回滚/CLI导入 |
 | AC-012-1 | compose四项ro、外部pgdata、运行契约；T24测试无真实宿主挂载/端口 | N；T25 inspect正式挂载，A5原图/备份前后元数据归因 |
 | AC-012-2 | derivation.open_cache_record仅13名，导入不读users；test_import::test_v0_cache_access 实际open审计 | S+N；A5正式访问记录/ro核对，不遍历cache |
-| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | P8后A4两点真PG仍缺36k/512MiB余量，P1未闭；已暂停实施/扩规模，待T31设计讨论，不以A5待验或412全绿掩盖 |
+| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | P10后T32资源有改善仍未过放大条件：same6k153.01/varied160.58MiB，36k仅趋势532.82/586.54；P1未闭，已暂停，未36k，不以A5待验/423全绿掩盖 |
 | AC-012-4 | 成功未变事实复用、失败重读；test_scan复用回归 | N；A5全量≤1小时、无变重跑≤10分钟未证明 |
 | AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者非字段作者；P8共享/版本时间隔离/真PG JSON历史等价回归在A4通过，待独立R2 |
 | AC-013-2 | file-header/外部清单为确定，谱系/默认规则为推断；test_import::test_field_basis_and_author、test_rules及nlc依据断言 | S；confidence实际断言在综合用例中 |
@@ -110,5 +111,7 @@ R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=
 真实PG prepare/execute两次：2k首轮/重导RSS94.72/109.96MiB，6k133.24/175.71MiB；第二次全部事实复用、ID/basis摘要/history不变、变化为零。TIFF属性高度同质、仅外部HTTP替身，非真实材料吞吐/并发API/连续v0健康。两点RSS斜率16.832KiB/影像，36k线性约668.83MiB，不是全量实测/OOM；cgroup有可回收页缓存，不能当匿名内存外推。
 
 独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** 用户现已批准T31小幅设计调整：先Plan9/独立Checklist/Tasks/Analyze核对有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
+
+T31/P10及T32最新结果：候选private-candidate-047全423真库通过，54db项/协议trace实际执行；same2k/6k重导RSS102.37/153.01MiB，varied6k160.58，原S0同口径峰值143.17→109.02MiB且文本大小不变。读取缓冲确有改善，但残余完整S0/扫描/读取与当前结果的对象/阶段占用尚未精确归因。事前放大判据要求same两点及varied6k投影均≤480MiB，实际532.8164/586.5352MiB，false；这是操作安全门槛非新AC，未做36k/未OOM。**再次按约定停止新实施与放大，未发R2；T33仅建议受限归因/方案对比，待用户决定，不先重构/改plan9。** T32五API自然exit0，临时库/PG卷/网络/镜像/快照/.env/raw全清理，v0状态不变；完整证据见T32-A1/README。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。
