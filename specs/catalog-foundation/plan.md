@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-29）：第 9 版设计草案，对应已冻结 spec 第 7 版（13 R / 58 AC不变）。用户同意按T-31小幅修订S0读取设计；本版只补§4.1.1有界服务端游标及其验证，不扩内存/缩列/改归并或持久化。先独立Checklist，再拆任务/Analyze，通过后才Astra实施；第11轮通过仅适用于旧plan8，不代表本版已获核对或实现Review通过。
+> 状态（2026-10-29）：第 9 版设计草案，对应已冻结 spec 第 7 版（13 R / 58 AC不变）。用户同意按T-31小幅修订S0读取设计；本版只补§4.1.1有界服务端游标及其验证，不扩内存/缩列/改归并或持久化。独立Checklist12为10通过/2本轮不评、无阻断，可进入Tasks；现拆T31/T32待独立Analyze补评全项后才Astra实施。旧11轮仅plan8结果，任何设计通过不代实现Review。
 
 ## 1. 技术方案
 
@@ -102,7 +102,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 - **进入点/事务**：保持实际导入已有边界：§4.1第2步索引快照独立提交后，在扫描之前于正式目录事务内加载S0，再计算/一次持久化。`load_catalog_state(connection)`内用`connection.transaction()`覆盖六个SELECT：正式调用已在事务中则仅嵌套保存点，不提交/终结调用方事务；现有autocommit连接直接调用时建立短读事务，返回后不遗留事务。不改变隔离级别、快照独立提交或同一连接的会话咨询锁生命周期。
 - **游标/抓取**：六个既有查询（image、item、current/pending identifier、item_image、derivation、item_attachment）的列、过滤及已有排序完全保持；每个查询在显式上下文中打开psycopg命名服务端游标（`withhold=False`），迭代抓取固定**128行**一批（`itersize=128`），不使用`fetchall`或先整体`list`。查询按原顺序逐个消费，任一时刻只活一个游标；可复用固定内部游标名，不添加动态配置、随机命名框架或连接池。辅助上下文只包这六处复用的打开/execute/关闭概念。
-- **关闭/失败**：消费正常结束或SQL/行解码异常均先退出游标上下文，再退出加载事务；不用依赖生成器垃圾回收关闭。不得逐批commit、开启独立连接、使用WITH HOLD，或catch后当空S0继续。异常沿现有PreparedImport路径回滚正式事务、记failed并释放连接/会话锁；不恢复Q-025的中止/恢复机制。
+- **关闭/失败**：消费正常结束或SQL/行解码异常均先退出游标上下文，再退出加载事务；不用依赖生成器垃圾回收关闭。事务已INERROR时驱动可能不发CLOSE，依赖保存点/事务回滚销毁服务端游标；测试以回滚后pg_cursors无残留且外事务未提交为准，不强求错误路径CLOSE报文。不得逐批commit、开启独立连接、使用WITH HOLD，或catch后当空S0继续。异常沿现有PreparedImport路径回滚正式事务、记failed并释放连接/会话锁；不恢复Q-025的中止/恢复机制。
 - **对象语义**：每批解码后沿用既有有界依据池复用只读叶；CatalogState的键/行内容/编号列表顺序、全部字段与JSON列表类型仍相同。共享叶及其内部列表不就地修改，不改变作者/版本/批次/时间、history、附件原文或人工认定；不加载attachment.raw/history全表、不缩减当前六查询的列。
 - **验证**：真实PG超过两批的样本（至少257幅）与普通只读SELECT结果逐字段等价，包含依据/事实与关联；观察真实服务端FETCH的抓取上界（可用psycopg协议trace，不替换业务/DB为mock）。覆盖autocommit直接调用和已有外事务：同连接`pg_cursors`无残留，加载成功不提前提交外事务（另一连接不可见未提交写入、外层回滚后仍未持久化），调用后连接可用。加载中真实SQL失败时游标/读事务关闭、外事务未被偷偷提交；完整导入失败测试继续证明failed状态/回滚/锁和连接归还。不为人为制造的罕见并发加机制。
 
@@ -310,8 +310,8 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 | AC-011-5 | `api.py` | `test_api.py::test_no_mutating_routes`（检查路由表） |
 | AC-012-1 | 只读挂载 | NAS A5 |
 | AC-012-2 | `derivation.py` 统一打开函数、`api.py` | `test_import.py::test_v0_cache_access`（记录导入期间打开的全部路径：只有白名单文件，没有 `users.json`，没有列目录） |
-| AC-012-3 | 512m上限、`v0.py`健康采样、§4.1.1 S0有界读取 | 真实PG加载等价/批次与事务生命周期回归，§6.2受限规模；真实材料/连续健康仍NAS A5 |
-| AC-012-4 | 沿用未变事实、§4.1.1有界读取 | §6.2首轮及真PG二次加载重导合成趋势；真实耗时仍NAS A5 |
+| AC-012-3 | 512m上限、`v0.py`健康采样、§4.1.1 S0有界读取 | `test_import.py::test_state_load_batches_match_all_rows_and_json` / `test_state_load_preserves_caller_transaction_and_cursors` / `test_state_load_sql_failure_rolls_back_savepoint` / `test_state_load_row_failure_closes_cursor`；§6.2受限规模；真实材料/连续健康仍NAS A5 |
+| AC-012-4 | 沿用未变事实、§4.1.1有界读取 | 上述加载回归及§6.2首轮/真PG二次加载重导规模；真实耗时仍NAS A5 |
 | AC-013-1 | `importer.py` 字段依据 | `test_import.py::test_field_basis_and_author`（规则字段的作者是规则名与版本，不是触发者） |
 | AC-013-2 | `importer.py` | `test_import.py::test_confidence_labels` |
 | AC-013-3 | `importer.py`、`history`、`/history` 接口 | `test_import.py::test_value_at_any_run`（两次导入之间修改规则版本与文件） |
@@ -326,7 +326,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 数据库与接口测试用候选提交快照构建的测试镜像和一次性 PostgreSQL 容器运行，**不启动正式 compose、不访问正式 pgdata、不挂真实材料或 v0 文件**。经许可后以 `git archive` 把候选提交送到 NAS 隔离临时目录，`docker build -t dh-catalog-test <隔离目录>/catalog`；一次性数据库使用 `postgres:17.4-alpine3.21`，`--rm --memory 384m --memory-swap 384m`，无宿主数据卷、无宿主端口，在临时 Docker 网络内连通；测试容器同样 `--rm`，内存与 memswap 均为 512m，只用合成数据与合成认证文件。设置临时库 URL 后执行 pytest，结束删除测试容器、网络与隔离快照。它们是测试，不是正式服务部署；正式 compose 仍须 Gate 2 / merge 后另获许可才启动。
 
-T-31继续沿用已批准的合成隔离范围与硬限额，不部署/挂真实材料。新代码不得沿用A4的412通过数：完整pytest的所有db项需实际执行；先同探针2k/6k比较，再按余量决定约36k生产prepare/execute首轮与真实PG重导，另含事实值有差异的合成TIFF头（不解码大图）以免只证明同质缓存最佳情形。核对完整JSON/ID/basis摘要、全量事实复用、无变化history不新增；记录进程RSS与cgroup（页缓存可回收）及失败/OOM/退出状态，不能仅线性外推称通过。若证据仍不足支持512MiB或实际失败，停止扩展实现并讨论，不缩列/扩限/改全流水线。所有临时库/容器/卷/网络/镜像/快照/凭据均清理，v0状态前后核对；独立实现Review-R2及Gate2仍未通过。此验证不是§6.3真实材料验收。
+T-31/T-32继续沿用已批准的合成隔离范围与硬限额，不部署/挂真实材料。新代码不得沿用A4的412通过数：完整pytest的所有db项需实际执行；协议trace仅Linux临时文件，用后关闭删除，不进入证据/错误输出；保持A4只读S0探针源码不变做6k前后归因，合成材料确认位于容器磁盘文件系统而非tmpfs；先同探针2k/6k比较，再按余量决定约36k生产prepare/execute首轮与真实PG重导，另含事实值有差异的合成TIFF头（不解码大图）以免只证明同质缓存最佳情形。核对完整JSON/ID/basis摘要、全量事实复用、无变化history不新增；记录进程RSS与cgroup（页缓存可回收）及失败/OOM/退出状态，不能仅线性外推称通过。若证据仍不足支持512MiB或实际失败，停止扩展实现并讨论，不缩列/扩限/改全流水线。所有临时库/容器/卷/网络/镜像/快照/凭据均清理，v0状态前后核对；独立实现Review-R2及Gate2仍未通过。此验证不是§6.3真实材料验收。
 
 ### 6.3 NAS 验收（部署后，需你许可；导入由你在接口文档页触发）
 

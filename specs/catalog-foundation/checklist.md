@@ -22,7 +22,26 @@
 
 ## 当前结果
 
-2026-10-29：用户同意T31小幅S0读取修订，plan9草案回到Checklist阶段；新独立核对尚未返回。下列第11轮勾选只是plan8的历史结果，**不得据此实施plan9**。主会话不预填新勾选；计划核对后才正式拆新任务并Analyze。
+第12轮（2026-10-29，审阅`private-candidate-044`，plan9；A = anthropic/claude-fable-5-1）：**10通过 / 0不通过 / 2本轮不评，无阻断，可进入Tasks，尚不能Implement**。11:42:37～11:50:51 （原始时刻；时区非公开），自然exit0/仓库无修改。首选claude-bridge仍在R1已证实的接入不可用状态，引用 CodeReview-R1 bridge.err（非公开历史记录），本轮未重试；实际Anthropic，不伪称桥审阅。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [ ] CHK-04：本轮不评；正式新Tasks/Analyze后补评
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [ ] CHK-07：本轮不评；正式新Tasks后补评
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+原文/提示词/meta/status/哈希：Plan9-R12（非公开历史记录）。以上仅机械录入审核员原表，不代实现Review-R2；待Tasks后独立Analyze全项通过才实施。
+
+建议处理：采纳1补计划测试名、2按错误事务回滚销毁游标而非强断CLOSE、3 Linux临时trace不归档、5同口径S0/硬盘临时目录复验、6限importer/test_import不改db.py；4以真实DDL事务失败与必要的行处理失败测试清理，不新增生产防御规则。详细新任务在Tasks阶段补入，再审，不提前勾04/07。
+
+### 旧plan8历史结果（不作为plan9实施许可）
 
 第 11 轮（2026-10-28，审阅提交 `private-candidate-022`；A = claude-fable-5-1 via anthropic（claude-bridge 接入不可用））：通过 12 项，不通过 0 项，本轮不评 0 项。
 
@@ -84,6 +103,8 @@ Analyze：可以进入 Implement
 NAS 测试与部署仍需单独许可；实现期间不改本清单，Review 阶段另评实际代码。
 
 ## 历史
+
+第12轮为plan9的Plan/Checklist核对，10通过、2因新Tasks未拆不评；原文单独按哈希归档（见上），不重放1～11轮。后续Analyze补评尚未发生。
 
 | 轮次 | 审阅提交 | 审核员与通道 | 结果（通过 / 未通过） | 去向 |
 |---|---|---|---|---|
