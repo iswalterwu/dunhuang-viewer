@@ -1,6 +1,6 @@
 # catalog-foundation 实际实现评审记录
 
-> 2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。主会话已由P8/P9实施最小优化及两处语义修复，候选private-candidate-042真实NAS/PG全412项通过；但真PG规模趋势仍缺乏512MiB余量，P1未关闭，A4时按约定停止；用户现已同意小幅S0读取修订，plan9已独立Analyze13全12项通过，P10仅两文件实施，候选private-candidate-047在T32/NAS全423项通过、0跳过；游标后6k重导153.01MiB/差异160.58，36k趋势仍超放大条件，已停止扩大/新实施并清理，P1未闭。未启动R2或变更spec需求。
+> 2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。后续用户批准Plan10 A+C，经独立核对后P12/P13串行实现；最新候选private-candidate-056在T36/NAS全442项通过/0跳过、原512硬限36k差异化首轮/真实PG重导实际成功（RSS341.98/435.05MiB，cgroup含缓存触512、exit0无OOM）。资源已清理，现准备独立CodeReview-R2判断P1/02/05关闭，主会话不代审；未Gate2/merge/部署。历史阶段与局限下列保留，不把旧趋势当新实测。
 
 ## 1. 独立审核与通道
 
@@ -24,11 +24,11 @@
 
 | ID | 严重性 | 审核发现与核验 | 当前处置 |
 |---|---|---|---|
-| CR1-01 | P1 | 原代码重复basis/author/at与S0/本批并存；旧两点约23/30KiB每影像 | **仍未关闭**：P8后A4为175.71MiB；用户批准Plan9/P10游标后T32真PG6k重导153.01MiB、差异160.58，两种36k趋势532.82/586.54MiB未过放大条件。423全套真库通过但暂停36k/新实施/R2，待内存归因/方案讨论，不称实际OOM |
+| CR1-01 | P1 | 原代码重复basis/author/at与S0/本批并存；旧两点约23/30KiB每影像 | **待独立R2判断关闭**：P8/P10曾降低但不足；T33定位后Plan10 A+C候选private-candidate-056已全442真库通过、36k varied原512硬限首轮/真实PG重导实测成功，RSS341.98/435.05MiB，cgroup含缓存触512无OOM。实际材料/并发余量风险仍待验，主会话不改写原R1结论 |
 | CR1-02 | P3 | _persist_identifiers对撤销pending也一律改historical，造成从未持有过的候选号被展示为曾用号；resolve只current，不受影响 | P8已不新增状态修复，当前撤销pending删除、过去history保留；新候选真PG/API回归实际通过。实现/真库回归完成，待独立R2，不代审核员关闭 |
 | CR1-03 | P3，未证实 | 裸四位数紧邻扩展名的点按现有规则不计疑似编号；真实散放PSB名字尚未知，可能影响基线2处 | **现在不改规则**；冻结spec明确排除紧邻点，T-26 A2先核对真实对象，必要时Clarify/Gate1，不擅自取stem |
 | CR1-04 | P3，低概率 | 备份根直接散放文件不作镜像映射/不报备份对不上；现有925片均来自写卷目录，当前数据不触发，影像也不丢 | **不为低概率情况加代码**；留T-26 A2核查925/925，若实际出现先登记具体缺口 |
-| CR1-05 | P3 | 同号回退说明缺少参与写卷ID，虽然可按唯一编号反查，但未满足plan「注明同号的写卷」 | P9已仅补本轮全部参与ID/稳定顺序，算法不变；38项identity及NAS全412项通过。实现/回归完成，待独立R2 |
+| CR1-05 | P3 | 同号回退说明缺少参与写卷ID，虽然可按唯一编号反查，但未满足plan「注明同号的写卷」 | P9已仅补本轮全部参与ID/稳定顺序，算法不变；38项identity及NAS最新442全套通过。实现/回归完成，待独立R2 |
 
 ### CR1-01 主会话复核（不是NAS全量实测）
 
@@ -84,7 +84,17 @@ P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import�
 
 用户批准后P11只读Astra源码分析与主会话受限原代码诊断返回；完整报告 **memory-diagnosis.md**。对照6k varied160.48MiB、阶段hook160.99但耗时3.63倍，图观察器seen约33MiB额外，不当生产峰值。主要增长身份133.15→image行153.26→compute155.84，history/report至160.99；数据图71.677MiB、dict44.670、两状态四类image外层25.269。共享去重子集：S0根独占21.136、policy循环4.108，都是容量不是实际释放；循环普通路径持续到report自然GC。所有不变量/清理已留证，无业务/冻结计划改动。
 
-A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥已证实的接入不可用状态未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 T33-A1（非公开历史记录）、`analysis/P11-T33/`、`review/T33-diagnostic-check-R1/`；该校读不是CodeReview-R2/Plan10或实施许可；用户本轮现已同意A为主/C独立任务进入Plan10独立核对后实施，Checklist14无阻断后T34～36已拆、独立Analyze15全12项通过允许范围内实施，P12/P13已C/A串行实现且主会话完整本机387通过/55skip/1原有警告（442项），T36新PG/原限额规模待验，不预填目标通过；P1仍开/R2/Gate2未过。
+A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥已证实的接入不可用状态未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 T33-A1（非公开历史记录）、`analysis/P11-T33/`、`review/T33-diagnostic-check-R1/`；该校读不是CodeReview-R2/Plan10或实施许可；用户本轮现已同意A为主/C独立任务进入Plan10独立核对后实施，Checklist14无阻断后T34～36已拆、独立Analyze15全12项通过允许范围内实施，P12/P13已C/A串行实现且主会话完整本机387通过/55skip/1原有警告（442项），T36候选private-candidate-056已全442真PG通过/0skip，原限额36k差异化首轮/重导成功，cgroup触512含缓存/exit0无OOM，实测RSS341.98/435.05MiB；现准备CodeReview-R2判问题关闭，未Gate2；P1仍开/R2/Gate2未过。
+
+### Plan10 A+C候选T36实际证据（准备独立CodeReview-R2）
+
+独立Checklist14→Tasks→Analyze15全12项通过后，P12/T34 C、P13/T35 A已串行实现（实际openai/gpt-6-astra，原文和模型/meta/status在implement/P12-T34与P13-T35）；只读影像四类Mapping/64完整形状LRU、统一Jsonb dumps及无自捕获策略解析器，保持原字段/JSON/list/来源/历史/身份/锁，内部外层只读契约按Plan10公开补测。
+
+候选 **private-candidate-056**：本机387通过/55skip/1原警告（442项），NAS Python3.12.15/PG17.4 **442 passed/0 failed/0 skipped/1原有警告，64.37秒**，55db实际。无hook校准same2k/6k重导RSS97.09/135.48MiB，varied6k140.55；旧门槛两投影423.4141/465.3008MiB≤480后才实测 **36k差异化影像/6000写卷**。首轮 **RSS341.98MiB/343.115秒**，真PG重导 **RSS435.05MiB/307.414秒**，36k facts复用、ID/basis/facts摘要/history42000保持、变化零。原S0探针6k后102.34MiB、JSON文本大小不变。
+
+cgroup峰值**达到512MiB硬限**（材料/页缓存在内），两轮exit0无OOM；不能用435RSS推断容器总量有77MiB余量，不证明实际材料/长路径/复杂派生/并发API。HTTP健康是外部替身，实际连续v0/吞吐仍T26。**间接依赖漂移**：未改显式依赖/镜像源头，本次pip解析opentelemetry-api1.45.2，旧1.45.1，已单列不可称完全同解析环境；Starlette/httpx和原警告没改。完整证明/脚本/原精度JSONL/命令/限额与清理见 **T36-A1 README（非公开历史记录）**。
+
+六个API/测试/探针、全部临时库/PG卷/网络/镜像/隔离快照/脚本/.env/raw已清理，v0 ID/启动/restarts未变。**现仅具备主会话软件Converge候选证据，P1/CR1-02/05关闭及残余风险交独立R2判断，不由本报告改写R1结论。Gate2未批准，不合并/部署。**
 
 ## 5. 部署后待验与风险
 

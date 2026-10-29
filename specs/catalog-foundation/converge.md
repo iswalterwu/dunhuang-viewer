@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准spec7、原plan8及本轮独立核对后的plan9、tasks、实际源码/测试与T24/T32证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，T33已获准并完成受限归因，报告memory-diagnosis.md推荐A为主/C小任务辅选，用户现同意Plan10独立核对后实施，Checklist14/Tasks后Analyze15现全12项通过允许C/A串行，P12/P13已C/A串行本机就绪（442项387通过/55skip/1原有警告），新目标真PG/资源T36待验；spec、plan9/checklist及硬限额未再改。
+> 当前软件候选：Plan10按Checklist14→Tasks→Analyze15（12项全通过）后P12(C)/P13(A)串行实现，private-candidate-056在NAS **442 passed/0 skipped/1原有警告，64.37秒**。门槛通过后**36k差异化合成原512限额首轮/真实PG重导均实际成功，RSS341.98/435.05MiB、cgroup含缓存触512/exit0无OOM**，ID/JSON/事实/history稳定，资源全清理/v0未重启。主会话软件Converge候选证据具备，**独立R2未做、P1/02/05关闭交审核员，不是Gate2/实际材料验收**。spec7/plan10/checklist实施后未改，真实材料/并发/连续v0健康等仍N。
 
 ## 1. 范围与证据边界
 
@@ -12,10 +12,12 @@
 - 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 T24-A3（非公开历史记录），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
 - 新候选A4：private-candidate-042的 **412 passed/0 skipped/1原有警告，46.08秒**，43个db项实际执行。2k/6k真实PG二次加载/重导等价通过，但资源目标尚未完成；无36k实测。源码/探针/结果/清理见 T28-scale-A4（非公开历史记录），先读README。所有临时资源/凭据已清理、v0 ID/启动/restarts未变。
 - 最新T32-A1：候选private-candidate-047在NAS **423 passed/0 skipped/1警告，59.66秒**，54db全执行；游标/外事务/两异常路径的新11项实际通过。2k/6k/差异6k真库等价与S0定位通过，但未满足放大条件，未36k；资源全清理，v0不变。证据 T32-A1（非公开历史记录）。
-- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由T32-A1全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
+- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由T36-A1全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
 - S 不表示学术认定、生产配置或全部 AC 已验收。T-25/T-26 未获许可；没有因此启动正式服务或扫描真实材料。
 
-P10仅改loader读法及真实PG测试，plan9按顺序核对后才实施；本机369通过/54skip与T32目标423全通过分开记录。下表软件路径现经T32完整复验，但P1资源目标仍未关闭，不能将S或设计核对当独立实现Review/规模收敛。
+历史P10/T32的423结果仍属旧候选；Plan10 A+C本机387通过/55skip与T36目标442全通过分开记录。下表软件路径现经T36完整复验，并有36k差异化实际两轮资源证据；S或设计/主会话收敛仍不能代独立R2/实际材料或Gate2。
+
+Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有警告（64.37秒，55db实际）；无hook校准投影423.41/465.30过480后，36k varied/6000写卷首轮与PG重导实际成功，RSS341.98/435.05MiB、343.115/307.414秒、history42000/全部事实复用与ID/JSON稳定。cgroup含页缓存达512，未OOM，不能据此称实际材料/并发/v0健康通过；间接opentelemetry解析1.45.2漂移记录，源头未改。下表软件S路径经新候选再验；独立R2及Gate2未过。证据T36-A1/README，全部本轮资源清理。
 
 ## 2. 58 条 AC 的实际映射
 
@@ -76,7 +78,7 @@ P10仅改loader读法及真实PG测试，plan9按顺序核对后才实施；本�
 | AC-011-5 | 唯一写方法仅POST imports；test_api::test_no_mutating_routes | S；无目录写/取消/回滚/CLI导入 |
 | AC-012-1 | compose四项ro、外部pgdata、运行契约；T24测试无真实宿主挂载/端口 | N；T25 inspect正式挂载，A5原图/备份前后元数据归因 |
 | AC-012-2 | derivation.open_cache_record仅13名，导入不读users；test_import::test_v0_cache_access 实际open审计 | S+N；A5正式访问记录/ro核对，不遍历cache |
-| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | P10后T32资源有改善仍未过放大条件：same6k153.01/varied160.58MiB，36k仅趋势532.82/586.54；P1未闭，已暂停，未36k，不以A5待验/423全绿掩盖 |
+| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | Plan10 A+C/T36原限额36k varied两轮实际成功（RSS341.98/435.05、cgroup512含缓存、exit0无OOM），软件瓶颈修复证据具备待R2；真实材料/并发/连续v0仍N，不以442全绿掩盖 |
 | AC-012-4 | 成功未变事实复用、失败重读；test_scan复用回归 | N；A5全量≤1小时、无变重跑≤10分钟未证明 |
 | AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者非字段作者；P8共享/版本时间隔离/真PG JSON历史等价回归在A4通过，待独立R2 |
 | AC-013-2 | file-header/外部清单为确定，谱系/默认规则为推断；test_import::test_field_basis_and_author、test_rules及nlc依据断言 | S；confidence实际断言在综合用例中 |
