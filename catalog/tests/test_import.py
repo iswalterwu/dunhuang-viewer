@@ -23,10 +23,11 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from dh_catalog import importer, rules
+from dh_catalog._compact import CompactMap
 from dh_catalog.db import ImportBusy, create_pool
 from dh_catalog.derivation import CACHE_FILES
 from dh_catalog.importer import (
-    CatalogState, _BasisPool, _basis, build_report, compute_import, latest_valid_snapshot,
+    CatalogState, _BasisPool, _basis, _json_value, build_report, compute_import, latest_valid_snapshot,
     load_catalog_state, prepare_import,
     read_report, value_at_run,
 )
@@ -430,6 +431,16 @@ def test_basis_and_fact_leaves_shared_but_field_maps_independent(roots, cache, m
     at = datetime(2026, 10, 29, tzinfo=UTC)
     first = compute_import(roots, cache, run_id=1, at=at, attachment_sink=lambda file, raw: uuid4())
     left, right = first.images.values()
+    assert type(first.images) is dict
+    for row in (left, right):
+        for mapping in (row, row["facts"], row["field_basis"], row["field_basis"]["facts"]):
+            assert isinstance(mapping, CompactMap)
+            with pytest.raises(TypeError):
+                mapping["unexpected"] = None
+    assert left._shape is right._shape
+    assert left["field_basis"]._shape is right["field_basis"]._shape
+    assert all(type(row) is dict for rows in (first.items, first.links, first.derivations) for row in rows.values())
+    assert all(type(row) is dict for rows in first.identifiers.values() for row in rows)
     expected = {"source": "文件头", "author": "rule:file-header@" + rules.RULE_VERSION,
                 "confidence": "确定", "run": 1, "at": at.isoformat()}
     assert json.loads(json.dumps(left["field_basis"]["facts"]["pixel_size"])) == expected
@@ -440,7 +451,7 @@ def test_basis_and_fact_leaves_shared_but_field_maps_independent(roots, cache, m
     assert left["field_basis"]["facts"] is not right["field_basis"]["facts"]
     assert left["facts"] is not right["facts"]
     before = {
-        key: json.dumps(row, default=str, sort_keys=True) for key, row in first.images.items()
+        key: json.dumps(_json_value(row), sort_keys=True) for key, row in first.images.items()
     }
     unchanged = _compute(roots, cache, previous=_state(first), run=2)
     assert _report(unchanged, _state(first))["counts"]["changes"]["images"]["metadata_changed"] == 0
@@ -452,11 +463,21 @@ def test_basis_and_fact_leaves_shared_but_field_maps_independent(roots, cache, m
     assert row["field_basis"]["facts"]["software"]["run"] == 3
     assert row["field_basis"]["facts"]["channels"]["run"] == 1
     assert row["facts"]["channels"] == first.images[row["id"]]["facts"]["channels"]
-    assert {key: json.dumps(value, default=str, sort_keys=True) for key, value in first.images.items()} == before
+    assert {key: json.dumps(_json_value(value), sort_keys=True) for key, value in first.images.items()} == before
     other = next(r for r in changed.images.values() if r["id"] != row["id"])
     assert other["facts"]["software"]["status"] == "missing"
-    row["field_basis"]["facts"]["channels"] = dict(expected, author="user:synthetic")
-    row["facts"]["channels"] = {"status": "value", "value": 99}
+    with pytest.raises(TypeError):
+        row["field_basis"]["facts"]["channels"] = dict(expected, author="user:synthetic")
+    with pytest.raises(TypeError):
+        row["facts"]["channels"] = {"status": "value", "value": 99}
+    copied_basis = dict(row["field_basis"]["facts"])
+    copied_facts = dict(row["facts"])
+    copied_basis["channels"] = dict(expected, author="user:synthetic")
+    copied_facts["channels"] = {"status": "value", "value": 99}
+    assert copied_basis["channels"]["author"] == "user:synthetic"
+    assert copied_facts["channels"]["value"] == 99
+    assert row["field_basis"]["facts"]["channels"] == expected
+    assert row["facts"]["channels"]["value"] == 3
     assert other["field_basis"]["facts"]["channels"] == expected
     assert first.images[row["id"]]["field_basis"]["facts"]["channels"] == expected
     assert other["facts"]["channels"]["value"] == 3
@@ -525,14 +546,22 @@ def test_rule_version_change_is_field_history_not_forced_value_change(roots, cac
     first = _compute(roots, cache)
     image, = first.images.values()
     old_basis = image["field_basis"]["facts"]["pixel_size"]
-    image["field_basis"]["facts"]["pixel_size"] = dict(old_basis, author="rule:file-header@previous-version")
-    second = _compute(roots, cache, previous=_state(first), run=2)
+    previous = _state(first)
+    builder = dict(image)
+    builder["field_basis"] = dict(image["field_basis"])
+    builder["field_basis"]["facts"] = dict(image["field_basis"]["facts"])
+    builder["field_basis"]["facts"]["pixel_size"] = dict(old_basis, author="rule:file-header@previous-version")
+    previous.images = dict(previous.images)
+    previous.images[image["id"]] = builder
+    second = _compute(roots, cache, previous=previous, run=2)
     after = second.images[image["id"]]
     assert after["facts"] == image["facts"]
     assert after["field_basis"]["facts"]["pixel_size"]["author"] == "rule:file-header@" + rules.RULE_VERSION
     assert after["field_basis"]["facts"]["pixel_size"]["run"] == 2
     assert after["field_basis"]["facts"]["channels"]["run"] == 1
-    assert _report(second, _state(first))["counts"]["changes"]["images"]["metadata_changed"] == 1
+    assert _report(second, previous)["counts"]["changes"]["images"]["metadata_changed"] == 1
+    assert image["field_basis"]["facts"]["pixel_size"] is old_basis
+    assert old_basis["author"] == "rule:file-header@" + rules.RULE_VERSION
 
 
 def test_share_numbers_and_zhihao_are_not_doubtful_collection_numbers(roots, cache, make_image):
@@ -588,6 +617,10 @@ def test_entirely_missing_item_preserves_metadata(roots, cache, make_image):
     assert first.identifiers == second.identifiers
     assert first.links == second.links
     assert all(row["state"] == "missing" for row in second.images.values())
+    for key, row in second.images.items():
+        assert isinstance(row, CompactMap) and isinstance(row["field_basis"], CompactMap)
+        assert row["facts"] is first.images[key]["facts"]
+        assert row["field_basis"]["facts"] is first.images[key]["field_basis"]["facts"]
     assert _report(second, _state(first))["counts"]["changes"]["images"]["missing"] == 1
 
 
@@ -838,6 +871,117 @@ def test_loaded_basis_sharing_json_and_history_unchanged(connection, import_runn
         assert value_at_run(connection, "image", image["id"], first)["field_basis"] == image["field_basis"]
 
 
+@pytest.mark.db
+def test_compact_images_keep_history_and_json(connection, import_runner, roots, cache, make_image):
+    run, _, _ = import_runner
+    relative = "敦煌003/P2002 Plainte ＋---"
+    directory = roots["data"] / relative
+    source = make_image(directory / "source.psb")
+    make_image(directory / "合并长卷.tif")
+    raw = b"\xff\x00 original\r\n"
+    (directory / "原文.txt").write_bytes(raw)
+    nlc = roots["data"] / "中国国博馆藏/bd12345"
+    path = make_image(nlc / "BD12345_0000_0.tif", dpi=(180, 180))
+    (nlc / "manifest.json").write_bytes(_manifest())
+    (cache / "psb_convert.log").write_text(
+        f"===== 11:00:00 转换: {relative} =====\nPSBNAME: source.psb\n"
+        f"TIFF 完成: /data/{relative}/合并长卷_psb.tif  7 x 5\n已替换合并长卷.tif\n退出码: 0\n",
+        encoding="utf-8",
+    )
+    past = {}
+
+    def check(run_id):
+        loaded = load_catalog_state(connection)
+        # 六集合完整 SQL 对照；包括非影像行的可写契约与 JSON 数值类型。
+        images = {r["id"]: r for r in connection.execute("SELECT * FROM image")}
+        items = {r["id"]: r for r in connection.execute("SELECT * FROM item")}
+        identifiers, attachments = {}, {}
+        for row in connection.execute("SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id"):
+            identifiers.setdefault(row["item_id"], []).append(row)
+        for row in connection.execute("SELECT * FROM item_attachment"):
+            attachments.setdefault(row["item_id"], set()).add(row["attachment_id"])
+        links = {(r["item_id"], r["image_id"]): r for r in connection.execute("SELECT * FROM item_image")}
+        edges = {(r["image_id"], r["source_image_id"]): r for r in connection.execute("SELECT * FROM derivation")}
+        assert loaded == CatalogState(images, items, identifiers, links, edges, attachments)
+        assert all((images, items, identifiers, links, edges, attachments))
+        for actual, expected in ((loaded.images, images), (loaded.items, items),
+                                 (loaded.identifiers, identifiers), (loaded.links, links),
+                                 (loaded.derivations, edges)):
+            assert type(actual) is dict and actual.keys() == expected.keys()
+            for key in actual:
+                assert json.dumps(_json_value(actual[key]), sort_keys=True) == json.dumps(_json_value(expected[key]), sort_keys=True)
+        for row in loaded.images.values():
+            for mapping in (row, row["facts"], row["field_basis"], row["field_basis"]["facts"]):
+                assert isinstance(mapping, CompactMap)
+            assert type(row["facts"]["pixel_size"]) is dict
+            assert type(row["facts"]["pixel_size"]["value"]) is list
+        assert all(type(row) is dict for rows in (loaded.items, loaded.links, loaded.derivations) for row in rows.values())
+        assert all(type(row) is dict for rows in loaded.identifiers.values() for row in rows)
+        output, = [r for r in loaded.images.values() if r["lineage"] == "本地合成"]
+        assert type(output["field_basis"]["license"]["source_images"]) is list
+        assert output["original_path"] == relative + "/合并长卷.tif"
+        assert output["original_name"] == "合并长卷.tif"
+        assert bytes(connection.execute("SELECT raw FROM attachment WHERE kind='text'").fetchone()["raw"]) == raw
+        # 按任意批次读到的完整 JSON 与当时当前行逐字段相符，独立依据列也相符。
+        for kind, rows in (("image", loaded.images), ("item", loaded.items)):
+            for object_id, row in rows.items():
+                history = value_at_run(connection, kind, object_id, run_id)
+                assert history["field_basis"] == history["snapshot"]["field_basis"] == row["field_basis"]
+                for name, value in row.items():
+                    if name != ("last_seen" if kind == "image" else "updated_run"):
+                        assert json.dumps(history["snapshot"][name], sort_keys=True) == json.dumps(_json_value(value), sort_keys=True)
+                past[kind, object_id, run_id] = history
+        for (kind, object_id, requested), expected in past.items():
+            assert value_at_run(connection, kind, object_id, requested) == expected
+        return loaded
+
+    first, _ = run()
+    initial = check(first)
+    nlc_image = next(r for r in initial.images.values() if r["kind"] == "tiff" and r["lineage"] == "国图 IDP 下载")
+    assert type(nlc_image["hidden"]) is bool and type(nlc_image["canvas_number"]) is int
+    assert type(nlc_image["facts"]["resolution"]["value"][0]) is float
+    history_count = connection.execute("SELECT count(*) AS n FROM history").fetchone()["n"]
+    second, report = run()
+    repeated = check(second)
+    assert repeated.images.keys() == initial.images.keys()
+    assert repeated.images[nlc_image["id"]]._shape is not nlc_image._shape
+    assert report["counts"]["facts_reused"] == len(initial.images)
+    assert not any(report["counts"]["changes"]["images"].values())
+    assert connection.execute("SELECT count(*) AS n FROM history").fetchone()["n"] == history_count
+
+    version = rules.RULE_VERSION
+    try:
+        rules.RULE_VERSION = version + ".compact-test"
+        changed_rule, _ = run()
+        revised = check(changed_rule)
+        assert revised.images[nlc_image["id"]]["facts"] == nlc_image["facts"]
+        leaf = revised.images[nlc_image["id"]]["field_basis"]["facts"]["pixel_size"]
+        assert leaf["author"].endswith("@" + rules.RULE_VERSION) and leaf["run"] == changed_rule
+        replacement = make_image(nlc / "replacement.tif", software="Photoshop changed", dpi=(300, 300))
+        os.replace(replacement, path)
+        make_image(directory / ".新增.tif")
+        changed_file, report = run()
+        changed = check(changed_file)
+        assert set(initial.images) < set(changed.images) and set(initial.items) == set(changed.items)
+        assert report["counts"]["changes"]["images"]["changed"] == 1
+        assert report["counts"]["changes"]["images"]["new"] == 1
+        assert changed.images[nlc_image["id"]]["facts"]["software"]["value"] == "Photoshop changed"
+        assert changed.images[nlc_image["id"]]["field_basis"]["facts"]["software"]["run"] == changed_file
+        path.unlink()
+        missing_run, _ = run()
+        missing = check(missing_run)
+        assert missing.images[nlc_image["id"]]["state"] == "missing"
+        assert missing.images[nlc_image["id"]]["facts"] == changed.images[nlc_image["id"]]["facts"]
+        assert missing.images[nlc_image["id"]]["missing_since"] is not None
+        unchanged_missing, report = run()
+        check(unchanged_missing)
+        assert not any(report["counts"]["changes"]["images"].values())
+        assert value_at_run(connection, "image", nlc_image["id"], unchanged_missing)["run_id"] == missing_run
+        assert source.exists()
+    finally:
+        rules.RULE_VERSION = version
+
+
 @contextmanager
 def _state_load_protocol(connection, enabled):
     """只留下协议命令摘要；原始行数据仅在临时文件中，失败也 untrace / 关闭。"""
@@ -930,7 +1074,7 @@ def test_state_load_batches_match_all_rows_and_json(connection, import_runner, r
                 else ("image_id", "source_image_id")
             )))
             for name in json_fields:
-                assert json.dumps(row[name], sort_keys=True) == json.dumps(raw[name], sort_keys=True)
+                assert json.dumps(_json_value(row[name]), sort_keys=True) == json.dumps(raw[name], sort_keys=True)
     for image in loaded.images.values():
         assert type(image["facts"]["pixel_size"]["value"]) is list
     for item in loaded.items.values():

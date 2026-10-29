@@ -22,6 +22,7 @@ from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from . import rules
+from ._compact import CompactMap, ShapePool
 from .db import import_lock
 from .derivation import DerivationResult, resolve_derivations
 from .identifiers import Identifier
@@ -39,7 +40,7 @@ from .v0 import HealthMonitor, IndexFetch, IndexSnapshot, V0Client, V0Volume
 class CatalogState:
     """正式表的导入前状态；不包含附件原文。"""
 
-    images: dict[UUID, dict] = field(default_factory=dict)
+    images: dict[UUID, Mapping] = field(default_factory=dict)
     items: dict[UUID, dict] = field(default_factory=dict)
     identifiers: dict[UUID, list[dict]] = field(default_factory=dict)
     links: dict[tuple[UUID, UUID], dict] = field(default_factory=dict)
@@ -56,7 +57,7 @@ class ImportComputation:
     readings: dict[FileEntry, ReadResult]
     nlc: dict[str, NlcResult]
     derivation: DerivationResult
-    images: dict[UUID, dict]
+    images: dict[UUID, Mapping]
     items: dict[UUID, dict]
     identifiers: dict[UUID, list[dict]]
     links: dict[tuple[UUID, UUID], dict]
@@ -172,7 +173,7 @@ def load_catalog_state(connection: Connection) -> CatalogState:
     # 已有正式事务时只建立保存点；autocommit 直调时结束短读事务。
     with connection.transaction():
         with _state_cursor(connection, "SELECT * FROM image") as cursor:
-            state.images = {row["id"]: basis.share_row(row) for row in cursor}
+            state.images = {row["id"]: basis.compact_image(basis.share_row(row)) for row in cursor}
         with _state_cursor(connection, "SELECT * FROM item") as cursor:
             state.items = {row["id"]: basis.share_row(row) for row in cursor}
         with _state_cursor(connection, "SELECT * FROM identifier WHERE state IN ('current', 'pending') ORDER BY id") as cursor:
@@ -295,7 +296,7 @@ def _rule(name, source="默认规则", confidence="推断"):
 
 
 class _BasisPool:
-    """一次计算或 DB 加载内复用 JSON 依据/事实叶；不共享可写的字段映射。
+    """一次计算或 DB 加载内复用 JSON 叶与影像形状；不共享可写字段映射。
 
     叶及其内嵌列表按只读消费，修改须替换字段引用。缓存有界，结束后释放；
     键为完整 JSON（含版本、run/at、位置及来源列表），不省略任何语义。
@@ -304,6 +305,7 @@ class _BasisPool:
     def __init__(self, run=None, at=None):
         self.run = run
         self.at = at.isoformat() if at is not None else None
+        self.shapes = ShapePool()
         # 不用全局 intern：旧库可含任意历史作者/位置，不能永久保留。
         text = self.text = lru_cache(maxsize=512)(lambda value: value)
 
@@ -333,6 +335,15 @@ class _BasisPool:
             if isinstance(value, str):
                 row[name] = self.text(value)
         return row
+
+    def compact_image(self, row):
+        # 仅压紧影像的四类外层；builder 写完后调用，叶和 JSON list 原样沿用。
+        row["facts"] = self.shapes.compact(row["facts"])
+        fields = row["field_basis"]
+        if not isinstance(fields, CompactMap) and "facts" in fields:
+            fields["facts"] = self.shapes.compact(fields["facts"])
+        row["field_basis"] = self.shapes.compact(fields)
+        return self.shapes.compact(row)
 
 
 def _basis(values, semantic, old, pool):
@@ -396,7 +407,7 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at,
             row["field_basis"] = dict(old["field_basis"], **_basis(
                 row, {"state": _rule("image-presence", "文件头", "确定"),
                       "missing_since": _rule("image-presence", "文件头", "确定")}, old, basis))
-            rows[image.id] = row
+            rows[image.id] = basis.compact_image(row)
             continue
         reading, lineage, source = readings[file], lineages[file], policy(file)
         unit = unit_by_file[file]
@@ -434,7 +445,7 @@ def _image_rows(images, items, units, readings, nlc, derivation, prior, run, at,
         fact_basis = _basis(row["facts"], {name: _rule("file-header", "文件头", "确定") for name in row["facts"]},
                             dict(old.get("facts", {}), field_basis=old.get("field_basis", {}).get("facts", {})), basis)
         row["field_basis"]["facts"] = fact_basis
-        rows[image.id] = row
+        rows[image.id] = basis.compact_image(row)
     for unit in units.units:
         for member in unit.images:
             image = by_file[member.file]
@@ -616,7 +627,8 @@ def _upsert(connection, table, row, keys):
         sql.SQL(", ").join(map(sql.Identifier, keys)),
         sql.SQL(", ").join(sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(name), sql.Identifier(name)) for name in updates),
     )
-    connection.execute(query, tuple(Jsonb(value) if isinstance(value, (dict, list)) else value for value in row.values()))
+    connection.execute(query, tuple(Jsonb(value, dumps=_json_dumps) if isinstance(value, (Mapping, list)) else value
+                                    for value in row.values()))
 
 
 def _persist_identifiers(connection, run, previous, result):
@@ -634,7 +646,7 @@ def _persist_identifiers(connection, run, previous, result):
                 columns = list(row)
                 query = sql.SQL("INSERT INTO identifier ({}) VALUES ({}) RETURNING id").format(
                     sql.SQL(", ").join(map(sql.Identifier, columns)), sql.SQL(", ").join(sql.Placeholder() for _ in columns))
-                row["id"] = connection.execute(query, tuple(Jsonb(v) if isinstance(v, dict) else v for v in row.values())).fetchone()["id"]
+                row["id"] = connection.execute(query, tuple(Jsonb(v, dumps=_json_dumps) if isinstance(v, dict) else v for v in row.values())).fetchone()["id"]
 
 
 def _persist_relations(connection, result):
@@ -705,10 +717,11 @@ def _persist_history(connection, run, previous, result):
                     row["updated_run"] = run
                     connection.execute("UPDATE item SET updated_run = %s WHERE id = %s", (run, object_id))
                 connection.execute("INSERT INTO history VALUES (%s, %s, %s, %s, %s)",
-                                   (kind, object_id, run, Jsonb(snapshot), Jsonb(row["field_basis"])))
+                                   (kind, object_id, run, Jsonb(snapshot, dumps=_json_dumps), Jsonb(row["field_basis"], dumps=_json_dumps)))
             if kind == "item" and row["provenance"] != old_rows.get(object_id, {}).get("provenance"):
                 connection.execute("INSERT INTO provenance_history(item_id, run_id, value, field_basis) VALUES (%s, %s, %s, %s)",
-                                   (object_id, run, Jsonb(row["provenance"]), Jsonb(row["field_basis"]["provenance"])))
+                                   (object_id, run, Jsonb(row["provenance"], dumps=_json_dumps),
+                                    Jsonb(row["field_basis"]["provenance"], dumps=_json_dumps)))
 
 
 def value_at_run(connection: Connection, object_kind: str, object_id: UUID, run_id: int) -> dict | None:
@@ -724,14 +737,22 @@ def _changed(row, old, ignored=frozenset()):
     return _json_value({k: v for k, v in row.items() if k not in ignored}) != _json_value({k: v for k, v in old.items() if k not in ignored})
 
 
+def _json_default(obj):
+    if isinstance(obj, (UUID, PurePosixPath)):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, Mapping):
+        return dict(obj)
+    return asdict(obj)
+
+
+def _json_dumps(value):
+    return json.dumps(value, default=_json_default, ensure_ascii=False)
+
+
 def _json_value(value):
-    def convert(obj):
-        if isinstance(obj, (UUID, PurePosixPath)):
-            return str(obj)
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return asdict(obj)
-    return json.loads(json.dumps(value, default=convert, ensure_ascii=False))
+    return json.loads(_json_dumps(value))
 
 
 def _anomaly(category, object_kind, object_key, root, path, raw, description):
@@ -905,7 +926,8 @@ def _finish_run(connection, run, status, report, error=None):
     connection.execute("""
         UPDATE import_run SET ended_at = now(), status = %s, counts = %s, health_summary = %s,
                               cache_access = %s, error = %s WHERE id = %s
-    """, (status, Jsonb(report), Jsonb(report.get("health", {})), Jsonb(report.get("cache_access", [])), error, run))
+    """, (status, Jsonb(report, dumps=_json_dumps), Jsonb(report.get("health", {}), dumps=_json_dumps),
+          Jsonb(report.get("cache_access", []), dumps=_json_dumps), error, run))
 
 
 def read_report(connection: Connection, run_id: int | None = None) -> dict | None:

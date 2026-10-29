@@ -314,9 +314,9 @@
 - **完成标准/真实测试**：按plan§4.1.3保留源先于输出、memo命中、本批来源、最严格许可/署名等全部值；普通NLC/BnF/真实执行记录的派生源继承均测试。固定`test_image_policy_lifetime_without_gc`沿sys.setprofile实际返回事件登记weakref（不保frame/f_locals、不替换业务），在下一阶段实际进入时确认解析器无环释放；小测试期间可gc.disable并finally恢复原状态，防旧环被自然GC假绿，生产及资源探针不变。异常traceback持帧不误断必释放，保留所有失败回滚/历史/许可断言。
 - **验证命令**：本机完整`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_import.py`，再完整`catalog/tests catalog/acceptance/test_compare.py`；无DB如实skip不计通过，AST3.12/UTF8LF/原警告保留/限定diff检查。后T36真实PG全套。
 
-### T-35 A：影像四类紧凑映射及JSON边界（2小时，已获准方向、依赖T34就绪及Analyze）
+### T-35 A：影像四类紧凑映射及JSON边界（2小时，P13实现/本机就绪，真库待T36）
 
-- **上下文/依赖**：T33测得两状态四类外层25.269MiB/6k；按plan10§4.1.2完整key形状/值tuple减少每行hash索引，不把理想17.58MiB当RSS收益。T34本机就绪且新Analyze全项通过后Astra P13实施，不能覆盖C；完成代码/本机集成即就绪进入T36，真库由T36补齐，无依赖环。
+- **上下文/依赖**：P13已在private-candidate-055上完成四文件/本机就绪（22:21:58～22:30:05，openai/gpt-6-astra、exit0），新12紧凑单测+1PG历史测试；主会话完整387 passed/55 skipped/1原有警告，442项（52无DB/3Linux）。C/旧语义与prepare/cursor AST保留，UTF8LF/3.12 AST/diff通过；真PG/目标运行及预算待T36，skip不计通过。T33测得两状态四类外层25.269MiB/6k；按plan10§4.1.2完整key形状/值tuple减少每行hash索引，不把理想17.58MiB当RSS收益。T34本机就绪且新Analyze全项通过后Astra P13实施，不能覆盖C；完成代码/本机集成即就绪进入T36，真库由T36补齐，无依赖环。
 - **修改范围**：新增`catalog/src/dh_catalog/_compact.py`、`catalog/tests/test_compact.py`；修改`catalog/src/dh_catalog/importer.py`、`catalog/tests/test_import.py`，必要只在`catalog/tests/test_api.py`补API JSON断言。不改api.py/db.py/scan/rules/identity/derivation/schema/依赖/运行配置/v0/冻结spec/plan/checklist。200～400行生产/测试另计为估计，若需扩到B/其他行族先停，不偷偷扩大。
 - **完成标准**：支持AC-012-3/AC-012-4，保持AC-003-1/AC-003-2/AC-003-7/AC-005-1/AC-007-4/AC-008-1/AC-009-2/AC-009-3/AC-009-5/AC-013-1/AC-013-2/AC-013-3及API外部JSON。只image S0/当前行、facts、field_basis、fact basis外层只读，其他可写行不冻；Mapping.slots保存shape和values tuple，shape是所有keys精确顺序与index，每loader/compute有界64种，不硬编码/缩字段，淘汰不影响旧映射，池不自循环/跨批污染。loader逐行/compute每影像builder完成后立即压紧，missing分支同样；UUID行索引仍dict，叶/JSON list/数值类型/来源版本批次时间/原文完整，无全表展开副本。
 - **消费者/序列化清单**：按plan表逐项核_file_entry/_image_state、_read_images、_basis、_image_rows present/missing、_item_rows读policy、_release_unique_values、_upsert、_snapshot、_persist_history、build_report。只item.updated_run/identifier.id/is_primary等继续可写。统一私有JSON default/dumps支持Mapping/UUID/path/datetime/dataclass，_upsert按Mapping/list显式Jsonb dumps或局部展开，history独立field_basis也适配；identifier dict判定可保持、不全局set_json_dumps、不default=str吞未知类型、不改JSONB/schema/事务/锁。核全部Jsonb入口无漏。
@@ -355,6 +355,8 @@ P8/P9（2026-10-29，均openai/gpt-6-astra，派发HEAD private-candidate-041）
 P10：openai/gpt-6-astra，派发private-candidate-046，meta/status 12:12:32～12:21:09 （原始时刻；时区非公开）、exit0。仅importer.py/test_import.py，显式contextmanager产cursor、128行命名游标、短读事务/嵌套保存点。四新测试参数化11项，子agent完整369通过/54skip/1原有警告，主会话同全套369/54/1（423项）复验一致；54中51无DB/3Linux trace。原函数AST除loader外未改、3.12 AST/UTF8LF/差异通过；不代PG运行。证据 P10-T31（非公开历史记录），未由子agent访问NAS/提交；T32真实证据在T32-A1补齐423 passed/0 skipped/1原有警告，54db全部通过；校准资源有改善但未过36k放大条件，按约定停止，未R2。
 
 P12/T34 C：openai/gpt-6-astra，派发private-candidate-054，2026-10-29 22:13:07～22:18:27 （原始时刻；时区非公开），exit0。仅importer/test_import，生产+26/-12改为weakrefable slots解析器，无自捕获/方法缓存/生产GC；新6个测试包括NLC有无署名/BnF/真实多层派生/memo/读失败/异常traceback释放。主会话完整375 passed/54 skipped/1原有警告（429项，51无DB/3Linux），旧函数AST除_image_rows外不改，UTF8LF/3.12 AST/diff检查通过；真库待T36，P1未关，不代Review。证据 P12-T34（非公开历史记录），无子agent/NAS资源，现可串行P13。
+
+P13/T35 A：openai/gpt-6-astra，派发private-candidate-055，22:21:58～22:30:05 （原始时刻；时区非公开）、exit0，仅_compact.py/importer/test_compact/test_import；影像只读映射、64完整形状顺序LRU/值tuple、逐行压紧与全部Jsonb同一dumps。主会话完整387通过/55skip/1原有警告（442项）与子agent一致，原C/编排/游标保持；目标真PG待T36。证据 P13-T35（非公开历史记录），不代P1/Review，未由agent连NAS/提交。T36可开始。
 
 ## 本机目录迁移（2026-10-28，非功能实施任务）
 
