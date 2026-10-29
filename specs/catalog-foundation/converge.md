@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准 spec 第 7 版、plan 第 8 版、tasks、实际源码/测试及 T-24 证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：C1/T-27及A3全404项通过仍成立，但**独立CodeReview-R1已发现CR1-01/P1规模内存风险和CR1-02/05两项小缺口，结论「需修复后重审」；Converge重新打开，暂不收敛、不进入Gate2**。主会话独立两点正常比例测量支持内存风险，T-28～T-30方向/验证见review.md与tasks.md，尚未实施。没有修改冻结spec/plan/checklist，也不把旧合成测试全绿当规模已达标。
+> 当前结论：P8/P9最小修复候选private-candidate-042在NAS全412项通过、0跳过；T29/T30实现/真库回归完成、待独立R2。**P1未关闭：真实PG 6k重导RSS175.71MiB，两点36k趋势668.83MiB仅外推，未做全量/未OOM。按用户停止条件暂停扩大/实施，待批准T31回Plan/Analyze讨论S0读取。** Converge仍打开，不进入Gate2、不发R2冲通过；冻结spec/plan/checklist未改。
 
 ## 1. 范围与证据边界
 
@@ -10,7 +10,8 @@
 - 旧候选 `private-candidate-035`：T-24 A2 真库/Python 3.12.15 为 402 passed / 0 skipped / 1 原有警告，证据在 T24-A2（非公开历史记录）。该结果不覆盖本次新增 C1 回归。
 - P7 修复后主会话本机：362 passed / 42 db skipped / 1 原有警告（404 collected）；本机 Python 3.14.2，不能冒充 Python 3.12/SQL 新证据。源输出归档随 P7 记录。
 - 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 T24-A3（非公开历史记录），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
-- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由A3全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
+- 新候选A4：private-candidate-042的 **412 passed/0 skipped/1原有警告，46.08秒**，43个db项实际执行。2k/6k真实PG二次加载/重导等价通过，但资源目标尚未完成；无36k实测。源码/探针/结果/清理见 T28-scale-A4（非公开历史记录），先读README。所有临时资源/凭据已清理、v0 ID/启动/restarts未变。
+- 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由A4全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
 - S 不表示学术认定、生产配置或全部 AC 已验收。T-25/T-26 未获许可；没有因此启动正式服务或扫描真实材料。
 
 ## 2. 58 条 AC 的实际映射
@@ -35,7 +36,7 @@
 | AC-003-2 | 先签名后位置的两阶段认领、image_path_history；test_identity::test_rename_move_and_swap；API历史详情测试 | S；真实改名/移动/互换，不复制算法 |
 | AC-003-3 | UUIDv4 分配；test_identity::test_ids_not_path_derived、schema稳定UUID | S；相同路径独立初建不同ID |
 | AC-003-4 | S0 同时决策与编号历史；test_identity::test_number_change_keeps_id；test_import::test_number_swap_end_to_end | S；ID保持、旧号历史化 |
-| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | 原S算法回归通过；R1发现同号说明缺参与ID（CR1-05/T-30），待补后重验 |
+| AC-003-5 | identity._item_decisions/_rollback_collisions；test_identity::test_unmatched_cases_kept_pending（五情形及改回） | P9已补全部参与ID/稳定顺序，38项identity及A4全套通过；待独立R2，不改算法 |
 | AC-003-6 | 旧影像数量/serial确定新影像归属；test_identity::test_new_images_assignment、test_new_images_assignment_between_unkeyed_items、test_multi_number_new_images_shared | S；数量并列取较早登记 |
 | AC-003-7 | 改号提案同时生效、临时唯一值释放；test_identity::test_swap_and_rotation_order_independent、test_import::test_number_swap_end_to_end | S；两件互换/三件轮换含真实SQL |
 | AC-003-8 | 新增号与单号改写分开处理；test_identity::test_multi_number_add_and_rewrite | S；原ID/共享关联不丢 |
@@ -66,15 +67,15 @@
 | AC-010-1 | _collect_anomalies/build_report及API分页；test_import::test_anomaly_categories（18类）、P7 JPEG流水线异常回归 | S；结构化对象/原文/说明，合并建议双端关联 |
 | AC-010-2 | 34项固定JSON基线/只读compare/42个对照测试；无重扫或复制归并 | N；真实报告、差异说明及3项人工证据仍待A2 |
 | AC-011-1 | 唯一HTTP认证边界/管理员/503/401/403/202/409；test_auth；test_api::test_auth_and_admin_import、test_secret_missing_rejects_data_and_trigger | S+N；T-25真实v0登录态/普通用户冒烟未做 |
-| AC-011-2 | resolve只current、母号含分件；test_api::test_resolve | 查询S回归通过；R1发现撤销pending误入历史（CR1-02/T-29），待修；真实对象由A2补证 |
+| AC-011-2 | resolve只current、母号含分件；test_api::test_resolve | P8撤销pending不再冒充historical，过去history保留；A4真实PG/API断言通过、待R2；实际对象A2补证 |
 | AC-011-3 | SQL筛选/稳定分页/只读事务；test_api::test_filters_and_pagination | S+N；A6全量NAS列表/详情各100次P95尚未测 |
 | AC-011-4 | latest_valid_snapshot、viewer_link与目录存在检查；test_api::test_v0_links、test_v0_empty_failed_snapshot_and_never_valid | S+N；A7抽20真实卷链接，不能只看页面200 |
 | AC-011-5 | 唯一写方法仅POST imports；test_api::test_no_mutating_routes | S；无目录写/取消/回滚/CLI导入 |
 | AC-012-1 | compose四项ro、外部pgdata、运行契约；T24测试无真实宿主挂载/端口 | N；T25 inspect正式挂载，A5原图/备份前后元数据归因 |
 | AC-012-2 | derivation.open_cache_record仅13名，导入不读users；test_import::test_v0_cache_access 实际open审计 | S+N；A5正式访问记录/ro核对，不遍历cache |
-| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | R1/主会话规模探针显示P1内存风险（CR1-01/T-28），待优化；不能仅以A5部署后待验掩盖源码规模瓶颈 |
+| AC-012-3 | compose/API512m=memswap、HealthMonitor；T24受限小规模合成容器 | P8后A4两点真PG仍缺36k/512MiB余量，P1未闭；已暂停实施/扩规模，待T31设计讨论，不以A5待验或412全绿掩盖 |
 | AC-012-4 | 成功未变事实复用、失败重读；test_scan复用回归 | N；A5全量≤1小时、无变重跑≤10分钟未证明 |
-| AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者不是字段作者，原始依据保留 |
+| AC-013-1 | importer._basis、字段/关联/规则作者与版本；test_import::test_field_basis_and_author、test_changed_file_history_and_value_at_any_run | S；触发者非字段作者；P8共享/版本时间隔离/真PG JSON历史等价回归在A4通过，待独立R2 |
 | AC-013-2 | file-header/外部清单为确定，谱系/默认规则为推断；test_import::test_field_basis_and_author、test_rules及nlc依据断言 | S；confidence实际断言在综合用例中 |
 | AC-013-3 | history变化快照、value_at_run、API history；test_import::test_changed_file_history_and_value_at_any_run、test_rule_version_change_recorded_at_batch；API详情历史测试 | S；含任意后续无变化批次取最近已存值 |
 
@@ -102,6 +103,10 @@
 
 R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=1、无结论；回退同Claude模型经Anthropic API正常exit=0，报告「需修复后重审」。CR1-01为P1，主会话又用2000/6000影像、每卷6个微型PSB头的真实计算流程复测，约23KiB/影像首轮、30KiB/影像重导；36k含基线线性估算865.5/1111.4MiB（Windows/Py3.14，不是NAS实测），明确高于512MiB。其他确认的小缺口为撤销候选状态语义和冲突说明；未证实/低概率CR1-03/04留真实材料核查，不擅自改规则。
 
-完整独立原文、实际范围/局限及主会话复核见review.md与 CodeReview-R1（非公开历史记录）。T-28拟以依据复用降低正常规模内存，方向/复杂度先请用户确认；若须缩S0列或流式设计，先停下更新plan，不默改架构。T-29/T-30一起补测后，新候选完整/目标环境及规模验证，再独立Review-R2。当前没有P8运行或新生产代码改动，404全绿不作为Gate2通过。
+完整独立原文/范围在review.md与 CodeReview-R1（非公开历史记录）。用户批准后P8/P9已最小复用及修两处小缺口，源码/本机结果在 R1-fix-batch（非公开历史记录）；新候选private-candidate-042在A4/NAS/3.12/真PG全412项通过，不沿用旧404。
+
+真实PG prepare/execute两次：2k首轮/重导RSS94.72/109.96MiB，6k133.24/175.71MiB；第二次全部事实复用、ID/basis摘要/history不变、变化为零。TIFF属性高度同质、仅外部HTTP替身，非真实材料吞吐/并发API/连续v0健康。两点RSS斜率16.832KiB/影像，36k线性约668.83MiB，不是全量实测/OOM；cgroup有可回收页缓存，不能当匿名内存外推。
+
+独立6k只读S0探针加载前78.94/后143.17MiB，image.field_basis文本均值4803bytes。读取缓冲及Python常驻结构都需定位，不能保证只改游标足够。**已按停止条件暂停扩大/后续实施，T28资源目标未完成、未派R2。** T31只是待批准讨论：先Plan/Analyze评估有界服务端游标抓取，保留完整字段、内存计算/持久化和事务锁；不擅自流式重构/缩列/扩限。T29/T30实现/真库回归完成仍不代独立审核关闭。A4全部临时资源与凭据已清理，无运行子agent。
 
 Gate 2 需用户确认评审结果及部署后待验风险，不能由本报告自动批准。真实材料计数/对象关系、正式只读挂载/端口/pgdata、v0连续健康、全量资源/耗时、P95及链接抽查都留T-25/T-26；feature保持in-progress，不称全量已收敛，不启动正式部署。

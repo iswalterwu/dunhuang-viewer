@@ -1,13 +1,13 @@
 # 会话交接 — catalog-foundation
 
-> **状态：P8/P9 Astra已自然结束并完成本机修复；主会话集成369 passed/43 db skipped/1原有警告。内存两点本机复测显著改善，但真实PG/S0加载与目标规模/512MiB、Review-R2均仍待验。** R1不改写为通过；不放宽限额或改持久化/归并语义，若最小共享不足就停止讨论设计。
-> 更新：2026-10-29。尚未过Gate2、未merge main、未正式部署/全量导入；404全绿仅是已有合成验证，不代表全量512MiB已达标。
+> **状态：P8/P9最小修复候选private-candidate-042已在NAS完整412 passed/0 skipped，两个P3实现/真库回归完成；P1仍未关闭。真实PG的6k重导RSS峰值175.71MiB，两点36k趋势约668.83MiB（不是全量实测）。已按约定停止扩大规模/后续实施，清理本轮资源，等待用户确认是否回Plan/Analyze调整S0读取设计。** 未启动Review-R2、不以旧404或新412全绿代替资源目标。
+> 更新：2026-10-29。未Gate2、未merge main、未部署/真实导入；冻结spec/plan/checklist、512MiB限制均未改。
 
 ## 1. 恢复入口与当前安全点
 
 - 唯一本机仓库：**`/srv/example/project`**；分支 `feat/catalog-foundation`，upstream `origin/feat/catalog-foundation`。2026-10-28迁移自C盘，原目录已在6,049文件SHA-256一致、新环境验证后移除；本机依赖保留，激活/17个入口已重新生成。
-- 当前已审HEAD：**`private-candidate-039`**；最新实际NAS全套通过候选：**`private-candidate-038`**。两者的生产源码/测试/迁移/运行配置相同，其间仅状态/证据文档变化。
-- 本轮其后的评审归档/计划/状态提交仍未改生产代码，实际最新HEAD用 `git log -1 --oneline` / `git rev-parse HEAD` 查看，不写未知的自引用SHA。
+- R1已审HEAD：**`private-candidate-039`**，旧NAS候选private-candidate-038的404项是其原代码证据。
+- 最新修改并在NAS全套通过候选：**`private-candidate-042`**（P8/P9生产及测试7文件变更），**412 passed/0 skipped/1原有警告，46.08秒**；没有独立R2通过。其后状态/证据提交不改生产代码，最新HEAD以git log查看，不写未知自引用SHA。
 - 用户已批准普通GitHub功能分支持续同步，不重复询问push；GitHub：`origin 的 feat/catalog-foundation 分支（项目角色描述，非网址）`。没有merge、NAS git push、PR合并或部署。main/origin-main记录仍为private-candidate-023，最终以git分支/远端核对为准。
 
 ## 2. 工作流与不可混淆的结论
@@ -15,7 +15,7 @@
 - spec第7版已过Gate1并冻结（13 R / 58 AC / 25决策），feature plan第8版；设计Analyze第11轮审核员A的12项通过，**不是实际实现Review结论**。不重复Gate1、不改冻结spec/plan/checklist。
 - T-01～T-24对应实现/合成自动化证据已具备；Converge发现JPEG头安全异常C1/T-27，经P7最小修复并在A3真库通过。C1已关闭，不重修或关闭Pillow保护。
 - 主会话的58条AC矩阵在 `specs/catalog-foundation/converge.md`，包括7处计划测试名与实际综合测试别名。软件收敛初步结论已被R1新发现重新打开；**当前不能提交Gate2通过或宣称全量收敛**。
-- 有效独立评审、主会话复核、风险和后续建议在 **`specs/catalog-foundation/review.md`**；T-28～T-30已登记在tasks.md，尚未实施。T-25正式部署与T-26真实材料/性能验收未开始、未获许可。
+- 有效独立评审、风险和实际复验在 **`specs/catalog-foundation/review.md`**。T-28第一版最小优化有改善但资源目标未完成；T-29/T-30实现/真库回归完成、待独立复审。T-31只登记待批准的设计讨论，不实施。T-25/T-26未开始、未获许可。
 
 ## 3. 独立 Review-R1（已结束，不是超时或失联）
 
@@ -32,7 +32,7 @@
 
 所有派发的P1～P7及两次Review进程均已结束，P8/P9已自然结束：P8 08:08:58～08:19:49、P9 08:08:58～08:11:09，均openai/gpt-6-astra、exit=0、stderr为空，派发HEAD private-candidate-041。没有本会话遗留子agent，不重启历史任务。不要因等待较久把正常exit0误写成超时，也不要把首选接入失败误作审核不通过的代码结论。
 
-## 4. 发现与已批准最小方向（本机完成，目标验证待执行）
+## 4. R1最小修复后的实际结论与停止点
 
 ### CR1-01 / P1：正常目标规模内存
 
@@ -47,7 +47,16 @@ R1旧代码的每字段basis/author/at反复新建，重导入同时持有S0和�
 
 增量线性一致；约36k影像线性估算含基线为 **865.5MiB / 1111.4MiB**，高于512MiB。**这是具体高概率的正常规模风险，但不是NAS全量实测或已发生OOM**；真实DB反序列化S0的峰值尚未在该探针测量，不能用共享DTO替代真库验证。
 
-P8/P9已在批准范围完成本机修改。主会话同探针新测：2000影像首轮71.13/重导78.29MiB，6000首轮101.30/重导125.14MiB；这些是Win3.14/真实结果DTO重导，**不含实际PG/libpq全结果缓冲与S0反序列化**，不能外推即认为512MiB达标。下一步必须做目标环境真实库加载及合理规模验证，仍禁止扩大限额/改设计：
+P8/P9本机同探针新测2000为71.13/78.29MiB、6000为101.30/125.14MiB；仅Win3.14/DTO重导，不含实际PG路径。新候选已进一步在NAS/3.12/真实PG做生产prepare/execute两次：
+
+| 影像/写卷 | 首轮RSS峰值 | 重导RSS峰值 | 首轮/重导cgroup峰值 |
+|---|---:|---:|---:|
+| 2000/334 | 94.72MiB | 109.96MiB | 172.02/182.87MiB |
+| 6000/1000 | 133.24MiB | 175.71MiB | 240.75/281.44MiB |
+
+第二次真实PG加载S0、全量facts复用、ID/basis摘要/history不变、变化计数为零。仅合成微型TIFF/国图清单，属性高度相同；HTTP仅外部替身，非真实材料/连续v0健康/并发API证明。两点RSS斜率16.832KiB/影像，36k线性约668.83MiB，**不是全量已测或OOM**；cgroup含可回收页缓存，不能混为匿名内存。
+
+独立同环境只读S0探针：6k加载前78.94/后143.17MiB；image.field_basis文本均值4803bytes，总28,818,000bytes。加载缓冲/常驻Python结构需继续定位，不能保证只改游标足够。**已停止直接扩大到36k及后续实施，未发R2；需用户批准后回Plan/Analyze，优先讨论有界服务端游标读取S0，所有字段/最终全量内存计算/持久化JSON与事务锁保持。** 这不是已经授权的新设计，冻结plan8未改。
 
 - 必须有缓存容量/生命周期边界，版本/批次/时间/来源完整，不能跨批次污染，不能共享后就地修改；需要覆盖DB加载后的重复basis，不只优化首轮新建。
 - 持久化JSON、历史/作者/置信度/原文、身份/归并、事务/锁语义完全保持；不丢字段、不抽样材料、不把计算移出受限容器。
@@ -56,15 +65,15 @@ P8/P9已在批准范围完成本机修改。主会话同探针新测：2000影�
 
 ### CR1-02 / P3：撤销候选误入历史
 
-源码确有 `_persist_identifiers` 将所有未保留旧行（含pending）改historical，导致未持有过的候选号显示为曾用号；resolve仍只current，不受影响。P8已保持既有三状态，撤销pending删除其当前identifier行，真正曾用current继续历史化；补PG/API断言保证过去history值/来源/时间不丢。本机这些db项跳过，必须目标真库验证后才关闭发现。**不直接照抄原文建议新增withdrawn状态**；如需新状态先讨论设计。
+R1源码确有撤销pending改historical；P8保持三状态，撤销pending删除当前行，真正曾用current仍历史化，过去history值/来源/时间保留。新候选412全套包含真实PG/API当前与过去批次断言，43个db项均执行。实现/真库回归完成，**仍待独立R2，不冒充审核已关闭**。**不直接照抄原文建议新增withdrawn状态**；如需新状态先讨论设计。
 
 ### CR1-05 / P3：冲突说明缺参与ID
 
-算法/回退结果正确，但说明只有编号与「其他写卷」，不满足plan注明同号写卷。P9已仅在现有说明补本轮全部参与者ID与稳定排序，不加字段/状态、不改归并；主会话完整test_identity 38项通过，后续并入候选真库与复审。T-28/T-29共享importer必须串行；T-30独立文件可按需由Astra并行。
+P9已仅在现有说明补本轮全部参与者ID与稳定排序，不加字段/状态、不改归并。两件/三件/原持有者/级联/逆序覆盖，38项identity在主会话本机及NAS完整412套均通过；实现/回归完成，待独立R2。T28/T29共享文件由P8串行，P9独立文件并行，均已结束。
 
 CR1-03（裸号紧邻扩展名，未证实）和CR1-04（备份散放，低概率）**当前不改代码/规则**；按工程约束留T-26实际核查，必要时先澄清/登记，不擅自改变冻结spec。
 
-当前主会话建议 **先按最小方案修复并Review-R2，不直接风险接受后全量导入**。优化方向已在本轮明确获准，不重复请求同一确认；P8/P9只改约定7个文件，主会话已复核差异并集成全套；尚未形成新目标环境通过结论。批准范围含受限合成规模复测与新候选回归/独立复审，仍不含Gate2、main合并、正式部署或真实材料验收。
+本轮批准的最小修复/受限验证已执行，没有重复索取普通push许可。由于P1尚未满足目标，**按原停止条件暂停并请用户决定小幅设计修订，不进行风险接受后全量导入、不直接送R2冲通过**。任何新读取实现必须先获准并更新plan/Analyze；不得擅自改成全流水线、缩列或扩限。
 
 ## 5. 真实测试证据与NAS清理
 
@@ -76,15 +85,20 @@ CR1-03（裸号紧邻扩展名，未证实）和CR1-04（备份散放，低概�
 | A2 | private-candidate-035 | 402 passed /0 skipped /1 warning，47.62秒 | P6后全通过 |
 | A3 | private-candidate-038 | **404 passed /0 skipped /1 warning，48.27秒** | P7/C1两回归及全部42个db项通过；不覆盖36k规模内存 |
 | 本机P7后 | 与A3相同源码 | 362 passed /42 db skipped /1 warning | 3.14.2，无本机DB，skip不算通过 |
+| A4 / R1最小修复 | private-candidate-042 | **412 passed /0 skipped /1 warning，46.08秒** | 43个db项实际执行；2k/6k真PG规模通过但P1未关闭，36k未执行 |
+| 本机P8/P9后 | private-candidate-042同源码 | 369 passed /43 db skipped /1 warning | 3.14.2，不冒充真库通过 |
 
 A3快照SHA-256 `f30ca2c849ef9f359f3664c3023c9177a6933b7d081eb61746d3e42f8413ae30`，镜像ID `sha256:0b898cad5b78312eb48a8572238933d8d081e28e98326b716ea86bf379030b98`（已删除）。构建512m=memswap，实际探针验证；API512m/DB384m各自memswap相等，A3运行再次读cgroup memory=memsw=536870912，die exitCode=0/无OOM，合成.env的Compose config -q通过。不是正式挂载/默认启动证明。
 
 三轮库（显式DROP）、API/DB/诊断容器、三匿名PG卷、三网络、四测试/探针镜像标签、三隔离目录、临时.env与远端raw均已清理；没有需重启命令，未global prune，基础镜像保留。v0 ID `cb29d6cf59e9694ce1a35ecdb2f52a8f25a3164d8fcc46e037d93a295e254ac2`、启动 `2026-10-24T23:21:23.021250776Z`、restarts=0/running=true未变；这不代替真实全量期间连续健康采样。
 
+A4资源与临时库也已清理：四API/诊断容器exit0、PG/匿名卷/网络/镜像标签、快照/操作脚本/临时.env/raw均删除；v0 ID/启动/restarts继续不变。最终events历史只保留最近两API，早先退出以各自日志/结果核对，不伪称完整events。清理后宿主可用内存非公开；无当前NAS测试资源、无继续/重启命令。
+
 ## 6. 证据位置、调度与恢复
 
 - 有效独立原文/两通道meta/status/接入错误（账户细节非公开）/空输出/提示词/主会话内存探针源码与JSONL：**CodeReview-R1（非公开历史记录）**。显示文本自动转LF/去行尾空白，manifest含源/归档哈希；外部原文件保留，未改结论/严重性/数值。
 - 原审阅输出在 `/srv/example/private-audit/review/code-review-R1-{bridge,anthropic}.*`，主会话探针在 `/srv/example/private-audit/converge/CR1-memory-*`。桥无输出，Anthropic原文约18KB。
+- P8/P9原文/派发/meta/status/本机回归与探针：R1-fix-batch（非公开历史记录）。A4完整真库、两点规模、S0定位、两个操作探针源码、资源/清理：**T28-scale-A4（非公开历史记录）**，先读README/manifest；外部原件 `/srv/example/private-audit/t28/20261029-084537-private-candidate-042/`。
 - 原T24-A1/A2/A3、P1～P7、迁移及C1证据仍在 历史归档（非公开历史记录），不改旧通过数；不提交快照tar、私有raw、真实.env/users.json或认证配置。早先NAS原始抽查材料未入库。
 - 实施仍用 `/srv/example/private-audit/implement/run_task.sh`：cwd D盘、固定openai/gpt-6-astra、独立pi --no-session、2400秒；不可用则请用户决定，不擅自换模型。新任务用新批次/当前HEAD新提示词，不重放历史任务。
 - 审核仍为独立Claude A，旧设计r1～r11不重放。R2应核对修复差异/回归/规模证据并参考R1，不把主会话或Astra自测当独立通过；记录实际通道/切换原因。
@@ -101,4 +115,4 @@ git diff --check
 
 ## 7. 后续闸门
 
-T-28～T-30最小方向已获用户确认：由P8串行处理T28/T29（importer及必要rules/对应测试），P9独立处理T30（identity/test_identity）。主会话集成后复测相同两点，并在512m API/384m PG且memswap相等的合成环境验证真实S0加载/重导；若最小共享仍不足则停止先讨论plan，不擅自流式重构。再进行独立Review-R2。**当前Gate2未批准，不合并/部署**。T-25/T-26仍要单独许可，真实全量导入由用户在受保护OpenAPI触发，不代签会话；原材料/基线/对象关系、正式ro挂载/端口/pgdata、v0连续健康、全量资源/耗时/P95/20链接均未验。related-project仓库/模板未动，仍需单独确认。
+**当前等待用户是否批准T-31设计讨论/小幅plan修订**：优先有界服务端游标抓取S0，保留完整字段/内存计算/事务与历史，再独立Analyze、Astra实施、目标规模验证和Claude Review-R2。不是已准许或已实现，不能跳过讨论直接改SQL抓取/缩列/扩限。**当前Gate2未批准，不合并/部署**。T-25/T-26仍要单独许可，真实全量导入由用户在受保护OpenAPI触发，不代签会话；原材料/基线/对象关系、正式ro挂载/端口/pgdata、v0连续健康、全量资源/耗时/P95/20链接均未验。related-project仓库/模板未动，仍需单独确认。
