@@ -1,7 +1,7 @@
 # catalog-foundation — Converge 实现核对
 
 > 2026-10-29，主会话对照已批准spec7、原plan8及本轮独立核对后的plan9、tasks、实际源码/测试与T24/T32证据进行核对。起点 `private-candidate-036`。这是实施收敛记录，**不是独立审核员 A 的 Review、不是 Gate 2，也不宣称真实全量验收通过**。
-> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，T33已获准并完成受限归因，报告memory-diagnosis.md推荐A为主/C小任务辅选、待用户设计选择；spec、plan9/checklist及硬限额未再改。
+> 当前结论：plan9经独立Checklist12→Tasks→Analyze13（12项全通过）后P10仅两文件实现，候选private-candidate-047在NAS **423 passed/0 skipped/1原有警告，59.66秒**，54db项全执行。**P1仍开：6k真库重导153.01MiB（旧175.71）、差异160.58，两种36k趋势532.82/586.54MiB未过事前480操作门槛，按约定停止/清理，未36k/未OOM/未R2。** Converge不收敛/不进Gate2，T33已获准并完成受限归因，报告memory-diagnosis.md推荐A为主/C小任务辅选，用户现同意Plan10独立核对后实施，当前草案待Checklist/Tasks/Analyze；spec、plan9/checklist及硬限额未再改。
 
 ## 1. 范围与证据边界
 

@@ -84,7 +84,7 @@ P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import�
 
 用户批准后P11只读Astra源码分析与主会话受限原代码诊断返回；完整报告 **memory-diagnosis.md**。对照6k varied160.48MiB、阶段hook160.99但耗时3.63倍，图观察器seen约33MiB额外，不当生产峰值。主要增长身份133.15→image行153.26→compute155.84，history/report至160.99；数据图71.677MiB、dict44.670、两状态四类image外层25.269。共享去重子集：S0根独占21.136、policy循环4.108，都是容量不是实际释放；循环普通路径持续到report自然GC。所有不变量/清理已留证，无业务/冻结计划改动。
 
-A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥已证实的接入不可用状态未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 T33-A1（非公开历史记录）、`analysis/P11-T33/`、`review/T33-diagnostic-check-R1/`；不是CodeReview-R2/Plan10或实施许可，P1仍开/R2/Gate2未过。
+A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥已证实的接入不可用状态未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 T33-A1（非公开历史记录）、`analysis/P11-T33/`、`review/T33-diagnostic-check-R1/`；该校读不是CodeReview-R2/Plan10或实施许可；用户本轮现已同意A为主/C独立任务进入Plan10独立核对后实施，当前仅草案待Checklist，不预填新通过；P1仍开/R2/Gate2未过。
 
 ## 5. 部署后待验与风险
 
