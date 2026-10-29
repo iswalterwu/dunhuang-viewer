@@ -1,6 +1,6 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
-> 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8，T31/T32据plan9/Analyze13；用户现批准A+C的Plan10方向，独立Checklist14无阻断后，新增T34/T35/T36待Analyze，不以旧13轮许可偷跑。
+> 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8，T31/T32据plan9/Analyze13；用户现批准A+C的Plan10方向，独立Checklist14无阻断后，新增T34/T35/T36且独立Analyze15现全12项通过允许该范围实施，不以旧13轮许可偷跑。
 > 状态：P8/P9候选private-candidate-042在NAS Python3.12/真PG **412 passed/0 skipped**；T29/T30实现/真库回归完成但未独立重审。T28第一版共享仍未证明资源目标：6k真库重导RSS175.71MiB、两点36k趋势668.83MiB（非全量实测），A4时按约定停下；用户本轮已同意T31小幅S0设计修订，plan9独立Checklist12无阻断（10通过/2因新Tasks待补评），独立Analyze13现已12项全通过，P10候选private-candidate-047在T32/NAS已423 passed/0 skipped/1原有警告（59.66秒），54db项实际执行；6k重导153.01MiB/差异160.58，36k投影532.82/586.54未过480放大条件，按约定停止/清理，未36k/未R2。T31实现/真库回归完成，T28/P1仍开；无运行子agent/NAS资源。R1仍需修复重审，未发R2/未Gate2；spec和512MiB未改，T25/T26待单独许可。
 
 ## 执行约定
@@ -306,11 +306,11 @@
 - **完成标准**：服务既有AC-012-3/AC-012-4，保持AC-003-1/AC-013-1/AC-013-3；核验二次导入ID/JSON/事实/history不变、阶段和对象证据/开销/限制可复核。比较压紧内部只读状态、减少S0/当前结果双份驻留（及若证据支持的更小生命周期改法），给代码触及面/复杂度/可预期收益与必要验证，不许凭估计声明512MiB达标。报告建议后由用户决定，任何新设计先Plan/Analyze再Astra。
 - **验证/证据与清理**：在新批次候选快照构建原代码，原T31材生成器不改以保持可比。全新dh_catalog_test_*临时库/容器，无真实材料/v0/正式pgdata绑定、无宿主端口/正式Compose/global prune；对照和插桩分进程/新库，标准JSONL留源哈希、方法及资源/清理。所有本轮库/容器/卷/网络/镜像/快照/凭据删除，v0状态前后核对；不提交env/tar/trace/private raw。不重新计算全量或将本轮诊断冒充423测试的新实现证据。
 
-### T-34 C：移除影像策略解析自环（0.5～1小时，已获准方向、待Analyze）
+### T-34 C：移除影像策略解析自环（0.5～1小时，Analyze15通过，准备P12）
 
-- **上下文/状态**：T33明确普通路径存在局部递归policy自捕获，独占4.108MiB/6k且自然GC回收点变化；用户现同意C独立拆项、A为主。Checklist14为10通过/2新Tasks待补评、无阻断可拆任务，尚不能实施；目标支持AC-012-3/AC-012-4，保持AC-005-2/AC-005-3/AC-006-1/AC-006-2/AC-013-1。
-- **依赖/分工**：新独立Analyze全项通过后由Astra P12实施；与T35共享importer/test_import，必须先C后A串行。C仅本机/代码就绪即可进入T35，真库由T36补齐，C不能独立关闭P1。
-- **修改范围**：仅`catalog/src/dh_catalog/importer.py`的策略解析/调用和`catalog/tests/test_import.py`，不动rules/derivation/身份/编排/SQL/依赖/配置/v0，不强制GC/调GC或新增恢复机制。短小私有解析器无自捕获/不缓存自身bound method、实例可弱引用。
+- **上下文/状态**：T33明确普通路径存在局部递归policy自捕获，独占4.108MiB/6k且自然GC回收点变化；用户现同意C独立拆项、A为主。Checklist14为10通过/2新Tasks待补评、无阻断可拆任务，随后独立Analyze15在private-candidate-053全12项通过（21:56:02～22:08:52，Anthropic Claude，exit0）允许仅T34～36实施，现准备P12；目标支持AC-012-3/AC-012-4，保持AC-005-2/AC-005-3/AC-006-1/AC-006-2/AC-013-1。
+- **依赖/分工**：独立Analyze15已全项通过，由Astra P12实施；与T35共享importer/test_import，必须先C后A串行。C仅本机/代码就绪即可进入T35，真库由T36补齐，C不能独立关闭P1。
+- **修改范围**：仅`catalog/src/dh_catalog/importer.py`的策略解析/调用和`catalog/tests/test_import.py`，不动rules/derivation/身份/编排/SQL/依赖/配置/v0，不强制GC/调GC或新增恢复机制。短小私有解析器无自捕获/不缓存自身bound method、实例可弱引用，不用方法lru_cache/cached_property钉住self。
 - **完成标准/真实测试**：按plan§4.1.3保留源先于输出、memo命中、本批来源、最严格许可/署名等全部值；普通NLC/BnF/真实执行记录的派生源继承均测试。固定`test_image_policy_lifetime_without_gc`沿sys.setprofile实际返回事件登记weakref（不保frame/f_locals、不替换业务），在下一阶段实际进入时确认解析器无环释放；小测试期间可gc.disable并finally恢复原状态，防旧环被自然GC假绿，生产及资源探针不变。异常traceback持帧不误断必释放，保留所有失败回滚/历史/许可断言。
 - **验证命令**：本机完整`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_import.py`，再完整`catalog/tests catalog/acceptance/test_compare.py`；无DB如实skip不计通过，AST3.12/UTF8LF/原警告保留/限定diff检查。后T36真实PG全套。
 
@@ -320,7 +320,7 @@
 - **修改范围**：新增`catalog/src/dh_catalog/_compact.py`、`catalog/tests/test_compact.py`；修改`catalog/src/dh_catalog/importer.py`、`catalog/tests/test_import.py`，必要只在`catalog/tests/test_api.py`补API JSON断言。不改api.py/db.py/scan/rules/identity/derivation/schema/依赖/运行配置/v0/冻结spec/plan/checklist。200～400行生产/测试另计为估计，若需扩到B/其他行族先停，不偷偷扩大。
 - **完成标准**：支持AC-012-3/AC-012-4，保持AC-003-1/AC-003-2/AC-003-7/AC-005-1/AC-007-4/AC-008-1/AC-009-2/AC-009-3/AC-009-5/AC-013-1/AC-013-2/AC-013-3及API外部JSON。只image S0/当前行、facts、field_basis、fact basis外层只读，其他可写行不冻；Mapping.slots保存shape和values tuple，shape是所有keys精确顺序与index，每loader/compute有界64种，不硬编码/缩字段，淘汰不影响旧映射，池不自循环/跨批污染。loader逐行/compute每影像builder完成后立即压紧，missing分支同样；UUID行索引仍dict，叶/JSON list/数值类型/来源版本批次时间/原文完整，无全表展开副本。
 - **消费者/序列化清单**：按plan表逐项核_file_entry/_image_state、_read_images、_basis、_image_rows present/missing、_item_rows读policy、_release_unique_values、_upsert、_snapshot、_persist_history、build_report。只item.updated_run/identifier.id/is_primary等继续可写。统一私有JSON default/dumps支持Mapping/UUID/path/datetime/dataclass，_upsert按Mapping/list显式Jsonb dumps或局部展开，history独立field_basis也适配；identifier dict判定可保持、不全局set_json_dumps、不default=str吞未知类型、不改JSONB/schema/事务/锁。核全部Jsonb入口无漏。
-- **公开测试契约**：原共享测试物理改文件与另一影像/S0隔离语义保留；外层直接赋值改TypeError及显式新副本赋值不污染。旧规则版本模拟用独立S0的逐层dict builder，不改冻结输出；L317/L329/L807等内部JSON比较用_json_value再JSON，不repr。所有旧文件/ID/历史/数值/list/作者断言不删。新`test_compact.py`最少覆盖完整/额外/缺失keys、同keys不同序形状、64淘汰后旧值、get/iter/items/contains/dict及dict双向/嵌套相等、赋值/删除TypeError、叶list保持、嵌套Map+UUID/time/path JSON精确与未知对象TypeError、无新cache自环。PG固定`test_compact_images_keep_history_and_json`核六集合/字段/真实增改缺失与历史JSON；完整API当前/历史旧断言仍执行，必要补测不改路由。
+- **公开测试契约**：原共享测试物理改文件与另一影像/S0隔离语义保留；外层直接赋值改TypeError及显式新副本赋值不污染。旧规则版本模拟用独立S0的逐层dict builder，不改冻结输出；L317/L329/L807等内部JSON比较用_json_value再JSON，不repr。所有旧文件/ID/历史/数值/list/作者断言不删。新`test_compact.py`最少覆盖完整/额外/缺失keys、同keys不同序形状、64淘汰后旧值、get/iter/items/contains/dict及dict双向/嵌套相等、赋值/删除TypeError、叶list保持、嵌套Map+UUID/time/path JSON精确与未知对象TypeError、无新cache自环（池可weakref，测试可暂禁循环GC/del pool确认即释放并finally恢复）。补absent键KeyError/get默认身份/contains，以及压紧已Compact嵌套值直接沿用的幂等；不额外复制missing旧facts。PG固定`test_compact_images_keep_history_and_json`核六集合/字段/真实增改缺失与历史JSON；完整API当前/历史旧断言仍执行，必要补测不改路由。
 - **验证命令**：完整`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_compact.py catalog/tests/test_import.py catalog/tests/test_api.py`，再完整`catalog/tests catalog/acceptance/test_compare.py`；无DH_TEST_DATABASE_URL时skip不算PG过，拒用DH_DATABASE_URL。实际3.12/PG所有db在T36，原警告不升级/屏蔽；UTF8LF/3.12 AST与git diff--check仅静态证据，模型/范围/真实结果实施后记。
 
 ### T-36 A+C新候选目标回归/受限规模与独立R2入口（1～2小时，依赖T34/T35代码本机就绪）
@@ -328,7 +328,7 @@
 - **状态/上下文**：新Analyze通过、Astra串行C/A并主会话复验后才开始；不能沿用423或任何旧内存数字。仅已批准合成候选测试，不含Gate2/main/NAS部署/真实材料。
 - **范围/分工**：主会话操作诊断/记录/清理，不写业务修复；若实际缺陷派回Astra原边界。候选Git快照/新批次标签，512m=memswap构建/API、384m=memswap PG、MemAvailable≥2GB且低峰，无真实材料/v0/认证/正式pgdata绑定、无宿主端口/正式Compose/prune；所有资源/凭据最后删除并核v0状态不变。不改spec/plan/checklist/依赖/限额。
 - **完成标准**：AC-012-3/AC-012-4软件资源证据并保持上述所有值/身份/历史。目标Python3.12/PG17.4完整`python -m pytest tests acceptance/test_compare.py`所有新旧db实际执行；原S0/游标/弱引用及JSON/历史/失败路径通过。无hook same2k/6k、varied6k真实prepare/execute两次，记录baseline B、累计RSS R/V（字节）、cgroup/退出/OOM（页缓存另列）及ID/basis/facts/history稳定/事实全复用/变化零，varied独立尺寸和宽度和。小对象容量计量仅辅证，不当RSS、不预扣C。
-- **机械放大门槛**：同质`P_same=R2000+(R6000-R2000)/4000*34000`，差异`P_varied=B6000+(V6000-B6000)*6`，两者均≤480*1048576才建约36k合成库/容器跑首轮及真实PG重导；不过则停止/清理/报告，不扩其他行族/统一叶池/B流水线/增swap或改门槛。需实际36k完成/不变量/OOM状态，不能仅外推称512达标；实际原材料/v0持续健康/吞吐等仍T26待验。
+- **机械放大门槛**：同质`P_same=R2000+(R6000-R2000)/4000*34000`，差异`P_varied=B6000+(V6000-B6000)*6`，R/V固定各点第二次真实PG重导的累计ru_maxrss，B为varied加载前基线；新upscale-guard.json含候选SHA/四输入字节/P值/passed。两者均≤480*1048576才建约36k合成库/容器跑首轮及真实PG重导；不过则停止/清理/报告，不扩其他行族/统一叶池/B流水线/增swap或改门槛。需实际36k完成/不变量/OOM状态，不能仅外推称512达标；实际原材料/v0持续健康/吞吐等仍T26待验。
 - **验证/证据命令**：沿T24/T32已批准Git archive候选、512m受限build及一次性PG/API命令；原`T31-pg-scale-probe.py`与`T28-s0-load-probe.py`保持口径，合成文件确认btrfs/磁盘非tmpfs。每候选完整SHA、脚本/结果/归档哈希、所有命令/资源/完整结果与清理存新handoff目录；不提交tar/.env/凭证/private raw/trace。A+C通过资源后独立Claude CodeReview-R2，不以设计全勾/测试绿代审核或Gate2；仍不足先讨论。
 
 CR1-03（扩展名紧邻裸号，未证实）与CR1-04（备份散放，低概率）现在不改代码或冻结编号规则；留T-26按实际材料核查，必要时先澄清/登记。评审范围、全部发现与Gate2待验风险见review.md，原文按哈希归档，不勾改设计checklist。

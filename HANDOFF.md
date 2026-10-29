@@ -1,6 +1,6 @@
 # 会话交接 — catalog-foundation
 
-> **当前停止点（2026-10-29）：Plan9 / P10候选private-candidate-047已在NAS全423项通过、0跳过；S0游标改动有效，但P1资源目标仍未关闭。** 6k真库重导RSS153.01MiB（原175.71），差异化事实160.58MiB；36k趋势532.82/586.54MiB未满足事先480MiB放大门槛，按用户约定未跑36k、未继续改架构、未发Review-R2。没有实际OOM。全部本轮资源/凭据已清理，v0未重启。用户批准T33诊断后已完成受限测量与只读Astra源码交叉分析，业务代码仍未改：主增量在当前行构造，旧/新四类影像外层dict25.27MiB/6k，循环独占4.11MiB；报告 `specs/catalog-foundation/memory-diagnosis.md` 推荐A紧凑私有状态为主、C小生命周期改法为辅，均未授权实施。独立Claude口径校读已返回，要求补GC回收阶段可变和A容量余量薄（已补），认为可交用户方向选择；非R2/设计或实施许可。用户本轮回复「好的」，已同意A为主/C独立拆项的Plan修订、独立核对后再Astra实施与受限复验。当前回Plan10草案：影像四类完整只读Mapping/JSON边界及无自环解析器，独立Checklist14已10通过/2因新Tasks不评、无阻断；现正式拆T34(C)/T35(A)/T36复验，待独立Analyze补全，未新代码/资源。
+> **当前停止点（2026-10-29）：Plan9 / P10候选private-candidate-047已在NAS全423项通过、0跳过；S0游标改动有效，但P1资源目标仍未关闭。** 6k真库重导RSS153.01MiB（原175.71），差异化事实160.58MiB；36k趋势532.82/586.54MiB未满足事先480MiB放大门槛，按用户约定未跑36k、未继续改架构、未发Review-R2。没有实际OOM。全部本轮资源/凭据已清理，v0未重启。用户批准T33诊断后已完成受限测量与只读Astra源码交叉分析，业务代码仍未改：主增量在当前行构造，旧/新四类影像外层dict25.27MiB/6k，循环独占4.11MiB；报告 `specs/catalog-foundation/memory-diagnosis.md` 推荐A紧凑私有状态为主、C小生命周期改法为辅，均未授权实施。独立Claude口径校读已返回，要求补GC回收阶段可变和A容量余量薄（已补），认为可交用户方向选择；非R2/设计或实施许可。用户本轮回复「好的」，已同意A为主/C独立拆项的Plan修订、独立核对后再Astra实施与受限复验。当前回Plan10草案：影像四类完整只读Mapping/JSON边界及无自环解析器，独立Checklist14已10通过/2因新Tasks不评、无阻断；现正式拆T34(C)/T35(A)/T36复验，独立Analyze15已全12项通过、无阻断，现准备P12(C)→P13(A)串行；未新代码/资源。
 
 ## 1. 仓库与安全点
 
@@ -13,7 +13,7 @@
 
 - spec7已Gate1批准冻结：13 R /58 AC /25 Q，需求未变、不重跑Gate1。
 - 用户先批准T28～T30最小共享及两P3修复，A4真PG风险仍大时按约定停止；随后回复「同意」批准T31小幅S0读取设计调整，先核对再Astra实施/受限验证/独立复审，仍不足再停。
-- plan9先Checklist12→Tasks→Analyze13（12项通过）后才P10；T33诊断后用户现同意回修Plan10（spec需求不变）。Checklist14已无阻断允许Tasks，现T34/35/36已拆，待独立Analyze全项通过；旧13轮不代本版实施许可，当前无新业务代码。
+- plan9先Checklist12→Tasks→Analyze13（12项通过）后才P10；T33诊断后用户现同意回修Plan10（spec需求不变）。Checklist14已无阻断允许Tasks，现T34/35/36已拆，Analyze15已全12项通过允许仅T34/35/36实施；旧13轮不代本版许可，当前准备P12，无新业务代码。
 - Converge仍打开，P1不能用部署后待验或423全绿掩盖；Gate2未请求通过/未批准。T25部署、T26真实材料/性能/A1～A7仍须单独许可，正式导入由用户在受保护OpenAPI触发，不代签cookie、不提供CLI导入。
 - 业务实现/语义修复必须独立`openai/gpt-6-astra`；主会话只协调、诊断、复验、文档。共享文件串行；模型不可用请用户决定，不自行替换。
 - 独立审核员A仍Claude；优先`claude-bridge/claude-fable-5-1`，不可用才`anthropic/claude-fable-5-1`，记实际通道/原因。首选桥R1接入失败已留证（账户细节非公开）；本轮12/13在已证实的接入不可用状态引用该证据，未重试桥，实际Anthropic。
@@ -79,9 +79,11 @@ C1/T27已由P7具体捕获JPEG DecompressionBombError、保留Pillow保护，旧
 
 21:36:27～21:49:41 （原始时刻；时区非公开），Anthropic Claude、exit0、审private-candidate-052/工作区无修改；桥仍已证实的接入不可用状态未调用。10通过/2因新Tasks不评、无阻断，可以Tasks不能Implement。原文/提示词/meta/status/哈希 Plan10-R14（非公开历史记录）。采纳消费者history/report、按对象Jsonb dumps、不全局适配；解析器可weakref，真实profile观测，小测试可临时禁循环GC且finally恢复防假绿（不生产调GC）；紧凑单测完整key/淘汰/JSON/TypeError；内部测试契约显式改法；旧投影公式机械化。Tasks已拆，待Analyze全项通过，清单不预勾04/07。
 
+Plan10独立Analyze15（21:56:02～22:08:52 （原始时刻；时区非公开），Anthropic Claude、exit0、审private-candidate-053）全12项通过，允许仅T34/35/36实施；原文/哈希 Plan10-R15（非公开历史记录），桥仍已证实的接入不可用状态未调用。建议进入派发：C真实code弱引用/禁方法缓存、Map缺key/幂等/shape池无自环及Jsonb直接dumps、投影明确真PG第二次累计峰/基线/字节证据。设计/清单从此冻结，未测试新代码，不代R2/Gate2。
+
 ## 6. 下一步与闸门
 
-**T31实现/真库回归完成，T32有限验证与清理已完成，但36k目标未完成，T28/P1仍开，R2暂缓。** T33诊断/方案报告已具备，见memory-diagnosis.md；用户现已同意A为主/C独立任务进入Plan10，Checklist14已无阻断后拆T34/35/36，待独立Analyze全项通过才派Astra（C/A共享文件串行），**不直接实施**。不重构/缩列/改持久化或硬限额，不用容量算数替代真实规模。若要改设计，先回Plan/Analyze再Astra，本轮只按用户许可回修plan9为10版草案/清单待核，不改spec或预填审核通过。
+**T31实现/真库回归完成，T32有限验证与清理已完成，但36k目标未完成，T28/P1仍开，R2暂缓。** T33诊断/方案报告已具备，见memory-diagnosis.md；用户现已同意A为主/C独立任务进入Plan10，Checklist14已无阻断后拆T34/35/36，Analyze15已全项通过，准备派Astra（C/A共享文件串行），**不直接实施**。不重构/缩列/改持久化或硬限额，不用容量算数替代真实规模。若要改设计，先回Plan/Analyze再Astra，本轮只按用户许可回修plan9为10版草案/清单待核，不改spec或预填审核通过。
 
 Gate2/合并/部署/真实验收继续分开批准。真实数量/对象、正式ro/pgdata/端口、v0连续健康、全量耗时/P95/20链接仍T25/T26。固定基线34项不改，6096是影像目录而非写卷数，txt477保留Q024的新增6差异；不删对象级证据凑通过。related-project仓库/模板未动。
 

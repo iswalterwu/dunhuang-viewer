@@ -22,6 +22,25 @@
 
 ## 当前结果
 
+第15轮（2026-10-29，审阅private-candidate-053，Plan10新Tasks后的Analyze；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T34/T35/T36进入Implement**。21:56:02～22:08:52 （原始时刻；时区非公开），exit0、工作区无修改；桥仍已证实的接入不可用状态引用R1原证据未调用。原文/meta/status/提示词/哈希 Plan10-R15（非公开历史记录），机械录入，不代代码Review-R2/Gate2或实际资源通过。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [x] CHK-04：通过
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [x] CHK-07：通过
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+非阻断建议交派发/操作约束：投影输入固定第二次真PG重导累计ru_maxrss/varied基线并留字节JSON；C按实际解析器code捕weakref、不依局部名，禁方法lru_cache/cached_property；CompactMap缺key应KeyError/get默认身份/contains，已紧凑嵌套对象幂等沿用；shape池可weakref、cache不包绑定方法，禁循环GC小测试后finally恢复；Jsonb优先私有dumps避免额外loads；状态表同步。已记录但不扩范围。实施期间本清单冻结，不因测试绿新增勾选。
+
+### 第14轮历史（Plan→Checklist）
+
 第14轮（2026-10-29，审阅private-candidate-052，Plan10→Checklist；实际anthropic/claude-fable-5-1）：**10通过/0不通过/2本轮不评，无阻断，可进入Tasks，尚不能Implement**。21:36:27～21:49:41 （原始时刻；时区非公开），exit0、无仓库修改。首选桥仍在已证实的接入不可用状态，本轮引用R1 bridge.err未重试，实际Anthropic。原文/提示词/meta/status/哈希 Plan10-R14（非公开历史记录），以下仅机械录入，不代CodeReview-R2/Gate2。
 
 - [x] CHK-01：通过
