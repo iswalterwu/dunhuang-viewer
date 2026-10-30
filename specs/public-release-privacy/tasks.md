@@ -1,6 +1,6 @@
 # public-release-privacy 任务清单
 
-> 7R/25AC已获用户Gate1批准。Plan初审10通过/2项因Tasks未拆不评；本版已补发布后本机历史切换阻断及相关建议，待独立Analyze后才Implement。详细派发/原始输出均非公开保全，公开仅发布脱敏结果摘要。
+> 7R/25AC已获用户Gate1批准。独立Tasks后Analyze第2轮12项全通过、无阻断，设计层关闭B-1，允许仅PRIV-01～07按依赖实施（Anthropic/claude-fable-5-1，2026-10-30T09:04:56Z～09:13:40Z，exit0）。Plan/Checklist/本任务范围在实施中冻结；原始派发/输出私下保全，公开仅脱敏摘要。
 
 ## 执行约定
 
@@ -13,7 +13,7 @@
 
 ## PRIV-01 catalog配置、旧日志前缀和接收标签（1.5～2小时，Astra）
 
-- **依赖/状态**：独立Analyze全项通过后；尚未实施。支持AC-003-1/003-2/003-3、AC-004-1/004-2/004-3/004-4、AC-007-3。
+- **依赖/状态**：独立Analyze已全项通过；准备派发。支持AC-003-1/003-2/003-3、AC-004-1/004-2/004-3/004-4、AC-007-3。
 - **唯一写范围**：catalog/src/dh_catalog/{config,api,importer,derivation,rules}.py，catalog/docker-compose.yml、catalog/.env.example，catalog/tests/test_{config,api,import,derivation,rules,runtime}.py。不改schema、其他算法/模块、README/其他文档或其他任务文件。
 - **接口/固定值**：Settings新增`record_roots`字符串POSIX映射（默认空，现有构造/replace调用兼容），load_settings只在入口读取DH_RECORD_DATA_ROOT/DH_RECORD_BACKUP_ROOT、去空白、绝对且非单根、补尾斜杠；不用Path值、不加前缀重叠机制。沿API后台→PreparedImport.execute→compute_import→resolve_derivations→读/解析函数传递同名可选record_roots；默认空仍支持/data/、/backup/及相对记录，不硬编码私人前缀，不读日志所指宿主文件。
 - **部署/标签**：正式Compose的DH_V0_URL、两项CATALOG_LAN_IP/CATALOG_TAILSCALE_IP及DH_HOST_DATA_DIR/BACKUP_DIR/CACHE_DIR/V0_ENV_FILE/PGDATA_DIR均显式配置（:?），不再私人默认值；DH_V0_PUBLIC_URL可复用显式DH_V0_URL。load_settings开发后备仅http://localhost:8503，明确不是生产入口。env example敏感角色参数为空占位；挂载ro/外部PG/无DB端口/限额/启动/健康策略不变。TRANSFER_EVENT固定为`第三方资料接收（接收事件 A）`，不含原私人事件日期；RULE_VERSION=2026-10-30.1，其余下载/本地派生标签、许可/谱系/机构/严格度不改。
