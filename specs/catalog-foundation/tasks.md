@@ -1,7 +1,7 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8，T31/T32据plan9/Analyze13；用户现批准A+C的Plan10方向，独立Checklist14无阻断后，新增T34/T35/T36且独立Analyze15现全12项通过允许该范围实施，不以旧13轮许可偷跑。
-> 当前：Plan10经独立Checklist14→Tasks→Analyze15全项通过后P12(C)/P13(A)串行实施。候选private-candidate-056在T36/NAS **442 passed/0 skipped/1原有警告，64.37秒**，55db实际；无hook门槛通过后，**36k varied首轮/真PG重导原512限额实测成功，RSS341.98/435.05MiB、343.115/307.414秒，cgroup含缓存触512但exit0无OOM**。资源/凭据已全清理、v0未重启，独立CodeReview-R2现软件通过、CR1-01代码级/02/05关闭，可请求Gate2；新N1/P3为旧基线规则升级重插未变编号，待用户决定修复或显式登记接受，未擅修/未Gate2/merge/部署。旧失败门槛/趋势只作历史，不代当前实测；真实材料/并发/连续v0健康仍待T25/T26单独许可。
+> 当前：Plan10经独立Checklist14→Tasks→Analyze15全项通过后P12(C)/P13(A)串行实施。候选private-candidate-056在T36/NAS **442 passed/0 skipped/1原有警告，64.37秒**，55db实际；无hook门槛通过后，**36k varied首轮/真PG重导原512限额实测成功，RSS341.98/435.05MiB、343.115/307.414秒，cgroup含缓存触512但exit0无OOM**。资源/凭据已全清理、v0未重启，独立CodeReview-R2现软件通过、CR1-01代码级/02/05关闭，可请求Gate2；新N1/P3为旧基线规则升级重插未变编号；2026-10-30用户回复「同意并继续」，批准Gate2前最小修复、真实临时PG完整回归与独立重审。T37/T38已细化，先独立Analyze16核对再Astra实施；不改冻结spec7/plan10、不以旧Checklist15仅T34～36许可代替本次核对，未Gate2/merge/部署。旧失败门槛/趋势只作历史，不代当前实测；真实材料/并发/连续v0健康仍待T25/T26单独许可。
 
 ## 执行约定
 
@@ -331,11 +331,21 @@
 - **机械放大门槛**：同质`P_same=R2000+(R6000-R2000)/4000*34000`，差异`P_varied=B6000+(V6000-B6000)*6`，R/V固定各点第二次真实PG重导的累计ru_maxrss，B为varied加载前基线；新upscale-guard.json含候选SHA/四输入字节/P值/passed。两者均≤480*1048576才建约36k合成库/容器跑首轮及真实PG重导；不过则停止/清理/报告，不扩其他行族/统一叶池/B流水线/增swap或改门槛。需实际36k完成/不变量/OOM状态，不能仅外推称512达标；实际原材料/v0持续健康/吞吐等仍T26待验。
 - **验证/证据命令**：沿T24/T32已批准Git archive候选、512m受限build及一次性PG/API命令；原`T31-pg-scale-probe.py`与`T28-s0-load-probe.py`保持口径，合成文件确认btrfs/磁盘非tmpfs。每候选完整SHA、脚本/结果/归档哈希、所有命令/资源/完整结果与清理存新handoff目录；不提交tar/.env/凭证/private raw/trace。A+C通过资源后独立Claude CodeReview-R2，不以设计全勾/测试绿代审核或Gate2；仍不足先讨论。
 
-### T-37 CodeReview-R2 N1/P3：仅规则依据变化不重置编号持有历史（待用户决定，未授权新实施）
+### T-37 CodeReview-R2 N1/P3：仅规则依据变化不重置编号持有历史（0.5～1小时，已获用户许可，待Analyze16）
 
-- **发现/状态**：R2软件层通过但新列N1/P3：RULE_VERSION升级、编号/state/source/source_path/is_primary等值不变，_identifier_rows因basis不同不复用旧行，_persist_identifiers把旧current历史化/重插同号current，since_run重置；pending亦删后重插。R1基线已有非本轮回归，resolve/UUID/主号/过去history不受影响。主会话真实compute三次确认并核源码，非新PG执行；原文/探针在 CodeReview-R2（非公开历史记录）。
-- **建议待批准范围**：优先Astra仅importer.py与test_import.py（必要API断言）最小修，约6～10行生产及真库回归为审核员估计：值相同仅basis变化保id/since_run、原地UPDATE basis，不改S0；过去history仍保存旧作者/批次时间，真正改号/撤销pending仍按既有语义。满足AC-004-5/AC-011-2/AC-013-1/AC-013-3；不新增状态/表/API/需求、不改冻结spec/plan/checklist、限额或v0。
-- **用户决策**：建议Gate2前修并真实PG/完整回归/独立重审，或明确登记风险、约定首次规则升级前修；当前两者均未获用户决定，不代签风险接受/偷修/merge。获准后才细化执行命令/派发新任务；任何新代码不能沿用442作为新证据。
+- **发现/许可**：R2软件层通过但新列N1/P3：RULE_VERSION升级、编号/state/source/source_path/is_primary等值不变，_identifier_rows因basis不同不复用旧行，_persist_identifiers把旧current历史化/重插同号current，since_run重置；pending亦删后重插。R1基线已有非本轮回归，原文/真实compute探针在 CodeReview-R2（非公开历史记录）（不是新PG证据）。2026-10-30用户回复「同意并继续」，选择Gate2前最小修复、真库复验和独立重审，不是Gate2/部署/真实导入许可。
+- **依赖/分工**：冻结spec7/plan10需求与设计不变，支持既有编号起止批次、字段依据与历史契约；先独立Analyze16核对新T37/T38与全部12项Checklist，无阻断后由独立 `openai/gpt-6-astra` 实施。主会话负责派发、差异复核、复验与证据；模型不可用即报告，不替换。共享文件串行，不与审核/其他实施同时写入。
+- **修改范围**：仅 `catalog/src/dh_catalog/importer.py` 的 `_identifier_rows` / `_persist_identifiers`、`catalog/tests/test_import.py`，必要的HTTP断言只在 `catalog/tests/test_api.py`。值全等仅basis变化时保旧id/since_run/until_run，构造新行/field_basis而不就地改S0，持久化只原地更新变化的field_basis；同版本完全未变仍复用、不无条件UPDATE。约6～10行生产是审核员估计，不是强制行数。不改schema/规则版本/身份算法/JSON结构/事务锁/游标/CompactMap/依赖/配置/v0，不新增状态、恢复机制或通用抽象。
+- **完成标准**：满足AC-003-1/AC-004-5/AC-011-2/AC-013-1/AC-013-3。current与pending在值不变、仅规则作者版本变化时保数据库identifier.id及原since_run、until_run；不制造同号historical、不删重插pending。当前依据更新为实际规则作者/本批run/at，旧S0与旧history中的作者/时间/批次完全保留；新history仍记录依据变化。同版本下一次重导不新增history。真正改号仍历史化旧current，撤销pending仍删除当前候选而保过去快照。含NLC目录号/Pressmark/IDP多来源的回归验证原文、来源、主号及resolve/detail语义不变，不把不同source/path/state等值变化误当basis-only。
+- **真实测试**：先以新回归在旧代码上证明失败，再最小修复。小型compute用独立S0 builder模拟旧版本依据，保旧S0深值/身份断言；PG用真实文件/prepare/execute/SQL与批次历史，沿既有测试方式设置合成旧部署依据，不mock业务/SQL或复制比较逻辑。补current/pending及多来源/历史/无变化重跑断言；必要时用已有API夹具验证当前详情无伪曾用号、resolve只current及过去history原样。不改旧断言求绿，只有HTTP外边界可用替身。
+- **验证命令**：本机指定完整文件 `catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_import.py catalog/tests/test_api.py`，再显式全套 `catalog/tests catalog/acceptance/test_compare.py`；无DB/仅Linux如实skip、不算通过。`git diff --check`、UTF8LF/无BOM、3.12 AST及未授权函数/文件AST不变检查。真库由T38补，不与本机就绪形成循环；实施者不提交/推送/连NAS、不改冻结spec/plan/checklist或状态文档。任何新代码不能沿用442作为新证据。
+
+### T-38 N1新候选隔离目标回归与独立CodeReview-R3（1～2小时，依赖T37，已获本轮复验许可）
+
+- **范围/顺序**：T37本机集成通过并形成完整候选SHA后，主会话按既有T24/T36通道导出 `git archive <SHA> catalog` 到新NAS隔离临时目录，仅构建候选并跑完整真实Python3.12/PostgreSQL17.4 pytest。所有新旧db项实际执行、0跳过；不是正式部署/材料导入，也不自动重跑36k规模。T36旧36k只属private-candidate-056，本轮若未新做规模不得称新候选已足规模实测；用限定差异/回归与独立R3判断原资源证据适用边界。
+- **安全/停止**：前检NAS MemAvailable≥2GB且低峰；构建/测试512m=memswap、PG384m=memswap，PG64MB buffers/20连接/work_mem4MB，先inspect验证限额再start；不挂真实材料/v0 cache或.env/正式pgdata、不发布端口、不起正式Compose、不重启v0/生成器、不全局prune。新随机临时凭据只写权限600外部env文件、不打印/入库；测试库只dh_catalog_test_*。预算/连接/模型失败则报告，不扩限/换模型/隐瞒跳过；业务缺陷派回Astra。
+- **完成标准**：上述AC在目标环境全部回归并取得候选SHA/快照哈希、完整pytest与exit、资源限制/OOM/依赖解析与pip freeze、v0前后ID/启动/restarts、临时库/容器/匿名卷/网络/镜像/快照/凭据清理证据。保持Starlette/httpx原警告、不升级/屏蔽；依赖漂移如实记录。仅合成软件证据，T25/T26与真实资源/连续健康/性能仍待单独许可。
+- **验证/审核**：完整目标命令 `python -m pytest tests acceptance/test_compare.py`，真实连接由外部env-file传入；限定inspect字段不输出Env。清理后冻结新HEAD，由独立Claude审核员A按AGENTS指定实际通道运行CodeReview-R3，核spec/plan/tasks、`git diff private-candidate-058..HEAD -- catalog`及旧R2基线、新测试与原证据，评估N1、旧修复与残余风险。原文/meta/status/哈希归档 历史归档（非公开历史记录）；主会话更新tasks/converge/review/HANDOFF与状态表。R3不能代用户批准Gate2，仍不merge/push nas/部署/真实导入。
 
 CR1-03（扩展名紧邻裸号，未证实）与CR1-04（备份散放，低概率）现在不改代码或冻结编号规则；留T-26按实际材料核查，必要时先澄清/登记。评审范围、全部发现与Gate2待验风险见review.md，原文按哈希归档，不勾改设计checklist。
 
