@@ -19,7 +19,7 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-30 | spec7（13R/58AC）与plan10冻结。旧候选private-candidate-056/T36：目标Python3.12/PG17.4全442通过/0skip，原512m内36k差异化两轮成功，cgroup含缓存触512/无OOM，临时资源清理、v0未重启；独立R2软件通过、CR1-01代码级及02/05关闭。用户本轮「同意并继续」批准N1/P3最小修复、隔离真PG复验与独立重审，T37/T38待Analyze16后Astra实施，不沿用旧442或36k冒充新代码证据。未Gate2/merge/push nas/部署/真实导入，T25/T26与真实材料/并发/健康/性能仍待独立许可；功能分支持续同步，详情见tasks.md、review.md与HANDOFF.md |
+| catalog-foundation | in-progress | 无 | 2026-10-30 | spec7（13R/58AC）与plan10冻结。旧候选private-candidate-056/T36：目标Python3.12/PG17.4全442通过/0skip，原512m内36k差异化两轮成功，cgroup含缓存触512/无OOM，临时资源清理、v0未重启；独立R2软件通过、CR1-01代码级及02/05关闭。用户本轮「同意并继续」批准N1/P3最小修复、隔离真PG复验与独立重审，T37/T38经Analyze16全12项通过，准备Astra P14实施，不沿用旧442或36k冒充新代码证据。未Gate2/merge/push nas/部署/真实导入，T25/T26与真实材料/并发/健康/性能仍待独立许可；功能分支持续同步，详情见tasks.md、review.md与HANDOFF.md |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。

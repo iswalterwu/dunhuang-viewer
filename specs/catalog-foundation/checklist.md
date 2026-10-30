@@ -22,7 +22,7 @@
 
 ## 当前结果
 
-第15轮（2026-10-29，审阅private-candidate-053，Plan10新Tasks后的Analyze；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T34/T35/T36进入Implement**。21:56:02～22:08:52 （原始时刻；时区非公开），exit0、工作区无修改；桥仍已证实的接入不可用状态引用R1原证据未调用。原文/meta/status/提示词/哈希 Plan10-R15（非公开历史记录），机械录入，不代代码Review-R2/Gate2或实际资源通过。
+第16轮（2026-10-30，审阅private-candidate-059，N1新T37/T38后的Analyze；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T37/T38进入Implement**。调度meta/status实际09:48:03～09:55:40 （原始时刻；时区非公开）、exit0，前后HEAD/工作区固定干净；桥仍在已证实的接入不可用状态，引用R1原证据未重试。原文/meta/status/提示词/哈希 N1-Analyze16（非公开历史记录）。以下按审核员结论机械录入，不代实际实现、目标复验、独立CodeReview-R3或用户Gate2。
 
 - [x] CHK-01：通过
 - [x] CHK-02：通过
@@ -37,7 +37,13 @@
 - [x] CHK-P4：通过
 - [x] CHK-P5：通过
 
-非阻断建议交派发/操作约束：投影输入固定第二次真PG重导累计ru_maxrss/varied基线并留字节JSON；C按实际解析器code捕weakref、不依局部名，禁方法lru_cache/cached_property；CompactMap缺key应KeyError/get默认身份/contains，已紧凑嵌套对象幂等沿用；shape池可weakref、cache不包绑定方法，禁循环GC小测试后finally恢复；Jsonb优先私有dumps避免额外loads；状态表同步。已记录但不扩范围。实施期间本清单冻结，不因测试绿新增勾选。
+本轮非阻断建议交派发/复验：compute S0可没有id，不以old['id']强取；保留存在的旧元数据，不改S0；只UPDATE实际改变的field_basis且复用私有Jsonb编码边界；固定新测试名与红→绿原输出留证，真库覆盖current/pending/NLC多来源与旧/新history/无变化重跑。T38不自动重跑36k，不把旧候选资源实测冒充新代码；R3据差异评证据边界，后续按实际可用性依规则先试首选通道。实施期间本清单冻结，不因测试绿另勾项。
+
+### 第15轮历史（Plan10 Tasks后的Analyze）
+
+第15轮（2026-10-29，审阅private-candidate-053；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T34/T35/T36进入Implement**。21:56:02～22:08:52 （原始时刻；时区非公开），exit0、工作区无修改；桥已证实的接入不可用状态引用R1原证据未调用。原文/meta/status/提示词/哈希 Plan10-R15（非公开历史记录），不代代码Review/Gate2或实际资源通过。
+
+当时非阻断建议：固定投影输入/字节JSON；解析器code识别weakref、禁方法缓存自环；CompactMap缺key/get/contains/幂等/弱引用形状池；GC小测试finally恢复；私有Jsonb dumps与状态表同步。原12项全通过表与完整理由保留在上述原文。
 
 ### 第14轮历史（Plan→Checklist）
 
