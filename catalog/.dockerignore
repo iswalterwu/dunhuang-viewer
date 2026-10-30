@@ -1,0 +1,29 @@
+# Credentials, including nested copies; keep only the non-secret example.
+**/.env
+**/.env.*
+**/*.env
+!.env.example
+
+# Host environments (especially Windows executables) never enter Linux images.
+**/.venv
+**/venv
+**/env
+**/.git
+
+# Runtime material and Python/test artifacts, not synthetic test source.
+**/cache
+**/pyramids
+**/thumbs
+**/pgdata
+**/logs
+**/*.log
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/build
+**/dist
+**/*.egg-info

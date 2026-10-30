@@ -1,5 +1,7 @@
 # Feature: catalog-foundation 质量检查清单（checklist.md）
 
+> 公开隐私修订，原件非公开保全，不是逐字原文。仅隐私表述、候选别名与公开链接修订；需求ID、AC、领域/许可/安全语义及原审核勾选、数字、结论保持。旧候选别名不是可用于Git的公开版本指针；证据边界见[公开验证摘要](../../docs/verification.md)。
+
 > 由审核员 A（claude-fable-5-1）在独立只读会话审核；规则见 AGENTS.md §2。实施者只机械记录审核员结论，不自行勾选。
 > 检查通过只代表规格与方案 / 任务质量达标，不代表实现或 NAS 验收完成。第 7 轮及以前另有审核员 B，按双人共识判断。
 
@@ -22,7 +24,91 @@
 
 ## 当前结果
 
-第 11 轮（2026-10-28，审阅提交 `private-candidate-022`；A = claude-fable-5-1 via anthropic（claude-bridge 接入不可用））：通过 12 项，不通过 0 项，本轮不评 0 项。
+第16轮（2026-10-30，审阅private-candidate-059，N1新T37/T38后的Analyze；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T37/T38进入Implement**。调度meta/status实际09:48:03～09:55:40 （原始时刻；时区非公开）、exit0，前后HEAD/工作区固定干净；桥仍在已证实的接入不可用状态，引用R1原证据未重试。原文/meta/status/提示词/哈希非公开保全；公开只提供 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。以下按审核员结论机械录入，不代实际实现、目标复验、独立CodeReview-R3或用户Gate2。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [x] CHK-04：通过
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [x] CHK-07：通过
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+本轮非阻断建议交派发/复验：compute S0可没有id，不以old['id']强取；保留存在的旧元数据，不改S0；只UPDATE实际改变的field_basis且复用私有Jsonb编码边界；固定新测试名与红→绿原输出留证，真库覆盖current/pending/NLC多来源与旧/新history/无变化重跑。T38不自动重跑36k，不把旧候选资源实测冒充新代码；R3据差异评证据边界，若已过通道恢复时再按规则先试桥。实施期间本清单冻结，不因测试绿另勾项。
+
+### 第15轮历史（Plan10 Tasks后的Analyze）
+
+第15轮（2026-10-29，审阅private-candidate-053；实际anthropic/claude-fable-5-1）：**12通过/0不通过/0不评，无阻断，允许仅T34/T35/T36进入Implement**。21:56:02～22:08:52 （原始时刻；时区非公开），exit0、工作区无修改；桥既有接入不可用证据引用R1原证据未调用。原文/meta/status/提示词/哈希非公开保全；公开只提供 [公开验证摘要](../../docs/verification.md)（详细原件非公开），不代代码Review/Gate2或实际资源通过。
+
+当时非阻断建议：固定投影输入/字节JSON；解析器code识别weakref、禁方法缓存自环；CompactMap缺key/get/contains/幂等/弱引用形状池；GC小测试finally恢复；私有Jsonb dumps与状态表同步。原12项全通过表与完整理由保留在上述原文。
+
+### 第14轮历史（Plan→Checklist）
+
+第14轮（2026-10-29，审阅private-candidate-052，Plan10→Checklist；实际anthropic/claude-fable-5-1）：**10通过/0不通过/2本轮不评，无阻断，可进入Tasks，尚不能Implement**。21:36:27～21:49:41 （原始时刻；时区非公开），exit0、无仓库修改。首选桥仍在已证实的接入不可用状态，本轮引用R1 bridge.err未重试，实际Anthropic。原文/提示词/meta/status/哈希 [公开验证摘要](../../docs/verification.md)（详细原件非公开），以下仅机械录入，不代CodeReview-R2/Gate2。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [ ] CHK-04：本轮不评；新Tasks/Analyze后补评
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [ ] CHK-07：本轮不评；新Tasks后补评
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+建议处理：采纳1补history/report消费者；2限定按对象Jsonb dumps，不全局改驱动且identifier普通dict判定不动；3解析器可weakref、只setprofile观察真实返回/下一阶段，测试可临时禁用循环GC并finally恢复以防残环假绿（非生产GC调参、不用业务monkeypatch）；4紧凑映射单测覆盖顺序/淘汰/双向相等/TypeError/JSON与未知类型失败；5公开S0 builder/规范化测试改法；6操作投影公式写入新任务。待Tasks/Analyze实际全项通过才实施。
+
+### 旧plan9第13轮（历史结果）
+
+第13轮（2026-10-29，审阅`private-candidate-045`，plan9/spec7，Tasks后的Analyze；A = anthropic/claude-fable-5-1）：**12通过 / 0不通过 / 0不评，无阻断，允许仅T31/T32进入Implement**。12:00:38～12:09:43 （原始时刻；时区非公开），自然exit0，工作区无修改。首选桥仍是既有接入不可用证据，本轮未调用；实际Anthropic。原文/提示词/meta/status/哈希在 [公开验证摘要](../../docs/verification.md)（详细原件非公开），本段仅机械记录，不代CodeReview-R2/Gate2。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [x] CHK-04：通过
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [x] CHK-07：通过
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+非阻断建议机械记录：1 DDL失败不用第二连接读被锁表；2 辅助上下文产出游标、不是yield from行生成器；3 FETCH上界/多批断言容纳整批后的空FETCH，trace仅临时Linux，非支持平台明确skip不冒充目标验证；4 先真实导入再UPDATE JSON null造行错误；5 T32开跑前明确放大安全条件与非tmpfs证据。已交派发/操作约束，不因此扩生产逻辑或新增需求。实施期间本清单不改；新代码仍须实际回归/资源/CodeReview-R2。
+
+### 第12轮历史（Plan→Checklist）
+
+第12轮（2026-10-29，审阅`private-candidate-044`，plan9；A = anthropic/claude-fable-5-1）：**10通过 / 0不通过 / 2本轮不评，无阻断，可进入Tasks，尚不能Implement**。11:42:37～11:50:51 （原始时刻；时区非公开），自然exit0/仓库无修改。首选claude-bridge仍在R1既有接入不可用证据（已确认不可用期间），引用 [公开验证摘要](../../docs/verification.md)（详细原件非公开），本轮未重试；实际Anthropic，不伪称桥审阅。
+
+- [x] CHK-01：通过
+- [x] CHK-02：通过
+- [x] CHK-03：通过
+- [ ] CHK-04：本轮不评；正式新Tasks/Analyze后补评
+- [x] CHK-05：通过
+- [x] CHK-06：通过
+- [ ] CHK-07：本轮不评；正式新Tasks后补评
+- [x] CHK-P1：通过
+- [x] CHK-P2：通过
+- [x] CHK-P3：通过
+- [x] CHK-P4：通过
+- [x] CHK-P5：通过
+
+原文/提示词/meta/status/哈希：[公开验证摘要](../../docs/verification.md)（详细原件非公开）。以上仅机械录入审核员原表，不代实现Review-R2；待Tasks后独立Analyze全项通过才实施。
+
+建议处理：采纳1补计划测试名、2按错误事务回滚销毁游标而非强断CLOSE、3 Linux临时trace不归档、5同口径S0/硬盘临时目录复验、6限importer/test_import不改db.py；4以真实DDL事务失败与必要的行处理失败测试清理，不新增生产防御规则。详细新任务在Tasks阶段补入，再审，不提前勾04/07。
+
+### 旧plan8历史结果（不作为plan9实施许可）
+
+第 11 轮（2026-10-28，审阅提交 `private-candidate-022`；A = claude-fable-5-1 via anthropic（claude-bridge 通道不可用））：通过 12 项，不通过 0 项，本轮不评 0 项。
 
 - [x] CHK-01：通过
 - [x] CHK-02：通过
@@ -38,7 +124,7 @@
 - [x] CHK-P5：通过
 
 <details>
-<summary>审核员 A 原文</summary>
+<summary>审核员 A 脱敏摘录（原件非公开）</summary>
 
 ### 结论表
 
@@ -53,7 +139,7 @@
 | CHK-07 | 通过 | 26 项估时 0.5～2 小时，各有上下文、依赖、修改范围、引用 AC 的完成标准与验证命令；`-k` 已全部删除（grep 0 命中）；数据库项明确「T-24 执行、本机 compileall 不算通过、db 项 0 跳过」；T-25 的命令现在可在正式服务上无副作用执行；T-24 的临时 PostgreSQL 来源已写明。T-24 容器内 pytest 依赖镜像含 tests/（非阻断 1），不影响可执行性判断 |
 | CHK-P1 | 通过 | 逐 AC 验证方式与第 10 轮相同且足以证明：AC-003-2 在临时目录真实改名 / 移动 / 互换（NTFS 与 btrfs 改名均保留 inode 与 mtime，本机与容器都能跑）；AC-003-7 打乱顺序 + 数据库端到端互换；AC-012-2 记录导入期间打开的全部路径；AC-011-3 本机筛选 + A6 P95；AC-010-2 由 compare.py 读报告对照基线 |
 | CHK-P2 | 通过 | 13 条需求全部落到 plan §2～§4；额外的 `/images/*`、`/attachments/{id}`、`excluded`、`v0_volume` 各服务具体 AC；基线对照已只保留 compare.py（§4.1 第 8 步、§6.3 A2、T-23），importer 只存计数；无超出、无遗漏 |
-| CHK-P3 | 通过 | 正式部署：catalog-db 384m、catalog-api 512m 且 memswap 相等；三个数据根与 v0 `.env` 均 ro；pgdata 在 `/srv/example/catalog/` 而非 git 工作区；数据库无宿主端口；不改 v0 compose、不重建 / 重启 v0。T-24 一次性容器同样硬限额、不挂真实材料；回滚 down + 删 pgdata。只读文件头不解码整幅影像 |
+| CHK-P3 | 通过 | 正式部署：catalog-db 384m、catalog-api 512m 且 memswap 相等；三个数据根与 v0 `.env` 均 ro；pgdata 在 `${DH_HOST_PGDATA_DIR}（独立存储目录）` 而非 git 工作区；数据库无宿主端口；不改 v0 compose、不重建 / 重启 v0。T-24 一次性容器同样硬限额、不挂真实材料；回滚 down + 删 pgdata。只读文件头不解码整幅影像 |
 | CHK-P4 | 通过 | 第 10 轮两处修订与四条建议均为测试隔离、部署顺序、验证命令、读 secret 的实现细节，未改需求；spec 第 7 版原样；tasks 明确不恢复 Q-025 规则（T-04、T-09、T-11、T-16） |
 | CHK-P5 | 通过 | 校验只在 scan / nlc / derivation / api / v0 入口；不引入 ORM、迁移框架、任务队列、后备份；只有 v0 HTTP 用替身，文件系统、数据库、接口都测真实实现；T-15 按 app.py 协议外部生成 cookie 调真实校验函数；compare.py 只读报告不重算业务；一次性测试容器不为罕见情形加机制 |
 
@@ -83,17 +169,19 @@ NAS 测试与部署仍需单独许可；实现期间不改本清单，Review 阶
 
 ## 历史
 
+第12轮为plan9的Plan/Checklist核对，10通过、2因新Tasks未拆不评；原文单独按哈希归档（见上），不重放1～11轮。随后第13轮已补评全12项通过、进入仅T31/T32的Implement；原文见上，不代实际代码Review。
+
 | 轮次 | 审阅提交 | 审核员与通道 | 结果（通过 / 未通过） | 去向 |
 |---|---|---|---|---|
 | 1 | `private-candidate-008`：spec 第 1 版 + Clarify 第二轮，plan 第 1 版 | A via claude-bridge，B via openai | 共识 8 / 13 | spec、plan 第 2 版 |
 | 2 | `private-candidate-009`：第 2 版 | 同上 | 共识 13 / 9 | 第 3 版 |
 | 3 | `private-candidate-010`：第 3 版 | 同上 | 共识 15 / 7 | 第 4 版 |
 | 4 | `private-candidate-011`：第 4 版 | 同上 | 共识 14 / 8 | 第 5 版 |
-| 5 | `private-candidate-012`：第 5 版 | A 未运行（claude-bridge 接入不可用），B via openai | 未形成共识（B 15 / 7） | 第 6 版 |
-| 6 | `private-candidate-014`：spec 第 6 版、plan 第 6 版 | A via anthropic（claude-bridge 接入不可用），B via openai | 共识 21 / 1 | plan 第 7 版 |
+| 5 | `private-candidate-012`：第 5 版 | A 未运行（claude-bridge 通道不可用），B via openai | 未形成共识（B 15 / 7） | 第 6 版 |
+| 6 | `private-candidate-014`：spec 第 6 版、plan 第 6 版 | A via anthropic（claude-bridge 通道不可用），B via openai | 共识 21 / 1 | plan 第 7 版 |
 | 7 | `private-candidate-015`：spec 第 6 版、plan 第 7 版 | 同上 | A 21 / 1，B 19 / 3（整件缺失的编号被清空；v0 链接限制与 spec 不符） | 两处新增随第 8 版精简删去；第 8 轮起取消 B |
-| 8 | `private-candidate-016`：spec 第 7 版、plan 第 8 版 | A via anthropic（claude-bridge 接入不可用） | 10 / 0，无阻断，2 不评 | 采纳建议 1～6、8、10 |
-| 9 | `private-candidate-019`：spec 第 7 版、plan 第 8 版 | A via anthropic（claude-bridge 接入不可用） | 10 / 0，无阻断，2 不评 | Gate 1 批准，采纳四项文字澄清 |
-| 10 | `private-candidate-021`：新增 26 项 tasks | A via anthropic（claude-bridge 接入不可用） | 10 / 2（CHK-04、07） | `private-candidate-022` 修复测试隔离与正式部署冒烟步骤，第 11 轮复核 |
+| 8 | `private-candidate-016`：spec 第 7 版、plan 第 8 版 | A via anthropic（claude-bridge 通道不可用） | 10 / 0，无阻断，2 不评 | 采纳建议 1～6、8、10 |
+| 9 | `private-candidate-019`：spec 第 7 版、plan 第 8 版 | A via anthropic（claude-bridge 通道不可用） | 10 / 0，无阻断，2 不评 | Gate 1 批准，采纳四项文字澄清 |
+| 10 | `private-candidate-021`：新增 26 项 tasks | A via anthropic（claude-bridge 通道不可用） | 10 / 2（CHK-04、07） | `private-candidate-022` 修复测试隔离与正式部署冒烟步骤，第 11 轮复核 |
 
-完整原文见本文件 git 历史：第 1～7 轮截至 `private-candidate-015`，第 8 轮 `private-candidate-018`，第 9 轮 `private-candidate-020`，第 10 轮 `private-candidate-022`。第 8 轮起取消重复的 CHK-R001～R013；最终需求结论只保留于 spec §5。
+完整原文仅在非公开档案保全：第 1～7 轮截至旧候选别名 `private-candidate-015`，第 8 轮 `private-candidate-018`，第 9 轮 `private-candidate-020`，第 10 轮 `private-candidate-022`。这些别名不是公开Git版本指针，重写后的历史不能冒称原测试逐字输入。第 8 轮起取消重复的 CHK-R001～R013；最终需求结论只保留于 spec §5。

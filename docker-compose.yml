@@ -1,10 +1,7 @@
 # 敦煌画卷 · NAS 高清查看器
 #
-# 历史路径记录所用系统版本 DSM 7.3.2；私人设备实例与现场布局非公开：
-#   - 敦煌画卷：/srv/example/data
-#   - 部署目录：/srv/example/viewer
-# 部署后访问：局域网 http://192.0.2.10:8503
-#             Tailscale http://192.0.2.20:8503
+# 部署方须显式配置 DH_HOST_DATA_DIR、DH_HOST_CACHE_DIR（见 .env.example）。
+# DH_HOST_STATIC_DIR 默认 ./static，是相对本项目的公开示例，不代表已部署路径。
 #
 # 内存安全设计（2026-10-18 事故后加固）：
 #   - 容器硬上限 768MB 且禁用额外 swap：超限由 cgroup 直接杀容器，绝不会拖垮 NAS
@@ -26,8 +23,8 @@ services:
     container_name: dunhuang-pyramid-builder
     restart: on-failure
     volumes:
-      - /srv/example/data:/data:ro
-      - /srv/example/cache:/cache
+      - "${DH_HOST_DATA_DIR:?Set DH_HOST_DATA_DIR}:/data:ro"
+      - "${DH_HOST_CACHE_DIR:?Set DH_HOST_CACHE_DIR}:/cache"
     environment:
       - TZ=Asia/Shanghai
       - DATA_DIR=/data
@@ -54,8 +51,8 @@ services:
     container_name: dunhuang-pyramid-huge
     restart: on-failure
     volumes:
-      - /srv/example/data:/data:ro
-      - /srv/example/cache:/cache
+      - "${DH_HOST_DATA_DIR:?Set DH_HOST_DATA_DIR}:/data:ro"
+      - "${DH_HOST_CACHE_DIR:?Set DH_HOST_CACHE_DIR}:/cache"
     environment:
       - TZ=Asia/Shanghai
       - DATA_DIR=/data
@@ -84,9 +81,9 @@ services:
     ports:
       - "8503:8000"
     volumes:
-      - /srv/example/data:/data:rw
-      - /srv/example/cache:/cache
-      - /srv/example/static:/app/static:ro
+      - "${DH_HOST_DATA_DIR:?Set DH_HOST_DATA_DIR}:/data:rw"
+      - "${DH_HOST_CACHE_DIR:?Set DH_HOST_CACHE_DIR}:/cache"
+      - "${DH_HOST_STATIC_DIR:-./static}:/app/static:ro"
     environment:
       - TZ=Asia/Shanghai
       - CACHE_MAX_GB=600

@@ -1,11 +1,13 @@
 # D-001 部署形态：NAS 本机 Docker Compose 服务，直读原图
 
+> 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
+
 - 日期：2026-10-27（追认登记；决策早于本文件）
 - 状态：accepted
 
 ## 背景
 
-敦煌画卷原图存放在NAS（DSM 7.3.2；设备实例与容量非公开）的 `/srv/example/data`，为数百 GB 级 TIFF 扫描件。
+敦煌画卷原图存放在NAS（具体设备实例非公开）的 `${DH_HOST_DATA_DIR}`，为数百 GB 级 TIFF 扫描件。
 依据：`docker-compose.yml` 头部注释、`app.py` 文档字符串。
 
 ## 备选方案
@@ -15,7 +17,7 @@
 ## 结论
 
 在 NAS 本机以 Docker Compose 运行查看服务，原图目录挂载进容器直接读取；不拷贝原图、不做全量转码；
-浏览器即客户端（局域网 / Tailscale；如开放公网，由部署方配置受控入口，私人拓扑非公开）。
+浏览器即客户端（局域网 / Tailscale；公网入口如需开放须另行配置受控 HTTPS 与登录墙，不公开私人拓扑）。
 
 ## 取舍理由
 
@@ -25,5 +27,5 @@
 
 ## 影响
 
-- `docker-compose.yml`、`Dockerfile`；部署目录 `/srv/example/viewer`
+- `docker-compose.yml`、`Dockerfile`；部署目录 `${DH_DEPLOY_DIR}`
 - 所有解码都在 NAS 上进行，受 D-005 约束

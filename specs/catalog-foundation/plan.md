@@ -1,12 +1,14 @@
 # Feature: catalog-foundation 目录底座 实施计划（plan.md）
 
+> 公开隐私修订，原件非公开保全，不是逐字原文。仅隐私表述、候选别名与公开链接修订；需求ID、AC、领域/许可/安全语义及原审核勾选、数字、结论保持。旧候选别名不是可用于Git的公开版本指针；证据边界见[公开验证摘要](../../docs/verification.md)。
+
 > Plan 阶段产物：由 spec.md 生成的设计成果，包含具体实施细节。需求本身在 spec.md，此处不复制。
-> 状态（2026-10-28）：第 8 版，对应已获 Gate 1 批准并冻结的 spec 第 7 版（按 AGENTS.md §2「工程约束」精简；删去的内容见 spec §5 Q-025）。第 11 轮 Analyze 全部 12 项通过，现进入 Implement；各轮结果见 `checklist.md`。
+> 状态（2026-10-29）：第10版，spec7仍冻结（13 R/58 AC不变）。用户本轮回复「好的」，同意A紧凑私有状态为主、C生命周期修正独立拆项的下一版设计/独立核对后Astra实施；新增§4.1.2/4.1.3，保留§4.1.1。独立Checklist14已10通过/2因新Tasks不评、无阻断，允许进入Tasks；已拆T34/T35/T36，独立Analyze15于private-candidate-053全12项通过、无阻断，允许仅该范围Implement。现设计/清单冻结，实际资源与代码Review-R2仍待验。旧plan9/Analyze13与T33诊断校读不代本版设计或实现Review通过；512m/384m、字段/JSON/历史/身份/事务锁不变。
 
 ## 1. 技术方案
 
 - **架构落点**：前后端分离后的第一个后端服务「目录服务」（D-011、D-016、D-018），与 v0 并存、互不依赖；影像查看仍由 v0 提供
-- **技术栈**：Python 3.12 + FastAPI + uvicorn（D-018）；PostgreSQL 17.4（NAS 已有镜像 `postgres:17.4-alpine3.21`，D-016），驱动 psycopg 3；影像事实用 tifffile 读 TIFF 标签、Pillow 读 JPEG 信息，PSB 只读文件头 26 字节；测试用 pytest
+- **技术栈**：Python 3.12 + FastAPI + uvicorn（D-018）；PostgreSQL 17.4（镜像 `postgres:17.4-alpine3.21`，D-016；不报告私人镜像缓存状态），驱动 psycopg 3；影像事实用 tifffile 读 TIFF 标签、Pillow 读 JPEG 信息，PSB 只读文件头 26 字节；测试用 pytest
 - **依赖**：`catalog/requirements.txt` 写精确版本（v0 的范围约束保持不动）；与 v0 共有的库取 v0 当前版本（plan.md RK-05）
 - **规则数据**：批次层登记、子目录词表、编号号段、疑似编号、谱系、许可默认表、出处线索集中在 `rules.py`；每条规则有名称，整体带版本号（如 `2026-10-28.1`），作为字段依据的「作者」（R-013）
 - **校验位置**（AGENTS.md §2 工程约束第 2 条）：外部输入只在入口校验——文件系统（`scan.py`）、国图清单与执行记录（`nlc.py`、`derivation.py`）、登录 cookie 与接口参数（`api.py`）、v0 的响应（`v0.py`）；之后传类型确定的值，内部不重复检查
@@ -33,6 +35,7 @@ catalog/
 │   ├── nlc.py                 # 国图清单：Pressmark、IDP 条目 ID、署名、画布对应
 │   ├── derivation.py          # 10-21 执行记录 → 派生来源；cache/ 的统一打开函数
 │   ├── v0.py                  # v0 索引快照、健康采样、卷 ID 与链接
+│   ├── _compact.py            # 私有只读Mapping/有界形状池（plan10，仅导入内部使用，无新依赖）
 │   ├── importer.py            # 一次导入：扫描 → 计算 → 单事务写入（含字段依据与历史）→ 报告
 │   ├── api.py                 # FastAPI：认证、只读接口、触发导入
 │   └── __main__.py            # 命令行：migrate / report / health
@@ -61,7 +64,7 @@ catalog/
 
 ## 3. 数据与存储
 
-PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（git 工作区）里。
+PostgreSQL 数据目录在 `${DH_HOST_PGDATA_DIR}`，不在 v0 的部署目录（git 工作区）里。
 
 | 表 | 主要字段 | 说明 |
 |---|---|---|
@@ -81,7 +84,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 **字段依据**（R-013）：按字段记录 `{来源, 作者, 批次, 时间, 置信度}`。来源为 文件名解析 / 文件头 / 外部清单 / 执行记录 / 默认规则 / 人工；作者为 `rule:<规则名>@<规则版本>` 或 `user:<账号>`；置信度为 确定 / 推断。
 
-数据量：影像约 3.6 万行、写卷约 6,000 行，导入在内存中计算。
+数据量：影像约 3.6 万行、写卷约 6,000 行，导入仍在内存中完整计算；S0的数据库读取采用§4.1.1有界抓取，避免驱动先缓冲全表文本结果，不丢任何原有列。第10版只对影像两状态的四类内部映射采用§4.1.2紧凑只读表示，其他记录仍用现有dict，数据库/接口JSON仍是原结构。
 
 ## 4. 关键流程
 
@@ -95,6 +98,48 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 6. **身份、单元与规则**：§4.2.1 → §4.2.2 → §4.2.3 → §4.4
 7. **写入**：结果在一个事务中写入正式表，派生字段有变化的写入 `history`；任何一步失败则整批回滚，`import_run` 记为 failed。`grouping_key` 与影像位置有变化的，先改为临时值再写入新值，编号或位置互换时不违反唯一约束。附件原文读到即写入这个事务，不在内存中整体保留（5,140 份 manifest 与 report 合计约百 MB）；附件内容变化时更新为最新原文
 8. 停止健康采样；生成报告与计数，写回 `import_run`；释放锁，丢弃内存中的登录状态。基线对照只由 `acceptance/compare.py` 读取报告完成，不在导入器中重复计算
+
+### 4.1.1 S0有界读取（第9版，CR1-01 / AC-012-3、AC-012-4）
+
+**依据与范围**：P8共享叶优化后，A4真实PG 2k/6k重导RSS峰值109.96/175.71MiB；6k独立S0加载进程峰值143.17MiB，image.field_basis文本28,818,000bytes。36k两点RSS估算668.83MiB只是趋势，未做全量/OOM，详见 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。本次优先控制客户端全结果缓冲，不保证只改游标足够；最终S0与本批结果仍全量驻留内存，不改成扫描/计算/持久化全流水线。
+
+- **进入点/事务**：保持实际导入已有边界：§4.1第2步索引快照独立提交后，在扫描之前于正式目录事务内加载S0，再计算/一次持久化。`load_catalog_state(connection)`内用`connection.transaction()`覆盖六个SELECT：正式调用已在事务中则仅嵌套保存点，不提交/终结调用方事务；现有autocommit连接直接调用时建立短读事务，返回后不遗留事务。不改变隔离级别、快照独立提交或同一连接的会话咨询锁生命周期。
+- **游标/抓取**：六个既有查询（image、item、current/pending identifier、item_image、derivation、item_attachment）的列、过滤及已有排序完全保持；每个查询在显式上下文中打开psycopg命名服务端游标（`withhold=False`），迭代抓取固定**128行**一批（`itersize=128`），不使用`fetchall`或先整体`list`。查询按原顺序逐个消费，任一时刻只活一个游标；可复用固定内部游标名，不添加动态配置、随机命名框架或连接池。辅助上下文只包这六处复用的打开/execute/关闭概念。
+- **关闭/失败**：消费正常结束或SQL/行解码异常均先退出游标上下文，再退出加载事务；不用依赖生成器垃圾回收关闭。事务已INERROR时驱动可能不发CLOSE，依赖保存点/事务回滚销毁服务端游标；测试以回滚后pg_cursors无残留且外事务未提交为准，不强求错误路径CLOSE报文。不得逐批commit、开启独立连接、使用WITH HOLD，或catch后当空S0继续。异常沿现有PreparedImport路径回滚正式事务、记failed并释放连接/会话锁；不恢复Q-025的中止/恢复机制。
+- **对象语义**：每批解码后沿用既有有界依据池复用只读叶；CatalogState的键/行内容/编号列表顺序、全部字段与JSON列表类型仍相同。共享叶及其内部列表不就地修改，不改变作者/版本/批次/时间、history、附件原文或人工认定；不加载attachment.raw/history全表、不缩减当前六查询的列。
+- **验证**：真实PG超过两批的样本（至少257幅）与普通只读SELECT结果逐字段等价，包含依据/事实与关联；观察真实服务端FETCH的抓取上界（可用psycopg协议trace，不替换业务/DB为mock）。覆盖autocommit直接调用和已有外事务：同连接`pg_cursors`无残留，加载成功不提前提交外事务（另一连接不可见未提交写入、外层回滚后仍未持久化），调用后连接可用。加载中真实SQL失败时游标/读事务关闭、外事务未被偷偷提交；完整导入失败测试继续证明failed状态/回滚/锁和连接归还。不为人为制造的罕见并发加机制。
+
+### 4.1.2 A：影像内部四类紧凑只读映射（第10版）
+
+**针对已测正常规模**：T33的6k varied联合数据图71.677MiB，S0+当前image行/field_basis/fact basis/facts四类外层dict25.269MiB；旧6k重导约160.5MiB，36k仅投影586.54。理想tuple载荷容量上界105.47MiB/36k未扣包装/索引/转换，余量薄，不是实施收益；详见memory-diagnosis.md。本次不改全量内存计算，不缩SQL列、不换事务/锁、不流式重写。
+
+**表示与容量边界**：在私有`_compact.py`实现一个小型只读`collections.abc.Mapping`（下称CompactMap），`__slots__`仅保存共享形状和按顺序的值tuple；形状含完整keys tuple及只读使用的key→index，不给每行再造hash索引。提供getitem/iter/len及Mapping的get/items/values/contains/dict()读契约，不继承dict、不提供写接口/隐式解冻。每次loader/compute各自有独立形状池（可由BasisPool持有），LRU最多64种精确key顺序；按实际mapping的**全部keys**构造，不硬编码27/23/7或只取白名单，额外/缺失/不同顺序keys均完整保留，缓存淘汰只影响复用、不丢已返回映射的形状/值。形状构造缓存不得因保存绑定自身的方法而产生池的自环；活映射只引用形状/值，不引用池。无全局任意数据缓存、不存shape之外的行值、不以值字符串化或元组化JSON列表换内存。
+
+**四类与转换时点**：仅`CatalogState.images`和`ImportComputation.images`每行外层、该行facts外层、field_basis外层及其facts外层采用CompactMap。UUID→行索引仍dict。loader沿现有128行游标逐行复用叶后立即压紧；compute每影像先在局部可写dict完成赋值/来源依据，再逐行压紧存入结果，不先建完全表dict再转换。missing分支也在状态/依据更新后压紧。item/identifier/link/derivation记录和rules.SourcePolicy.basis仍为原可写dict；P8只读叶与其内部JSON列表按现有约定消费，事实value/source_images等list仍list，不深冻/就地改共享叶。
+
+**可写边界**：影像构造完成后的四类外层变为只读，这是明确的私有容器契约变更；要修改必须先`dict(...)`/JSON展开为新的局部builder再压紧，不能改S0。当前item.updated_run、identifier.id/is_primary、构造中的field_basis重赋等仍可写，不能误压紧其他行或叶。不用改API路由/响应schema，未来标注接口不在本版。
+
+| 实际消费者/写点 | 本版处理 |
+|---|---|
+| `_file_entry/_image_state`、`_read_images`、`_release_unique_values`、`_item_rows`读取images | Mapping读取；字段/UUID/时间/三态事实不变，不改身份/规则算法 |
+| `_basis`的old.get、previous.items、old facts对照 | 完整Mapping读契约；逐字段run/at沿用与版本变化逻辑不变 |
+| `_image_rows` present/missing | builder为新dict，所有写入结束才冻结；missing用dict(old)，不改旧映射 |
+| `_item_rows`更新updated_run；`_identifier_rows/_persist_identifiers`更新is_primary/id | 继续普通dict，不扩大紧凑范围 |
+| `_snapshot`的dict(rows[id])及JSON比较 | 单对象浅展开影像，嵌套CompactMap由统一JSON默认转换展开，不能保留全库展开副本 |
+| `_persist_history`遍历rows.items/读取row[field_basis] | 完整Mapping读取，snapshot与独立field_basis的Jsonb都走正确边界；只item分支更新updated_run |
+| `build_report`的present及state/kind/lineage/path/canvas读取 | 保持Mapping读契约和逐对象对照，不累计展开影像 |
+| `_upsert`及history直接`Jsonb(row[field_basis])` | 通过同一私有JSON编码边界支持Mapping/list；不依赖Jsonb默认支持自定义Mapping，也不全局修改psycopg适配器 |
+| API/history读取数据库行 | 原SQL/JSON返回，保持外部object/array、所有key、数值类型与过去批次原样 |
+
+**JSON单一边界**：把现有`_json_value`的default转换提为复用的私有编码函数：UUID/PurePosixPath→str、datetime→iso、CompactMap/Mapping→临时dict，其余既有dataclass→asdict。`_json_value`继续JSON往返得到普通结构；_upsert按`isinstance(value, (Mapping, list))`选择Jsonb，显式使用同一dumps或先局部展开，逐对象处理；不调用全局set_json_dumps。identifier行仍普通dict，其现有判定可保持不动。核对importer全部Jsonb入口，尤其_upsert、_persist_identifiers、_persist_history的snapshot和独立field_basis、provenance、_finish_run；普通dict/list输入语义相同，禁止default=str吞类型或改jsonb持久化内容。无新依赖/ORM/通用序列化框架。
+
+**测试契约公开变化**：现有`test_basis_and_fact_leaves_shared_but_field_maps_independent`的文件变更/另一影像及S0不污染断言保留；最后两处直接外层赋值改为TypeError断言，并对显式展开的新副本赋值证明旧/其他值不污染。`test_rule_version_change_is_field_history_not_forced_value_change`改为在独立S0 builder中替换旧规则依据，不修改冻结输出；真实PG版本/历史测试继续原断言。直接json.dumps内部影像映射的测试改为同一JSON边界规范化再比较，不用repr/default=str。旧叶复用、list类型、run/time隔离、数据库原值/作者/历史等价、原有真实文件回归都不删除；新增只读/完整key/容量及序列化测试。
+
+### 4.1.3 C：策略解析不依赖循环GC（第10版，独立小任务）
+
+T33源码与weakref确认_image_rows局部递归policy自捕获，额外可达容量4.108MiB/6k；回收阶段随GC/插桩改变，不能把它预减当RSS收益。将该递归解析改为无自捕获环的短小私有解析器（例如拥有显式输入和memo的可调用对象，递归经self方法，实例不缓存自身bound method）。保留源先于输出、本批源/许可最严格、NLC署名、缓存命中/异常传播算法，不改rules/派生规则。解析器/临时索引最后消费后随_image_rows返回正常释放，不新增全局cache/强制gc.collect/GC调参/中止恢复。
+
+验证普通NLC、BnF、具有真实合成执行记录的多层源继承及读取失败/异常清理。解析器实例支持weakref；只沿真实setprofile观察实际对象，不monkeypatch业务。测试可仅在小型compute期间暂禁循环GC并finally恢复原状态，防止旧环被自动回收导致假绿；生产/资源对照仍不调GC。只用weakref观察实际对象：在_image_rows返回事件当下其帧仍活不要求已死，**进入下一阶段后**应无自环残留；异常traceback仍持帧时不假称对象必须已释放，释放测试自己持有的异常/帧后验证无环，不靠显式GC。完整JSON/来源/许可/history和事务锁回归不变，C不能单独关闭P1。
 
 ### 4.2 身份与归并（R-002、R-003）
 
@@ -110,7 +155,7 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 未被认领的 present 影像标为 missing，记缺失时间，不删除；被认领的 missing 影像恢复为 present，记「重新出现」。
 
-依据：2026-10-27 核查两个根目录的 `st_dev` 不同（btrfs 的不同子卷，inode 各自独立），故只在同根内比较；btrfs 按设计不复用已删除的 inode，同一子卷内改名或移动保留 inode 与 mtime_ns（设计说明，未实测）。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 不同，落到第 2 行（AC-009-3）。
+依据：原图与备份是独立的身份比较根，故只在同根内比较；文件系统设计依据为 btrfs 不复用已删除的 inode、同一子卷内改名或移动保留 inode 与 mtime_ns（设计说明，未实测）。私人设备号与存储拓扑非公开保全。拼接工作台以临时文件 + 原子替换覆盖 `合并长卷.tif`，新文件的 inode 不同，落到第 2 行（AC-009-3）。
 
 **4.2.2 写卷单元**（spec §1 术语；AC-001-3、AC-002-2、AC-002-3、AC-002-6、AC-002-7）
 
@@ -215,6 +260,8 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 - PSB 转换日志：「转换: <相对目录>」与「PSBNAME」→ 源 PSB，「已替换合并长卷.tif」→ 覆盖之前的拼接结果
 - 同一个合并长卷以时间上最后一次成功的操作为准；证据记录日志文件名与行号
 - 对不上的、白名单文件不存在或读不了的，记「派生来源不明」（注明原因），导入不因此失败；不在 10-21 记录中的合并长卷（如拼接工作台之后生成的）原因写「不在 2026-10-21 执行记录中」
+- 公开隐私配置修订：`DH_RECORD_DATA_ROOT` / `DH_RECORD_BACKUP_ROOT` 是记录中的旧绝对路径字符串前缀，不是 HOST 挂载输入。为空时只识别 `/data/`、`/backup/` 与相对记录；配置中性旧宿主前缀可兼容相应旧绝对记录。入口去空白、要求绝对且非单根并补尾斜杠，只构造库存键，不访问这些路径、不猜测宿主目录；派生与许可算法不变
+- 接收事件标签为 `第三方资料接收（接收事件 A）`，公开规则版本 `2026-10-30.1`；机构下载及本地派生标签原值保持，不改写已导入数据库或过去批次
 
 ### 4.6 国图清单（AC-004-3、AC-005-4）
 
@@ -227,20 +274,21 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 
 - **`AUTH_SECRET`**：从只读挂载的 v0 `.env` 中只读取这一项；缺失时所有请求返回 503（fail-closed）
 - **请求校验**：cookie `dh_session` 按 v0 的格式验证——base64url(`用户|过期时间|HMAC-SHA256(AUTH_SECRET, "用户|过期时间")`)，未过期，且用户在 `users.json` 中（architecture.md §7）；管理员 = `admin: true`。`users.json` 只由请求校验读取，导入过程不打开它。cookie 不区分端口，在 8503 登录 v0 后即可访问 8504；v0 的 cookie 为 `SameSite=Lax`，跨站请求不会带上它
-- **调用 v0**（局域网地址，配置项 `DH_V0_URL`，默认 `http://192.0.2.10:8503`）：导入只经接口触发，使用该请求自带的 `dh_session`，只保存在导入线程的内存中，导入结束即丢弃；目录服务不签发会话
+- **调用 v0**（局域网地址，正式 Compose 必须显式配置 `DH_V0_URL`；`load_settings` 开发后备仅 `http://localhost:8503`，不是生产入口）：导入只经接口触发，使用该请求自带的 `dh_session`，只保存在导入线程的内存中，导入结束即丢弃；目录服务不签发会话
   - 索引快照：`GET /api/index`，有效条件见 §4.1 第 2 步
   - 健康采样：导入期间每 5 秒 `GET /api/health`，2 秒内返回 200 且 `ok` 为 true 记为正常；采样汇总（次数、失败数、最大耗时）写入 `import_run`
-- **v0 链接**（AC-011-4）：取最近一份有效快照（`v0_volume`），只为其中有、且本次导入时磁盘上仍存在的影像目录中的 TIFF 影像生成 `<DH_V0_PUBLIC_URL>/view/<base64url(相对目录)>`；散放文件附带 `?file=<文件名>`（v0 忽略该参数，仅供人看）；其余写明不给链接的原因（备份分片、JPG、PSB、不在 v0 索引中、从未取得有效索引）。`DH_V0_PUBLIC_URL` 默认同 `DH_V0_URL`
+- **v0 链接**（AC-011-4）：取最近一份有效快照（`v0_volume`），只为其中有、且本次导入时磁盘上仍存在的影像目录中的 TIFF 影像生成 `<DH_V0_PUBLIC_URL>/view/<base64url(相对目录)>`；散放文件附带 `?file=<文件名>`（v0 忽略该参数，仅供人看）；其余写明不给链接的原因（备份分片、JPG、PSB、不在 v0 索引中、从未取得有效索引）。`DH_V0_PUBLIC_URL` 从可选 env_file 值在配置入口读取，空值等同缺省并回退明确的 `DH_V0_URL`，不依赖 Compose 嵌套插值
 
 ### 4.8 部署与运行（D-018）
 
 | 服务（容器） | 镜像 | 内存（= memswap） | 挂载 | 其他 |
 |---|---|---|---|---|
-| `catalog-db` | `postgres:17.4-alpine3.21` | 384m | pgdata → `/srv/example/pgdata` | 不对外暴露端口；`shared_buffers=64MB`、`max_connections=20`、`work_mem=4MB`；healthcheck `pg_isready` |
-| `catalog-api` | 本仓库 `catalog/Dockerfile` | 512m | `/srv/example/data:/data:ro`、`/srv/example/backup:/backup:ro`、`/srv/example/cache:/v0cache:ro`、`/srv/example/viewer/.env:/run/v0.env:ro` | 端口 8504→8000；`env_file: ./.env`（数据库密码等）；以 root 运行（`users.json` 为 root 600）；导入在本容器的后台线程中执行，受 512m 上限约束 |
+| `catalog-db` | `postgres:17.4-alpine3.21` | 384m | `${DH_HOST_PGDATA_DIR}` → 容器 PG 数据目录；宿主根在 git 工作区外 | 不对外暴露端口；`shared_buffers=64MB`、`max_connections=20`、`work_mem=4MB`；healthcheck `pg_isready` |
+| `catalog-api` | 本仓库 `catalog/Dockerfile` | 512m | `${DH_HOST_DATA_DIR}:/data:ro`、`${DH_HOST_BACKUP_DIR}:/backup:ro`、`${DH_HOST_CACHE_DIR}:/v0cache:ro`、`${DH_HOST_V0_ENV_FILE}:/run/v0.env:ro` | 端口 8504→8000；`env_file: ./.env`（数据库密码等）；以 root 运行（`users.json` 为 root 600）；导入在本容器的后台线程中执行，受 512m 上限约束 |
 
-- 启动：`cd /srv/example/viewer/catalog && /usr/local/bin/docker-compose -p dunhuang-catalog up -d --build`（只作用于本项目，不影响 v0）
-- 首次导入：管理员登录 v0 后打开 `http://192.0.2.10:8504/api/v1/docs`，执行 `POST /api/v1/imports`
+- 宿主输入须显式配置 `DH_HOST_DATA_DIR`、`DH_HOST_BACKUP_DIR`、`DH_HOST_CACHE_DIR`、`DH_HOST_V0_ENV_FILE`、`DH_HOST_PGDATA_DIR`，绑定地址显式配置 `CATALOG_LAN_IP` / `CATALOG_TAILSCALE_IP`，不提供私人默认值。这些 HOST 输入不同于容器内 `DH_DATA_DIR=/data` / `DH_BACKUP_DIR=/backup`
+- 启动：获准并合并后，在 `DH_DEPLOY_DIR` 下的 `catalog/` 按 `catalog/README.md` 受限构建步骤执行；始终指定 `-p dunhuang-catalog`，只操作 `catalog-db` / `catalog-api`，不影响 v0
+- 首次导入：另获许可后由管理员登录 v0，在部署方配置的目录服务入口 `/api/v1/docs` 执行 `POST /api/v1/imports`
 - 上线前置：NAS `MemAvailable` ≥ 2 GB；首次全量导入放在低峰时段
 
 ## 5. 验收对应
@@ -300,11 +348,11 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 | AC-011-5 | `api.py` | `test_api.py::test_no_mutating_routes`（检查路由表） |
 | AC-012-1 | 只读挂载 | NAS A5 |
 | AC-012-2 | `derivation.py` 统一打开函数、`api.py` | `test_import.py::test_v0_cache_access`（记录导入期间打开的全部路径：只有白名单文件，没有 `users.json`，没有列目录） |
-| AC-012-3 | 512m 上限、`v0.py` 健康采样 | NAS A5 |
-| AC-012-4 | 沿用未变文件的事实 | NAS A5 |
+| AC-012-3 | 512m上限、`v0.py`健康采样、§4.1.1 S0有界读取 | `test_import.py::test_state_load_batches_match_all_rows_and_json` / `test_state_load_preserves_caller_transaction_and_cursors` / `test_state_load_sql_failure_rolls_back_savepoint` / `test_state_load_row_failure_closes_cursor`；plan10新增 `test_compact.py`完整只读Mapping/有界shape/JSON，`test_import.py::test_image_policy_lifetime_without_gc` / `test_compact_images_keep_history_and_json`；compact单测覆盖完整key/顺序/形状淘汰/双向相等/拒写与嵌套JSON未知类型拒绝；§6.2无hook受限规模；真实材料/连续健康仍NAS A5 |
+| AC-012-4 | 沿用未变事实、§4.1.1有界读取 | 上述加载回归及§6.2首轮/真PG二次加载重导规模；真实耗时仍NAS A5 |
 | AC-013-1 | `importer.py` 字段依据 | `test_import.py::test_field_basis_and_author`（规则字段的作者是规则名与版本，不是触发者） |
 | AC-013-2 | `importer.py` | `test_import.py::test_confidence_labels` |
-| AC-013-3 | `importer.py`、`history`、`/history` 接口 | `test_import.py::test_value_at_any_run`（两次导入之间修改规则版本与文件） |
+| AC-013-3 | `importer.py`、`history`、`/history` 接口 | `test_import.py::test_value_at_any_run`（实际别名见converge.md）、`test_compact_images_keep_history_and_json`及完整API历史回归；字段/原JSON/任意批次不变 |
 
 ## 6. 测试与验证
 
@@ -315,6 +363,10 @@ PostgreSQL 数据目录在 `/srv/example/pgdata`，不在 v0 的部署目录（g
 ### 6.2 NAS（需你许可后才运行）
 
 数据库与接口测试用候选提交快照构建的测试镜像和一次性 PostgreSQL 容器运行，**不启动正式 compose、不访问正式 pgdata、不挂真实材料或 v0 文件**。经许可后以 `git archive` 把候选提交送到 NAS 隔离临时目录，`docker build -t dh-catalog-test <隔离目录>/catalog`；一次性数据库使用 `postgres:17.4-alpine3.21`，`--rm --memory 384m --memory-swap 384m`，无宿主数据卷、无宿主端口，在临时 Docker 网络内连通；测试容器同样 `--rm`，内存与 memswap 均为 512m，只用合成数据与合成认证文件。设置临时库 URL 后执行 pytest，结束删除测试容器、网络与隔离快照。它们是测试，不是正式服务部署；正式 compose 仍须 Gate 2 / merge 后另获许可才启动。
+
+T-31/T-32继续沿用已批准的合成隔离范围与硬限额，不部署/挂真实材料。新代码不得沿用A4的412通过数：完整pytest的所有db项需实际执行；协议trace仅Linux临时文件，用后关闭删除，不进入证据/错误输出；保持A4只读S0探针源码不变做6k前后归因，合成材料确认位于容器磁盘文件系统而非tmpfs；先同探针2k/6k比较，再按余量决定约36k生产prepare/execute首轮与真实PG重导，另含事实值有差异的合成TIFF头（不解码大图）以免只证明同质缓存最佳情形。核对完整JSON/ID/basis摘要、全量事实复用、无变化history不新增；记录进程RSS与cgroup（页缓存可回收）及失败/OOM/退出状态，不能仅线性外推称通过。若证据仍不足支持512MiB或实际失败，停止扩展实现并讨论，不缩列/扩限/改全流水线。所有临时库/容器/卷/网络/镜像/快照/凭据均清理，v0状态前后核对；独立实现Review-R2及Gate2仍未通过。此验证不是§6.3真实材料验收。
+
+**第10版分层/停止**：独立核对后C与A因importer/test_import共享文件串行，C先仅本机/功能就绪、A整合后形成新候选。先真实PG完整pytest（含compact/旧JSON与游标/ID历史API）全db实际执行，再无hook same2k/6k及varied6k对照，必要对象图只作容器容量辅证。放大操作条件保持两种36k RSS投影均≤480MiB，不能预扣C容量或用理想tuple算数代替测量；满足后才约36k合成prepare/execute首轮与真PG重导、记录cgroup/退出/OOM及全部不变量。若A首期+C仍未支持此门槛则停止，不自动扩到其他行族/统一事实池/尾段流水线，不扩限或改门槛；先报告具体余量再讨论。新代码不沿用423通过，真实材料/v0连续健康/吞吐仍A1～A7待验。独立CodeReview-R2与Gate2须后续完成。
 
 ### 6.3 NAS 验收（部署后，需你许可；导入由你在接口文档页触发）
 

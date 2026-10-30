@@ -44,7 +44,7 @@ from urllib.parse import parse_qs, quote
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
-try:  # libvips 优先：流式解码，超大扫描件内存占用低（限制解码内存占用）
+try:  # libvips 优先：流式解码，降低超大扫描件的内存占用
     import pyvips
 
     HAS_VIPS = True
@@ -79,7 +79,7 @@ SESSION_COOKIE = "dh_session"
 USERS_FILE = Path(os.environ.get("USERS_FILE", "/cache/users.json"))
 USERS_LOCK = threading.Lock()
 
-# —— 内存安全红线：不能让查看器把宿主拖死 ——
+# —— 内存安全红线：查看器不能耗尽宿主机内存 ——
 MEM_GUARD_MB = int(os.environ.get("MEM_GUARD_MB", "900"))  # 可用内存低于此值就拒绝解码
 FULL_DZI_MAX_PIXELS = int(os.environ.get("FULL_DZI_MAX_PIXELS", "350000000"))  # 超过此像素量只做预览
 PREVIEW_LONG_EDGE = int(os.environ.get("PREVIEW_LONG_EDGE", "10000"))  # 预览图长边像素

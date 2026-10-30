@@ -1,0 +1,63 @@
+# Always select this independent project with -p dunhuang-catalog.
+# Do not combine with the repository-root (v0) compose file.
+services:
+  catalog-db:
+    image: postgres:17.4-alpine3.21
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dunhuang_catalog
+      POSTGRES_USER: dunhuang_catalog
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in catalog/.env}"
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=20", "-c", "work_mem=4MB"]
+    volumes:
+      - "${DH_HOST_PGDATA_DIR:?Set DH_HOST_PGDATA_DIR in catalog/.env}:/var/lib/postgresql/data"
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dunhuang_catalog", "-d", "dunhuang_catalog"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  catalog-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DH_CODE_VERSION: "${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+    image: "dunhuang-catalog:${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+    restart: unless-stopped
+    user: root
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      DH_DATABASE_URL: "postgresql://dunhuang_catalog:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in catalog/.env}@catalog-db:5432/dunhuang_catalog"
+      DH_CODE_VERSION: "${DH_CODE_VERSION:?Set DH_CODE_VERSION to the actual commit SHA}"
+      DH_DATA_DIR: /data
+      DH_BACKUP_DIR: /backup
+      DH_V0_CACHE_DIR: /v0cache
+      DH_V0_ENV_FILE: /run/v0.env
+      DH_V0_URL: "${DH_V0_URL:?Set DH_V0_URL in catalog/.env}"
+    ports:
+      - "${CATALOG_LAN_IP:?Set CATALOG_LAN_IP in catalog/.env}:8504:8000"
+      - "${CATALOG_TAILSCALE_IP:?Set CATALOG_TAILSCALE_IP in catalog/.env}:8504:8000"
+    volumes:
+      - "${DH_HOST_DATA_DIR:?Set DH_HOST_DATA_DIR in catalog/.env}:/data:ro"
+      - "${DH_HOST_BACKUP_DIR:?Set DH_HOST_BACKUP_DIR in catalog/.env}:/backup:ro"
+      - "${DH_HOST_CACHE_DIR:?Set DH_HOST_CACHE_DIR in catalog/.env}:/v0cache:ro"
+      - "${DH_HOST_V0_ENV_FILE:?Set DH_HOST_V0_ENV_FILE in catalog/.env}:/run/v0.env:ro"
+    mem_limit: 512m
+    memswap_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
