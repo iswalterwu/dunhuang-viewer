@@ -1,6 +1,15 @@
 # 会话交接 — catalog-foundation
 
-## 当前安全点（2026-10-30，独立R3软件通过，待用户Gate2）
+## 当前安全点（2026-10-30，隐私Gate1/两分支历史授权已批，Plan待独立核对）
+
+- 用户已批准原软件Gate2，后续明确选择保持Public，要求全面扫描并隐去个人资料接收、网关/存储部署和账户等信息，完成后再继续交接/PR/合并；不改为Private，不部署或真实导入。
+- D-019已登记为现行公开边界，取代D-009的私有可见性要求，部署通道/许可/安全红线不变。新规格 `specs/public-release-privacy/spec.md` 的7R/25AC已获用户Gate1批准并冻结。Plan第1版已起草，待独立Checklist后拆Tasks/Analyze，尚未Implement或批量脱敏。
+- 只读扫描已覆盖457个已跟踪文件与1份本机待提交记录：136份文档/归档、19份源码/运行文件有候选命中，不是全部都属真实泄漏；真实默认值中也存在私人入口/路径/资料渠道，不能只改Markdown。历史730个文件对象中332个候选命中，65条提交元数据涉及非匿名邮箱。
+- 扫描明细、原始值、Git与未提交工作区备份均在仓库外，完整性已核验；不将敏感扫描原文或私有映射提交。公开摘要见 `specs/public-release-privacy/audit-summary.md`。
+- **下一步独立核对Plan，再Tasks/Analyze/Astra实施**。用户已明确批准最小必要源码/配置/脚本脱敏、清理公开历史/提交者信息，并受保护更新origin的main及功能分支。先独立副本演练与验证、必要Review/Gate2后才发布；其他远端/引用、部署及新的私人主机数据库验证未授权。原软件Gate2不代审新隐私代码。
+- HEAD仍private-candidate-065、main/origin-main仍private-candidate-023，生产/测试及原catalog冻结规格不变，未新推送/PR/merge或私人服务操作。本次只有本机治理/规格与状态草案，尚未提交/推送；既有归档尚未批量脱敏，不得声称已隐去全部个人信息。
+
+## 上一安全点（Gate2批准前；以下保留当时状态）
 
 - 唯一仓库/srv/example/project、feat/catalog-foundation，普通功能分支持续同步获准；main/origin-main仍private-candidate-023，未merge/push nas/正式部署或真实导入。
 - 用户「同意并继续」仅批准N1最小修复/隔离真PG完整复验/独立重审。Analyze16审private-candidate-059全12项通过（Anthropic Claude，09:48:03～09:55:40 （原始时刻；时区非公开）/exit0），spec7/plan10不变、checklist16在实施中冻结。

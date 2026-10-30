@@ -1,6 +1,8 @@
 # catalog-foundation — Converge 实现核对
 
-## 2026-10-30 N1修复（软件收敛，独立R3通过，Gate2未批）
+## 2026-10-30 N1修复（软件收敛，独立R3通过，Gate2已批）
+
+原Gate2批准后，用户已明确保持Public并要求全面隐私脱敏，D-019取代私有可见性要求。Handoff/合并等待public-release-privacy的规格批准/实施/验证与历史处置授权；当前仅本机盘点与草案、未批量脱敏。下列旧软件证据不变，不代未来隐私代码修改、部署或真实材料验收通过。
 
 用户批准N1在Gate2前最小修复后，Analyze16全12项通过，P14/P15独立openai/gpt-6-astra串行实施。实际生产差异仅importer._identifier_rows/_persist_identifiers（+6/-1）；值与来源/状态等全等、仅依据变化时复制旧行保id/since_run/until_run，不就地改S0；只UPDATE真实变化field_basis，沿同一私有Jsonb边界。原真正改号历史化、撤销pending删除、身份算法/事务/游标/CompactMap/schema/规则/依赖/配置/v0全部不变。
 

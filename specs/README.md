@@ -19,7 +19,8 @@ specs/<feature>/
 
 | feature | 状态 | 依赖 | 最近更新 | 备注 |
 |---|---|---|---|---|
-| catalog-foundation | in-progress | 无 | 2026-10-30 | spec7（13R/58AC）与plan10冻结。旧候选private-candidate-056/T36：目标Python3.12/PG17.4全442通过/0skip，原512m内36k差异化两轮成功，cgroup含缓存触512/无OOM，临时资源清理、v0未重启；独立R2软件通过、CR1-01代码级及02/05关闭。用户本轮「同意并继续」批准N1/P3最小修复、隔离真PG复验与独立重审，T37/T38经Analyze16全12项通过，P14已实现最小两个函数+6/-1与回归；主会话本机389通过/57skip/1原有警告（446项），A1/private-candidate-061真PG445通过/1新HTTP期望错误保留，P15仅测试一行已修；A2/private-candidate-063目标全446通过/0skip/1原有警告（73.22秒，57db实际），资源全清理/v0未重启，独立R3软件通过/N1关闭（审private-candidate-064），待用户Gate2；本轮未新36k，不沿用旧442或36k冒充新代码证据。未Gate2/merge/push nas/部署/真实导入，T25/T26与真实材料/并发/健康/性能仍待独立许可；功能分支持续同步，详情见tasks.md、review.md与HANDOFF.md |
+| catalog-foundation | blocked | public-release-privacy（仅交付依赖） | 2026-10-30 | 原软件Gate2已批、R3软件通过/N1关闭；既有目标446全通过属于原候选，不代表后续脱敏代码已验。用户已选择保持Public并全面清理隐私，D-019已登记；交接/PR/合并等待公开发布清理与历史处置决定。未推送/创建PR/合并/部署/真实导入，T25/T26仍另许可，当前变化仅本机。 |
+| public-release-privacy | in-progress | 无 | 2026-10-30 | 全树457已跟踪文件+1本机记录、历史730文件对象已只读盘点；7R/25AC已获用户Gate1批准；最小必要源码/配置/脚本及两分支历史/提交者清理、受保护更新origin授权已明确。Plan第1版待独立Checklist后拆Tasks/Analyze，尚未Implement/批量脱敏或推送；其他远端、部署与新的私人主机测试不在授权内，原值与备份仅仓库外保留。 |
 
 状态取值：`in-progress` / `blocked` / `done`。feature 开始、阻塞、完成时必须更新本表；
 依赖未满足的 feature 不得进入 Plan。

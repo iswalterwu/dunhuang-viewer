@@ -1,7 +1,8 @@
 # Feature: catalog-foundation 任务清单（tasks.md）
 
 > 2026-10-28：用户已在 Gate 1 批准 spec 第 7 版（含第 9 轮建议 1～3、5 的措辞澄清）。T01～30原据plan8，T31/T32据plan9/Analyze13；用户现批准A+C的Plan10方向，独立Checklist14无阻断后，新增T34/T35/T36且独立Analyze15现全12项通过允许该范围实施，不以旧13轮许可偷跑。
-> **当前（2026-10-30）**：N1经Analyze16全12项通过、P14/P15 Astra最小修复与主会话复验后，候选private-candidate-063在T38-A2目标Python3.12.15/PG17.4 **446 passed/0 failed/0 skipped/1原有警告，73.22秒**，57db实际；资源/凭据全清理、v0未重启。独立CodeReview-R3已软件通过、N1关闭（审private-candidate-064/源码private-candidate-063，Anthropic Claude，10:47:51～11:00:57 （原始时刻；时区非公开）、exit0），可请求用户Gate2；未Gate2/merge/部署/真实导入，本轮未新规模测试。A1失败原件保留，旧private-candidate-056/36k不当新候选实测。
+> **当前（2026-10-30）**：原软件Gate2已批准；用户随后明确保持Public并要求全面隐私脱敏后继续交接/PR/合并。D-019已登记，不再请求改Private；新public-release-privacy完成全树/历史只读盘点、7R/25AC Spec/Clarify待Gate1，运行默认值/接收标签的最小必要改动与历史重写/强推须明确授权。当前未批量脱敏/新推送/PR/merge/部署/真实导入，HEAD=private-candidate-065、main=private-candidate-023，原源码/测试/冻结规格不变；状态与新规格仅本机未提交。
+> **Gate2批准前的软件安全点**：N1经Analyze16全12项通过、P14/P15 Astra最小修复与主会话复验后，候选private-candidate-063在T38-A2目标Python3.12.15/PG17.4 **446 passed/0 failed/0 skipped/1原有警告，73.22秒**，57db实际；资源/凭据全清理、v0未重启。独立CodeReview-R3已软件通过、N1关闭（审private-candidate-064/源码private-candidate-063，Anthropic Claude，10:47:51～11:00:57 （原始时刻；时区非公开）、exit0），可请求用户Gate2；未Gate2/merge/部署/真实导入，本轮未新规模测试。A1失败原件保留，旧private-candidate-056/36k不当新候选实测。
 > 上轮及本轮实施前：Plan10经独立Checklist14→Tasks→Analyze15全项通过后P12(C)/P13(A)串行实施。候选private-candidate-056在T36/NAS **442 passed/0 skipped/1原有警告，64.37秒**，55db实际；无hook门槛通过后，**36k varied首轮/真PG重导原512限额实测成功，RSS341.98/435.05MiB、343.115/307.414秒，cgroup含缓存触512但exit0无OOM**。资源/凭据已全清理、v0未重启，独立CodeReview-R2现软件通过、CR1-01代码级/02/05关闭，可请求Gate2；新N1/P3为旧基线规则升级重插未变编号；2026-10-30用户回复「同意并继续」，批准Gate2前最小修复、真实临时PG完整回归与独立重审。T37/T38已细化，独立Analyze16于private-candidate-059全12项通过（09:48:03～09:55:40 （原始时刻；时区非公开），Anthropic Claude，exit0），允许仅T37/T38实施；不改冻结spec7/plan10，不以旧Checklist15许可代替本次核对，未Gate2/merge/部署。旧失败门槛/趋势只作历史，不代当前实测；真实材料/并发/连续v0健康仍待T25/T26单独许可。
 
 ## 执行约定

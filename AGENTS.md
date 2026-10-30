@@ -2,6 +2,7 @@
 
 > 本仓库内所有 agent 的上下文入口：先读本文件，再按任务进入对应文档。
 > 产品设计与决策的权威在 `docs/`。实现与 docs 冲突时以 docs 为准，并回修代码。
+> 2026-10-30公开发布边界：D-019及`specs/public-release-privacy/spec.md`为准；用户已批准Gate1并授权清理公开历史/提交者信息、受保护更新origin的main与功能分支。先Plan/独立核对/指定模型实施与验证；其他远端和部署不动，新差异仍须Review及必要Gate2，不擅自提前发布。
 
 ## 0. 这是什么
 
@@ -78,7 +79,7 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 - **ID 与缓存映射**（architecture.md §3）：卷 / 文件 ID = 相对路径的 base64url，缓存键 = `sha1(file_id)[:16]`；`app.py`、`pyramid_worker.py`、`stitch_apply.py` 三处保持同一映射
 - **登录墙**（D-007）：公网可达，`.env` 的 `AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` 必须齐全（缺一项即全站匿名可访问）；用户表 `cache/users.json`
 - **目录服务**（D-018）：独立 compose 项目 `dunhuang-catalog`，内存 384m + 512m 硬上限；原图、备份与 v0 `cache/` 只读挂载；只在局域网与 Tailscale 开放；缺少 `AUTH_SECRET` 时拒绝全部请求
-- **代码与部署通道**（D-009）：GitHub 私有仓库是代码权威；NAS 部署目录是 git 仓库（updateInstead），只接收本机工作副本的推送
+- **代码公开与部署通道**（D-009、D-019）：GitHub公开代码仓库为代码权威；私人配置、账户、接收渠道与未脱敏原始审计记录不得作为公开发布内容。部署目录仍为git仓库（updateInstead），仅接收本机已合并提交的获准推送；历史重写/强制推送另需明确授权
 
 ## 4. 工作约定
 

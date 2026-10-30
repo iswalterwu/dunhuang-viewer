@@ -1,6 +1,6 @@
 # 目录服务（catalog-foundation）
 
-当前是开发中的独立后端。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，Gate2未批准，未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
+当前是开发中的独立后端。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，原软件Gate2已获用户批准；用户随后确认保持Public，D-019已登记。交接/PR/合并等待public-release-privacy脱敏规格批准、实施与验证，当前尚未批量清理；未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
 已实现配置、只读材料与影像事实、编号解析、单元/备份映射、稳定身份、谱系/许可/出处、共用认证、v0快照/采样/链接、只读API与管理员导入。R2已软件通过并关闭原主要问题；本轮用户批准的N1最小修复保留依据升级时未变编号的id/持有起点，当前依据更新、过去历史保留，同版本无变化重导不制造曾用号或无条件更新。具体实现/测试矩阵、失败与清理证据见feature的tasks.md/converge.md/review.md，不把主会话回归当独立审核。
 
