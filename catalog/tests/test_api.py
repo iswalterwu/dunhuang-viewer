@@ -335,7 +335,7 @@ def test_identifier_basis_upgrade_detail_resolve_and_history(api_db, connection,
     for q, detail in (("P2002", pending), ("bd12345a", nlc)):
         assert _item(api, q)["identifiers"] == detail["identifiers"]
         history_url = f"/api/v1/items/{detail['id']}/history"
-        assert api.client.get(history_url, params={"run": repeated_run}).json() == new_history[q]
+        assert api.client.get(history_url, params={"run": repeated_run}).json() == dict(new_history[q], requested_run=repeated_run)
         assert api.client.get(history_url, params={"run": pending_run}).json() == past[q]
 
 
