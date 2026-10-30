@@ -4,7 +4,7 @@
 
 > 本仓库内所有 agent 的上下文入口：先读本文件，再按任务进入对应文档。
 > 产品设计与决策的权威在 `docs/`。实现与 docs 冲突时以 docs 为准，并回修代码。
-> 2026-10-30公开发布边界：D-019及`specs/public-release-privacy/spec.md`为准；用户已批准Gate1并授权清理公开历史/提交者信息、受保护更新origin的main与功能分支。先Plan/独立核对/指定模型实施与验证；其他远端和部署不动，新差异仍须Review及必要Gate2，不擅自提前发布。
+> 2026-10-30公开发布边界：D-019及`specs/public-release-privacy/spec.md`为准；用户已批准Gate1/历史权限，并在R5通过后明确确认Gate2。origin的main/功能分支已按原租约受保护更新、新取远端复扫与本机迁移完成；其他远端和部署不动，后续新语义差异仍须Review及必要Gate2，不把本轮批准推定为部署/真实导入许可。所有本机新提交/merge显式`TZ=UTC`、使用项目非个人贡献者身份；旧私有引用/reflog不得回传origin。
 
 ## 0. 这是什么
 
