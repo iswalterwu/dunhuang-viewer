@@ -2,7 +2,7 @@
 
 > 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
 
-**当前交付（2026-10-30）**：目录底座R3与隐私R5均独立通过，原软件及本轮隐私Gate2均获用户确认；当前运行实现已就绪，origin两分支历史按原租约受保护更新并实际远端复扫、本机迁移完成，交接与PR #1正常匿名UTC合并完成。交接本机489通过/61跳过/1原警告（48.99秒）；合并后T-39隔离目标回归483通过/0跳过（61个db项含新增4项实际通过）；v0根镜像重建与T25/T26仍须另许可。新前端/标注工作台不在本feature，v0继续原状；不宣称真实材料或生产验收通过。
+**当前交付（2026-10-30）**：目录底座R3与隐私R5均独立通过，原软件及本轮隐私Gate2均获用户确认；当前运行实现已就绪，origin两分支历史按原租约受保护更新并实际远端复扫、本机迁移完成，交接与PR #1正常匿名UTC合并完成。交接本机489通过/61跳过/1原警告（48.99秒）；合并后T-39隔离目标回归483通过/0跳过（61个db项含新增4项实际通过）。**T-25 已获准执行（2026-10-30）**：部署远端首次同步与 v0 宿主配置迁移完成，目录服务两容器健康，限额、只读挂载、端口绑定核验通过，匿名访问均得 401；登录态冒烟待用户完成。v0 未重建、未重启。T-26 仍须另许可，v0 根镜像重建亦另议。新前端/标注工作台不在本feature，v0继续原状；不宣称真实材料或生产验收通过。
 
 当前是独立后端。以下开头两段为隐私实施前的软件历史状态，后续公开发布进度以 `specs/public-release-privacy/` 为准，不把旧证据当新验证。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，原软件Gate2已获用户批准；用户随后确认保持Public，D-019已登记。交接/PR/合并等待public-release-privacy脱敏规格批准、实施与验证，当前尚未批量清理；未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
@@ -36,7 +36,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 | DH_TEST_DATABASE_URL | 仅测试用的一次性 PostgreSQL 库，库名须以 dh_catalog_test_ 开头，绝不能指向正式库 |
 | DH_HOST_DATA_DIR / DH_HOST_BACKUP_DIR / DH_HOST_CACHE_DIR | Compose 必填的宿主原图 / 备份 / v0缓存根；只读挂载到 /data、/backup、/v0cache，不是容器 DH_DATA_DIR / DH_BACKUP_DIR |
 | DH_HOST_V0_ENV_FILE / DH_HOST_PGDATA_DIR | Compose 必填的宿主 v0环境文件 / 外部专用PG目录；前者只读挂载，不复制凭证；后者不得置于git工作区 |
-| CATALOG_LAN_IP / CATALOG_TAILSCALE_IP | Compose 必填的局域网 / Tailscale 绑定地址，不可用公网或通配地址 |
+| CATALOG_LAN_IP / CATALOG_TAILSCALE_IP | Compose 必填的局域网 / Tailscale 绑定地址，不可用公网或通配地址。若 Tailscale 以用户态网络模式运行（Tailscale 地址不在本机网卡上），后者填 `127.0.0.1`：tailscaled 把连入 Tailscale 地址的连接转发到本机回环 |
 | DH_RECORD_DATA_ROOT / DH_RECORD_BACKUP_ROOT | 可选的旧记录绝对路径字符串前缀；为空仅识别 /data/、/backup/ 与相对记录，不从 HOST 输入推断，不访问所填路径 |
 
 `load_settings` 的开发后备仅为 `http://localhost:8503`，不代表生产入口。旧记录前缀在配置入口去首尾空白、要求绝对且不等于 `/` 并补尾斜杠；例如中性字符串 `/legacy/data` 与 `/legacy/backup` 仅示意记录格式，不是实际主机路径。未配置的绝对记录不能悄悄猜测其来源。

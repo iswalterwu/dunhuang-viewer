@@ -223,11 +223,11 @@ cache/
 - **公网**：如开放公网，必须由部署方配置 HTTPS 与受控入口，不公开私人拓扑或现场端口状态；v0 登录墙仍为 fail-open（§7），请求头的信任前提见 §7 与 plan.md RK-03
 - **下载**：任何已登录用户都可经 `/file/{fid}` 下载 GB 级原图
 
-## 12. 目录服务隔离与公开配置契约（部署仍待验）
+## 12. 目录服务隔离与公开配置契约（T-25 已部署，真实验收待 T-26）
 
 目录服务是独立的 `dunhuang-catalog` Compose 项目：FastAPI API + PostgreSQL，不把目录接口并入 v0。原目录需求/计划与历史软件评审见 `specs/catalog-foundation/`；真实材料与正式服务验收尚未完成，历史合成结果见 [公开验证摘要](verification.md)。
 
-- `catalog-api` 512m、`catalog-db` 384m，memswap分别等于内存硬限；PG无宿主端口。API仅绑定显式 `CATALOG_LAN_IP` / `CATALOG_TAILSCALE_IP`，不接公网。
+- `catalog-api` 512m、`catalog-db` 384m，memswap分别等于内存硬限；PG无宿主端口。API仅绑定显式 `CATALOG_LAN_IP` / `CATALOG_TAILSCALE_IP`，不接公网；Tailscale 以用户态网络模式运行时，后者为 `127.0.0.1`，由 tailscaled 转发到本机回环。
 - 宿主挂载输入 `DH_HOST_DATA_DIR` / `DH_HOST_BACKUP_DIR` / `DH_HOST_CACHE_DIR` / `DH_HOST_V0_ENV_FILE` 必填，分别只读挂载 `/data` / `/backup` / `/v0cache` / `/run/v0.env`；PG使用工作区外专用 `DH_HOST_PGDATA_DIR`。HOST输入不同于容器 `DH_DATA_DIR` / `DH_BACKUP_DIR`，不从记录前缀推断挂载位置。
 - Compose显式要求 `DH_V0_URL`。可选 `DH_V0_PUBLIC_URL` 从env_file进入配置入口，空值等同缺省并回退明确的前者，不用嵌套插值；开发 `load_settings` 后备仅 `http://localhost:8503`，不作为生产入口。
 - 共用v0会话与只读用户表，目录服务缺 `AUTH_SECRET` 拒绝所有请求；导入用触发者原会话访问v0，不另签会话。GET只读，唯一写入口是管理员POST导入；材料/cache不写、不全量遍历cache。
