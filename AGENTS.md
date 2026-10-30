@@ -1,5 +1,7 @@
 # AGENTS.md — dunhuang-viewer 工作手册
 
+> 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
+
 > 本仓库内所有 agent 的上下文入口：先读本文件，再按任务进入对应文档。
 > 产品设计与决策的权威在 `docs/`。实现与 docs 冲突时以 docs 为准，并回修代码。
 > 2026-10-30公开发布边界：D-019及`specs/public-release-privacy/spec.md`为准；用户已批准Gate1并授权清理公开历史/提交者信息、受保护更新origin的main与功能分支。先Plan/独立核对/指定模型实施与验证；其他远端和部署不动，新差异仍须Review及必要Gate2，不擅自提前发布。
@@ -55,7 +57,7 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 4. **Plan**：参考技术栈与架构，由 spec 生成设计与实施细节。产物：`plan.md`。
 5. **Checklist**：审核员针对 spec 与 plan 检查需求是否完整、清晰、一致（需求的「单元测试」），在拆任务前完成；只有审核员认为满足的项才勾选，勾选不代表已经实现。
    **审核员**：只设审核员 A（claude-fable-5-1），在独立会话中审核（新开会话、与实施会话隔离、模型与实施不同）。
-   接入通道优先 `claude-bridge`（`--model claude-bridge/claude-fable-5-1`），不可用时（额度耗尽、鉴权失败、launcher 异常等）改走 Anthropic API（`--model anthropic/claude-fable-5-1`）；两条通道同为 Claude 模型，只换接入路径。每轮在 checklist 中记录实际通道及切换原因。
+   接入通道优先 `claude-bridge`（`--model claude-bridge/claude-fable-5-1`），不可用时（通道不可用、鉴权失败、launcher 异常等）改走 Anthropic API（`--model anthropic/claude-fable-5-1`）；两条通道同为 Claude 模型，只换接入路径。每轮在 checklist 中记录实际通道及切换原因。
    产物：`checklist.md`（实施者不勾选）。
 6. **Tasks**：把方案拆成 0.5–2 小时的任务，每个任务写明上下文、修改范围、完成标准（必须引用 AC 编号，如「满足 AC-001-1」）和与之对应的验证命令。产物：`tasks.md`。
 7. **Analyze**：只读地检查 spec、plan、tasks 之间的冲突、缺口与模糊之处；发现问题先修复再重新检查，然后才实施。
@@ -75,7 +77,7 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 ## 3. 红线（实现不得偏离；全部决策见 plan.md §3 与 `docs/decisions/`）
 
 - **内存安全**（D-005）：容器硬上限且禁用额外 swap、`VIPS_CONCURRENCY=1`、`MEM_GUARD_MB` 内存守卫、超大卷降级为预览分辨率；只许收紧，放宽须先登记 ADR
-- **原图目录写入**（D-008）：本仓库代码对 `/srv/example/data` 的唯一写入是拼接工作台写回的 `合并长卷.tif`（临时文件 + 原子替换）；新增任何写原始数据的路径须先登记 ADR。外部写入方见 plan.md §1.4，治理待定（PD-02）
+- **原图目录写入**（D-008）：本仓库代码对 `${DH_HOST_DATA_DIR}` 的唯一写入是拼接工作台写回的 `合并长卷.tif`（临时文件 + 原子替换）；新增任何写原始数据的路径须先登记 ADR。外部写入方见 plan.md §1.4，治理待定（PD-02）
 - **ID 与缓存映射**（architecture.md §3）：卷 / 文件 ID = 相对路径的 base64url，缓存键 = `sha1(file_id)[:16]`；`app.py`、`pyramid_worker.py`、`stitch_apply.py` 三处保持同一映射
 - **登录墙**（D-007）：公网可达，`.env` 的 `AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` 必须齐全（缺一项即全站匿名可访问）；用户表 `cache/users.json`
 - **目录服务**（D-018）：独立 compose 项目 `dunhuang-catalog`，内存 384m + 512m 硬上限；原图、备份与 v0 `cache/` 只读挂载；只在局域网与 Tailscale 开放；缺少 `AUTH_SECRET` 时拒绝全部请求
@@ -87,6 +89,6 @@ Constitution → Spec → Clarify → 【Gate 1】 → Plan → Checklist → Ta
 - 数据与学术纪律见 plan.md §5（许可合规、可追溯、学术区分、非破坏、身份稳定、开放标准、先整理后扩展、NAS 安全）
 - 原始扫描件、缓存产物、私有数据、凭证永不入库；`.gitignore` 锚点（`.env`、`cache/`、`pyramids/`、`thumbs/`）不得移除；凭证只在 NAS 部署目录的 `.env`（权限 600），代码零 fallback 字面量
 - 部署：只部署已 merge 到 main 的提交（`git push origin main` → `git push nas main`），禁止在 NAS 上直接改代码。`static/` 挂载进容器，推送即生效；改 `app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 须重建镜像，**重建 / 重启容器前先征得用户确认**，且只针对目标服务（`docker-compose up -d --build dunhuang-viewer`；不带服务名会同时拉起两个图块生成器）
-- NAS 操作：文件用 `ssh nas`（operator），容器用 `ssh nasroot` + `/usr/local/bin/docker`、`/usr/local/bin/docker-compose`；禁止对 `cache/` 做全量遍历（`du` / `find` 会长时间占用 NAS IO）
-- 本机工作副本：`/srv/example/project`（2026-10-28 从 `/srv/example/project` 迁移）；本机命令在此仓库根目录执行，NAS 部署目录不变
+- NAS 操作：文件与容器分别使用部署方配置的文件操作角色、容器管理角色（本文以 `nas` / `nasroot` 为角色别名，不是私人账户）；Docker/Compose 可执行位置由部署方确认。禁止对 `cache/` 做全量遍历（`du` / `find` 会长时间占用 NAS IO）
+- 本机工作副本：由操作者在非公开配置中选择；本机命令均在仓库根目录执行，不在部署工作区开发。部署根由 `DH_DEPLOY_DIR` 显式提供，原图与缓存根分别为 `DH_HOST_DATA_DIR`、`DH_HOST_CACHE_DIR`，不得与容器内路径混同
 - 环境：本机开发（Windows 11 + Git Bash + Python 3.14，无 WSL），运行在 NAS 容器（Python 3.12 + libvips）；提交前跑测试（`tests/` 建立前至少 `python -m py_compile app.py pyramid_worker.py stitch_apply.py`）

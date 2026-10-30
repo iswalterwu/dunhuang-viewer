@@ -54,13 +54,17 @@ def test_independent_services_and_memory_limits():
 
 
 def test_read_only_inputs_and_external_pgdata():
-    assert "- /srv/example/pgdata:/var/lib/postgresql/data\n" in DB
-    assert re.findall(r"^      - (/srv/example/.*)$", API, re.MULTILINE) == [
-        "/srv/example/data:/data:ro",
-        "/srv/example/backup:/backup:ro",
-        "/srv/example/cache:/v0cache:ro",
-        "/srv/example/viewer/.env:/run/v0.env:ro",
+    assert re.findall(r'^      - "(.*:/var/lib/postgresql/data)"$', DB, re.MULTILINE) == [
+        "${DH_HOST_PGDATA_DIR:?Set DH_HOST_PGDATA_DIR in catalog/.env}:/var/lib/postgresql/data",
     ]
+    assert re.findall(r'^      - "(.*:ro)"$', API, re.MULTILINE) == [
+        "${DH_HOST_DATA_DIR:?Set DH_HOST_DATA_DIR in catalog/.env}:/data:ro",
+        "${DH_HOST_BACKUP_DIR:?Set DH_HOST_BACKUP_DIR in catalog/.env}:/backup:ro",
+        "${DH_HOST_CACHE_DIR:?Set DH_HOST_CACHE_DIR in catalog/.env}:/v0cache:ro",
+        "${DH_HOST_V0_ENV_FILE:?Set DH_HOST_V0_ENV_FILE in catalog/.env}:/run/v0.env:ro",
+    ]
+    assert "DH_DATA_DIR: /data" in API and "DH_BACKUP_DIR: /backup" in API
+    assert "DH_V0_CACHE_DIR: /v0cache" in API
     assert "user: root\n" in API
     assert "DH_V0_ENV_FILE: /run/v0.env" in API
     assert "      - ./.env\n" in API
@@ -68,11 +72,19 @@ def test_read_only_inputs_and_external_pgdata():
 
 def test_host_bindings_are_explicit_lan_and_tailscale():
     assert re.findall(r'^      - "(.*:8504:8000)"$', API, re.MULTILINE) == [
-        "${CATALOG_LAN_IP:-192.0.2.10}:8504:8000",
-        "${CATALOG_TAILSCALE_IP:-192.0.2.20}:8504:8000",
+        "${CATALOG_LAN_IP:?Set CATALOG_LAN_IP in catalog/.env}:8504:8000",
+        "${CATALOG_TAILSCALE_IP:?Set CATALOG_TAILSCALE_IP in catalog/.env}:8504:8000",
     ]
     assert "0.0.0.0" not in COMPOSE
     assert "[::]" not in COMPOSE
+
+
+def test_production_v0_url_required_and_optional_values_come_from_env_file():
+    assert 'DH_V0_URL: "${DH_V0_URL:?Set DH_V0_URL in catalog/.env}"' in API
+    assert "DH_V0_PUBLIC_URL:" not in API
+    assert "DH_RECORD_DATA_ROOT:" not in API and "DH_RECORD_BACKUP_ROOT:" not in API
+    assert "      - ./.env\n" in API
+    assert "${DH_V0_PUBLIC_URL" not in COMPOSE  # No nested Compose interpolation.
 
 
 def test_build_context_excludes_secrets_and_host_artifacts():
@@ -84,8 +96,11 @@ def test_build_context_excludes_secrets_and_host_artifacts():
     for pattern in ("*", "**", "src", "tests", "acceptance", "**/*.json", "**/*.tif"):
         assert pattern not in patterns
     example = (CATALOG / ".env.example").read_text(encoding="utf-8")
-    assert re.search(r"^POSTGRES_PASSWORD=$", example, re.MULTILINE)
-    assert re.search(r"^DH_CODE_VERSION=$", example, re.MULTILINE)
+    for name in ("POSTGRES_PASSWORD", "DH_CODE_VERSION", "CATALOG_LAN_IP", "CATALOG_TAILSCALE_IP",
+                 "DH_V0_URL", "DH_V0_PUBLIC_URL", "DH_HOST_DATA_DIR", "DH_HOST_BACKUP_DIR",
+                 "DH_HOST_CACHE_DIR", "DH_HOST_V0_ENV_FILE", "DH_HOST_PGDATA_DIR",
+                 "DH_RECORD_DATA_ROOT", "DH_RECORD_BACKUP_ROOT"):
+        assert re.search(rf"^{name}=$", example, re.MULTILINE), name
     assert not re.search(r"^AUTH_\w+=", example, re.MULTILINE)
 
 

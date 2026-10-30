@@ -1,8 +1,11 @@
 # catalog-foundation 实际实现评审记录
 
+> 公开隐私修订，原件非公开保全，不是逐字原文。仅隐私表述、候选别名与公开链接修订；需求ID、AC、领域/许可/安全语义及原审核勾选、数字、结论保持。旧候选别名不是可用于Git的公开版本指针；证据边界见[公开验证摘要](../../docs/verification.md)。
+> 下列为原软件评审及交接暂停时的历史状态；当时的未批准/待验与后来批准分别保留，不代表本轮隐私差异已评审。当前公开发布进度由 `public-release-privacy` 主会话维护。
+
 ## Gate2批准与Handoff当前阻塞（2026-10-30，本机未推送）
 
-用户已在明确询问后批准原软件Gate2，接受R3结论、现行边界和下列待验风险；后续明确保持Public并要求全面隐私清理后继续交接/PR/合并。D-019已取代D-009私有可见性要求，不再等待改Private。新 `public-release-privacy` 已完成全树/历史只读盘点并形成7R/25AC的Spec/Clarify草案，待Gate1；必要运行默认值/接收标签与已发布Git历史处理范围须明确，不以原Gate2代审新改动。当前未批量脱敏、未创建PR/新推送/合并或部署；HEAD=private-candidate-065、main=private-candidate-023，生产/测试及原冻结规格不变。明细仅仓库外，公开审计摘要见该feature的audit-summary.md；历史暂停记录见 Gate2-Handoff.md（非公开历史记录）。当前变化仅本机、未提交/推送。
+用户已在明确询问后批准原软件Gate2，接受R3结论、现行边界和下列待验风险；后续明确保持Public并要求全面隐私清理后继续交接/PR/合并。D-019已取代D-009私有可见性要求，不再等待改Private。新 `public-release-privacy` 已完成全树/历史只读盘点并形成7R/25AC的Spec/Clarify草案，待Gate1；必要运行默认值/接收标签与已发布Git历史处理范围须明确，不以原Gate2代审新改动。当前未批量脱敏、未创建PR/新推送/合并或部署；HEAD=private-candidate-065、main=private-candidate-023，生产/测试及原冻结规格不变。明细仅仓库外，公开审计摘要见该feature的audit-summary.md；历史暂停记录见 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。当前变化仅本机、未提交/推送。
 
 **下列为Gate2批准前的R3评审/待确认记录，独立结论与原风险保留；Gate2状态以上方新记录为准。**
 
@@ -23,11 +26,11 @@
 3. **依赖浮动与运行边界**：A1/A2完整freeze相同，不代表与所有旧批次完全相同环境。T25记录正式freeze；完整锁定另立任务。正式四项ro挂载/外部pgdata/端口仅LAN-Tailscale/真实v0认证/默认CMD/健康检查仍未验。
 4. **T26 A1～A7**：真实基线与对象对应、谱系/画布率/白名单访问、原材料只读、真实资源/耗时/P95、20链接均待；CR1-03/04仍实物核查。D018的architecture目录服务章节在Handoff补，含上列P3边界，不把软件合并写成feature全量验收完成。
 
-**下一步仅请求用户Gate2**（确认本轮评审结论、现行边界与上述待验风险，允许后续Handoff/PR/merge）；通过后才执行该阶段，正式T25部署与T26真实导入另取许可。当前没有运行子agent或NAS临时资源/恢复命令，未Gate2/merge/push nas/部署。原文/meta/status/提示词/哈希 CodeReview-R3（非公开历史记录），独立原结论不改。
+**下一步仅请求用户Gate2**（确认本轮评审结论、现行边界与上述待验风险，允许后续Handoff/PR/merge）；通过后才执行该阶段，正式T25部署与T26真实导入另取许可。当前没有运行子agent或NAS临时资源/恢复命令，未Gate2/merge/push nas/部署。原文/meta/status/提示词/哈希非公开保全；公开只提供 [公开验证摘要](../../docs/verification.md)（详细原件非公开），独立原结论不改。
 
 ## R2及以前历史评审（后续R3不得篡改原结论）
 
-> **最新独立CodeReview-R2（2026-10-29）软件层面通过，可向用户请求Gate2**：审阅private-candidate-057、源码等同已测private-candidate-056。CR1-01代码级关闭，CR1-02/05关闭；真实材料/并发/连续v0/耗时等仍待验。新N1/P3为R1已有的规则版本升级重插未变编号问题，审核员不阻断但须用户决定修复时机。主会话已独立复核，不擅自修/接受风险，Gate2仍未批准、未合并/部署。有效原文 CodeReview-R2 anthropic.out.txt（非公开历史记录）。
+> **最新独立CodeReview-R2（2026-10-29）软件层面通过，可向用户请求Gate2**：审阅private-candidate-057、源码等同已测private-candidate-056。CR1-01代码级关闭，CR1-02/05关闭；真实材料/并发/连续v0/耗时等仍待验。新N1/P3为R1已有的规则版本升级重插未变编号问题，审核员不阻断但须用户决定修复时机。主会话已独立复核，不擅自修/接受风险，Gate2仍未批准、未合并/部署。有效原文 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。
 
 > 历史：2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。后续用户批准Plan10 A+C，经独立核对后P12/P13串行实现；最新候选private-candidate-056在T36/NAS全442项通过/0跳过、原512硬限36k差异化首轮/真实PG重导实际成功（RSS341.98/435.05MiB，cgroup含缓存触512、exit0无OOM）。资源已清理，现准备独立CodeReview-R2判断P1/02/05关闭，主会话不代审；未Gate2/merge/部署。历史阶段与局限下列保留，不把旧趋势当新实测。
 
@@ -46,18 +49,18 @@
 3. 显式requirements未改但间接依赖浮动（本次opentelemetry1.45.2），本次证据只适用该解析环境；T25记录pip freeze，锁定约束另立任务，不为压警告升级/屏蔽。
 4. T25真实只读挂载/外部pgdata/LAN-Tailscale端口、v0 .env/users认证/默认CMD/健康；T26 A1～A7基线/对象/访问、资源与v0健康/耗时/P95/20链接仍需单独许可。D018的architecture.md目录服务章节仍为正式Handoff待补，不把部署验证混为软件合并。
 
-原文/提示词/meta/status/模型/哈希与协调员N1探针见 CodeReview-R2（非公开历史记录）。仅LF/行尾规范化，未改独立结论或估算；主会话以上明确估算/真实的边界，不篡改原文。**现在无运行审核/实施进程或NAS资源；未Gate2/merge/部署。**
+原文/提示词/meta/status/模型/哈希与协调员N1探针见 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。原档案曾仅作LF/行尾规范化；本公开版本另作隐私修订，未改独立结论或估算；主会话以上明确估算/真实的边界，不篡改原文。**现在无运行审核/实施进程或NAS资源；未Gate2/merge/部署。**
 
 ## 1. 独立审核与通道（R1历史）
 
-| 尝试 | 模型/通道 | 实际起止（原始时刻；时区非公开） | 结果 |
+| 尝试 | 模型/通道 | 实际起止（原始时刻（时区非公开）） | 结果 |
 |---|---|---|---|
-| 首选 | claude-bridge/claude-fable-5-1 | 2026-10-29 00:23:13～00:35:20 | exit=1，接入不可用（账户细节非公开），stdout为空；没有评审结论，不计通过 |
+| 首选 | claude-bridge/claude-fable-5-1 | 2026-10-29 00:23:13～00:35:20 | exit=1，接入不可用（详细原因非公开保全），stdout为空；没有评审结论，不计通过 |
 | 回退 | anthropic/claude-fable-5-1 | 2026-10-29 00:37:10～01:17:20 | exit=0，正常返回完整报告；同一Claude审核模型，只换接入通道 |
 
 审核为独立 `pi --no-session`，工具只开放read/bash，未交给Astra自审。两尝试均无仓库修改，主会话在整个审阅期间保持HEAD与工作区冻结，未运行NAS任务。设计阶段checklist未修改。
 
-原始结论、实际meta/status、接入错误（账户细节非公开）、空输出和提示词均归档于 **CodeReview-R1（非公开历史记录）**。`anthropic.out.txt` 是有效评审正文；文件仅做显示文本LF/行尾规范化，manifest记录源与归档SHA-256，外部原文件保留。下面是主会话整理与复核，不替换审核员原文。
+原始结论、实际meta/status、接入错误、空输出和提示词均在非公开档案保全；[公开验证摘要](../../docs/verification.md)只提供脱敏结果与范围，不是原文下载入口。有效评审正文、原完整性清单及来源映射不公开；本文件为隐私修订，不再宣称仅有LF规范化。下面保留主会话整理与复核的结论，不替换审核员原件。
 
 ## 2. 完成项
 
@@ -108,13 +111,13 @@ P8/P9均openai/gpt-6-astra、自然exit0，分别在共享文件串行处理T28/
 
 **T-28目标未完成，P1保持打开；已按用户停止条件暂停继续扩大/实施，未派Review-R2。** 两个P3只有实现与真库回归完成，不冒充独立关闭。用户本轮回复「同意」，T31已获准先回Plan/Checklist/Tasks/Analyze，plan9补有界服务端游标128行抓取S0，所有字段/最终全量内存计算/事务锁和持久化JSON不变；验证游标关闭、调用方事务、连接释放与充分规模，仍不足再讨论。plan8现仅在获准范围回修为9版草案，不缩列/全流水线重构/扩限/加swap，不恢复Q-025机制。
 
-新A4前检、构建/资源、完整回归、两点JSONL、S0探针与源码、清理证据：**T28-scale-A4（非公开历史记录）**（先读README/manifest）。四个API/诊断容器、PG/匿名卷/网络/镜像/快照/.env/raw已清理，v0 ID/启动/restarts未变；无当前资源或子agent。旧R1原文不变、Gate2仍未批准。
+新A4前检、构建/资源、完整回归、两点JSONL、S0探针与源码、清理证据：**[公开验证摘要](../../docs/verification.md)（详细原件非公开）**（先读README/manifest）。四个API/诊断容器、PG/匿名卷/网络/镜像/快照/.env/raw已清理，v0 ID/启动/restarts未变；无当前资源或子agent。旧R1原文不变、Gate2仍未批准。
 
 ### Plan9与P10新进度（不是独立实现Review）
 
-用户同意后先Checklist12（10通过/2Tasks未评，无阻断）再拆T31/T32；Analyze13于private-candidate-045全12项通过（Anthropic Claude，12:00:38～12:09:43，自然exit0），允许仅这两任务实施。桥仍在已证实的接入不可用状态，本轮实际Anthropic，原文见 Plan9-R12（非公开历史记录） 和 `Plan9-R13/`。
+用户同意后先Checklist12（10通过/2Tasks未评，无阻断）再拆T31/T32；Analyze13于private-candidate-045全12项通过（Anthropic Claude，12:00:38～12:09:43，自然exit0），允许仅这两任务实施。桥仍在既有接入不可用证据，本轮实际Anthropic，原文见 [公开验证摘要](../../docs/verification.md)（详细原件非公开） 和 非公开 Plan9-R13 阶段记录。
 
-P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import（12:12:32～12:21:09，exit0），原六SQL不变，显式cursor上下文/128批次/短读事务与保存点；四测试11参数项。主会话本机完整369 passed/54 skipped/1原有警告，423 collected；随后T32新候选 **private-candidate-047** 在NAS Python3.12.15/PG17.4 **423 passed/0 failed/0 skipped/1原有警告，59.66秒**，54个db项全部实际执行。原完整423不是沿用A4旧412；实现/真库回归完成，待独立R2。代码/本机证据 P10-T31（非公开历史记录）。
+P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import（12:12:32～12:21:09，exit0），原六SQL不变，显式cursor上下文/128批次/短读事务与保存点；四测试11参数项。主会话本机完整369 passed/54 skipped/1原有警告，423 collected；随后T32新候选 **private-candidate-047** 在NAS Python3.12.15/PG17.4 **423 passed/0 failed/0 skipped/1原有警告，59.66秒**，54个db项全部实际执行。原完整423不是沿用A4旧412；实现/真库回归完成，待独立R2。代码/本机证据 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。
 
 | T32数据/规模 | 首轮/重导RSS峰值 | 首轮/重导cgroup峰值 |
 |---|---|---|
@@ -124,13 +127,13 @@ P10 openai/gpt-6-astra已在private-candidate-046上仅改importer/test_import�
 
 每点真实PG二次加载，ID/basis/事实摘要/history稳定、事实全复用、变化零；varied还核独立像素尺寸/宽度和。微型TIFF/国图JSON、HTTP外替身、材料btrfs非tmpfs，仅合成非真实吞吐/健康/并发证明。原S0探针不改、数据文本大小相同，进程峰值143.17→109.02MiB，证明游标有改善，不是S0对象独占大小或完整阶段归因。
 
-**T32按事先放大条件停止，P1未闭。** 两种36k RSS投影532.8164/586.5352MiB均未满足≤480MiB（留32MiB、只作合成放大操作门槛，非新增AC）；未创建36k库/容器、未做全量/未发生OOM。没有继续实现新架构或发R2冲通过；用户本轮已同意T33受限内存归因/方案评估，当前仅诊断，不授权新业务实现、不擅改plan9。完整源/数据/命令/判据与清理见 **T32-A1 README（非公开历史记录）**。五API容器die0，PG/卷/网络/镜像/快照/.env/raw全部清理，v0未重启，无后台agent。
+**T32按事先放大条件停止，P1未闭。** 两种36k RSS投影532.8164/586.5352MiB均未满足≤480MiB（留32MiB、只作合成放大操作门槛，非新增AC）；未创建36k库/容器、未做全量/未发生OOM。没有继续实现新架构或发R2冲通过；用户本轮已同意T33受限内存归因/方案评估，当前仅诊断，不授权新业务实现、不擅改plan9。完整源/数据/命令/判据与清理见 **[公开验证摘要](../../docs/verification.md)（详细原件非公开）**。五API容器die0，PG/卷/网络/镜像/快照/.env/raw全部清理，v0未重启，无后台agent。
 
 ### T33诊断与候选（不是独立实现Review）
 
 用户批准后P11只读Astra源码分析与主会话受限原代码诊断返回；完整报告 **memory-diagnosis.md**。对照6k varied160.48MiB、阶段hook160.99但耗时3.63倍，图观察器seen约33MiB额外，不当生产峰值。主要增长身份133.15→image行153.26→compute155.84，history/report至160.99；数据图71.677MiB、dict44.670、两状态四类image外层25.269。共享去重子集：S0根独占21.136、policy循环4.108，都是容量不是实际释放；循环普通路径持续到report自然GC。所有不变量/清理已留证，无业务/冻结计划改动。
 
-A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥已证实的接入不可用状态未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 T33-A1（非公开历史记录）、`analysis/P11-T33/`、`review/T33-diagnostic-check-R1/`；该校读不是CodeReview-R2/Plan10或实施许可；用户本轮现已同意A为主/C独立任务进入Plan10独立核对后实施，Checklist14无阻断后T34～36已拆、独立Analyze15全12项通过允许范围内实施，P12/P13已C/A串行实现且主会话完整本机387通过/55skip/1原有警告（442项），T36候选private-candidate-056已全442真PG通过/0skip，原限额36k差异化首轮/重导成功，cgroup触512含缓存/exit0无OOM，实测RSS341.98/435.05MiB；现准备CodeReview-R2判问题关闭，未Gate2；P1仍开/R2/Gate2未过。
+A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放无法降低已发生的compute峰，B宽触及面更大暂缓。A理想tuple载荷替换的36k容量上界105.47MiB未扣wrapper/索引/转换，不是RSS收益或预算通过，尚未批准新设计/实施。独立Anthropic Claude诊断口径校读（17:52:47～18:07:10，审private-candidate-050，exit0，桥既有接入不可用证据未调用）认为补两处限定后可交用户方向选择：GC回收时点不固定、A理想容量与缺口同量级余量薄。已补明并公开内部可写映射测试契约须新设计登记；原文按哈希归档，不改结论。证据 [公开验证摘要](../../docs/verification.md)（详细原件非公开）、非公开档案中的 analysis/P11-T33/ 阶段记录、非公开档案中的 review/T33-diagnostic-check-R1/ 阶段记录；该校读不是CodeReview-R2/Plan10或实施许可；用户本轮现已同意A为主/C独立任务进入Plan10独立核对后实施，Checklist14无阻断后T34～36已拆、独立Analyze15全12项通过允许范围内实施，P12/P13已C/A串行实现且主会话完整本机387通过/55skip/1原有警告（442项），T36候选private-candidate-056已全442真PG通过/0skip，原限额36k差异化首轮/重导成功，cgroup触512含缓存/exit0无OOM，实测RSS341.98/435.05MiB；现准备CodeReview-R2判问题关闭，未Gate2；P1仍开/R2/Gate2未过。
 
 ### Plan10 A+C候选T36实际证据（准备独立CodeReview-R2）
 
@@ -138,7 +141,7 @@ A紧凑私有状态主候选、C小生命周期独立辅选；B窄尾段释放�
 
 候选 **private-candidate-056**：本机387通过/55skip/1原警告（442项），NAS Python3.12.15/PG17.4 **442 passed/0 failed/0 skipped/1原有警告，64.37秒**，55db实际。无hook校准same2k/6k重导RSS97.09/135.48MiB，varied6k140.55；旧门槛两投影423.4141/465.3008MiB≤480后才实测 **36k差异化影像/6000写卷**。首轮 **RSS341.98MiB/343.115秒**，真PG重导 **RSS435.05MiB/307.414秒**，36k facts复用、ID/basis/facts摘要/history42000保持、变化零。原S0探针6k后102.34MiB、JSON文本大小不变。
 
-cgroup峰值**达到512MiB硬限**（材料/页缓存在内），两轮exit0无OOM；不能用435RSS推断容器总量有77MiB余量，不证明实际材料/长路径/复杂派生/并发API。HTTP健康是外部替身，实际连续v0/吞吐仍T26。**间接依赖漂移**：未改显式依赖/镜像源头，本次pip解析opentelemetry-api1.45.2，旧1.45.1，已单列不可称完全同解析环境；Starlette/httpx和原警告没改。完整证明/脚本/原精度JSONL/命令/限额与清理见 **T36-A1 README（非公开历史记录）**。
+cgroup峰值**达到512MiB硬限**（材料/页缓存在内），两轮exit0无OOM；不能用435RSS推断容器总量有77MiB余量，不证明实际材料/长路径/复杂派生/并发API。HTTP健康是外部替身，实际连续v0/吞吐仍T26。**间接依赖漂移**：未改显式依赖/镜像源头，本次pip解析opentelemetry-api1.45.2，旧1.45.1，已单列不可称完全同解析环境；Starlette/httpx和原警告没改。完整证明/脚本/原精度JSONL/命令/限额与清理见 **[公开验证摘要](../../docs/verification.md)（详细原件非公开）**。
 
 六个API/测试/探针、全部临时库/PG卷/网络/镜像/隔离快照/脚本/.env/raw已清理，v0 ID/启动/restarts未变。**现仅具备主会话软件Converge候选证据，P1/CR1-02/05关闭及残余风险交独立R2判断，不由本报告改写R1结论。Gate2未批准，不合并/部署。**
 

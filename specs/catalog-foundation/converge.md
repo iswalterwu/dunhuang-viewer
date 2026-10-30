@@ -1,5 +1,8 @@
 # catalog-foundation — Converge 实现核对
 
+> 公开隐私修订，原件非公开保全，不是逐字原文。仅隐私表述、候选别名与公开链接修订；需求ID、AC、领域/许可/安全语义及原审核勾选、数字、结论保持。旧候选别名不是可用于Git的公开版本指针；证据边界见[公开验证摘要](../../docs/verification.md)。
+> 下列“当前”均指相应旧软件阶段，不把当时收敛结论扩展到本轮隐私代码、配置或历史处理；本轮进度由 `public-release-privacy` 主会话维护。
+
 ## 2026-10-30 N1修复（软件收敛，独立R3通过，Gate2已批）
 
 原Gate2批准后，用户已明确保持Public并要求全面隐私脱敏，D-019取代私有可见性要求。Handoff/合并等待public-release-privacy的规格批准/实施/验证与历史处置授权；当前仅本机盘点与草案、未批量脱敏。下列旧软件证据不变，不代未来隐私代码修改、部署或真实材料验收通过。
@@ -9,7 +12,7 @@
 - 新测试test_identifier_basis_upgrade_preserves_tenure_and_s0（有/无id两参数）核current/pending/NLC多来源、深值/引用不污染与真正路径/来源/主号变化；旧源码独立反事实2失败/48通过/29skip，since_run1→3/丢id，原输出保留。
 - 新真PG test_identifier_basis_upgrade_keeps_database_rows_and_history核id/起止、全部字段/作者/时间、新旧history与同版本零新增，用xmin确认变化依据真正UPDATE、历史/未变编号不无条件UPDATE；真实HTTP test_identifier_basis_upgrade_detail_resolve_and_history核resolve/detail/旧新历史/无变化后续批次。
 - A1/private-candidate-061为445通过/1新增HTTP元数据期望失败/0skip；原API requested_run应随请求变化，P15仅修新断言一行且完整快照/run_id/basis比较不减。所有旧测试函数AST未改、其余生产AST未改、UTF8LF/3.12 AST/diff通过；静态AST不冒充目标运行。
-- **A2/private-candidate-063：Python3.12.15/PG17.4完整446 passed/0 failed/0 skipped/1原有警告，73.22秒，57db实际**。包含所有旧回归及新PG/HTTP。临时资源/凭据已全清理、v0未重启；证据在 P14-T37（非公开历史记录）、`P15-T38/` 与 `logs/T38-A1/`、`T38-A2/`。
+- **A2/private-candidate-063：Python3.12.15/PG17.4完整446 passed/0 failed/0 skipped/1原有警告，73.22秒，57db实际**。包含所有旧回归及新PG/HTTP。临时资源/凭据已全清理、v0未重启；证据在 [公开验证摘要](../../docs/verification.md)（详细原件非公开）、非公开 P15-T38 阶段记录 与 非公开档案中的 logs/T38-A1/ 阶段记录、非公开 T38-A2 阶段记录。
 - 对应AC-004-5/AC-011-2/AC-013-1/AC-013-3等既有契约，无需求/冻结设计变化。主会话软件核对后，**独立R3已软件通过、N1关闭**（审private-candidate-064/源码private-candidate-063，Anthropic Claude，10:47:51～11:00:57 （原始时刻；时区非公开）、exit0），原文在CodeReview-R3归档，不代用户Gate2。
 - 本轮未新36k或规则升级足规模。旧T36/private-candidate-056的足规模证据仅直接覆盖旧候选；R3已据两个函数差异判旧T36支持新候选首轮/同版本无变化重导、不要求本轮再36k；不能把446小规模集成全绿当新全量资源实测。规则升级足规模仍未验。同号但路径/来源/主号来源变化的记录仍可能同号historical，属既有边界而非本轮回归，Handoff文档注明、改语义须先Clarify。真实材料/并发/连续v0健康/耗时/P95/正式挂载等仍T25/T26，feature保持in-progress，未merge/部署/真实导入。
 
@@ -22,11 +25,11 @@
 
 已完整核对 catalog 的配置/CLI、扫描事实、单元、编号、影像/写卷身份、规则、国图、派生、v0 边界、导入/持久化/报告、API、迁移与运行配置，并核对对应测试的实际断言。v0 源码及根镜像/compose/依赖与 main 无差异；未接入公网、未新增目录写接口、取消/回滚 API 或 CLI 导入。
 
-- 旧候选 `private-candidate-035`：T-24 A2 真库/Python 3.12.15 为 402 passed / 0 skipped / 1 原有警告，证据在 T24-A2（非公开历史记录）。该结果不覆盖本次新增 C1 回归。
+- 旧候选 `private-candidate-035`：T-24 A2 真库/Python 3.12.15 为 402 passed / 0 skipped / 1 原有警告，证据在 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。该结果不覆盖本次新增 C1 回归。
 - P7 修复后主会话本机：362 passed / 42 db skipped / 1 原有警告（404 collected）；本机 Python 3.14.2，不能冒充 Python 3.12/SQL 新证据。源输出归档随 P7 记录。
-- 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 T24-A3（非公开历史记录），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
-- 新候选A4：private-candidate-042的 **412 passed/0 skipped/1原有警告，46.08秒**，43个db项实际执行。2k/6k真实PG二次加载/重导等价通过，但资源目标尚未完成；无36k实测。源码/探针/结果/清理见 T28-scale-A4（非公开历史记录），先读README。所有临时资源/凭据已清理、v0 ID/启动/restarts未变。
-- 最新T32-A1：候选private-candidate-047在NAS **423 passed/0 skipped/1警告，59.66秒**，54db全执行；游标/外事务/两异常路径的新11项实际通过。2k/6k/差异6k真库等价与S0定位通过，但未满足放大条件，未36k；资源全清理，v0不变。证据 T32-A1（非公开历史记录）。
+- 新候选 A3：private-candidate-038 的404项全部通过、0跳过，含两条新增C1回归与全部42个db项；API实际cgroup memory=memsw=536870912、DB384m；Compose合成config -q通过；证据 [公开验证摘要](../../docs/verification.md)（详细原件非公开），临时库/容器/卷/网络/镜像/快照/凭据均已清理，v0未改动或重启。
+- 新候选A4：private-candidate-042的 **412 passed/0 skipped/1原有警告，46.08秒**，43个db项实际执行。2k/6k真实PG二次加载/重导等价通过，但资源目标尚未完成；无36k实测。源码/探针/结果/清理见 [公开验证摘要](../../docs/verification.md)（详细原件非公开），先读README。所有临时资源/凭据已清理、v0 ID/启动/restarts未变。
+- 最新T32-A1：候选private-candidate-047在NAS **423 passed/0 skipped/1警告，59.66秒**，54db全执行；游标/外事务/两异常路径的新11项实际通过。2k/6k/差异6k真库等价与S0定位通过，但未满足放大条件，未36k；资源全清理，v0不变。证据 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。
 - 表中 **S**：源码与真实合成文件/数据库测试具有实现、断言及可复现路径，新版本已由T36-A1全套复验；**S+N**：软件路径已核对，但真实材料/服务/性能还须 T-25/T-26；**N**：AC 核心结论仅部署后可证明。
 - S 不表示学术认定、生产配置或全部 AC 已验收。T-25/T-26 未获许可；没有因此启动正式服务或扫描真实材料。
 
@@ -123,7 +126,7 @@ Plan10最新候选private-candidate-056在T36-A1全442 passed/0 skipped/1原有�
 
 R1实际审阅private-candidate-039。首选claude-bridge因接入不可用exit=1、无结论；回退同Claude模型经Anthropic API正常exit=0，报告「需修复后重审」。CR1-01为P1，主会话又用2000/6000影像、每卷6个微型PSB头的真实计算流程复测，约23KiB/影像首轮、30KiB/影像重导；36k含基线线性估算865.5/1111.4MiB（Windows/Py3.14，不是NAS实测），明确高于512MiB。其他确认的小缺口为撤销候选状态语义和冲突说明；未证实/低概率CR1-03/04留真实材料核查，不擅自改规则。
 
-完整独立原文/范围在review.md与 CodeReview-R1（非公开历史记录）。用户批准后P8/P9已最小复用及修两处小缺口，源码/本机结果在 R1-fix-batch（非公开历史记录）；新候选private-candidate-042在A4/NAS/3.12/真PG全412项通过，不沿用旧404。
+完整独立原文/范围在review.md与 [公开验证摘要](../../docs/verification.md)（详细原件非公开）。用户批准后P8/P9已最小复用及修两处小缺口，源码/本机结果在 [公开验证摘要](../../docs/verification.md)（详细原件非公开）；新候选private-candidate-042在A4/NAS/3.12/真PG全412项通过，不沿用旧404。
 
 真实PG prepare/execute两次：2k首轮/重导RSS94.72/109.96MiB，6k133.24/175.71MiB；第二次全部事实复用、ID/basis摘要/history不变、变化为零。TIFF属性高度同质、仅外部HTTP替身，非真实材料吞吐/并发API/连续v0健康。两点RSS斜率16.832KiB/影像，36k线性约668.83MiB，不是全量实测/OOM；cgroup有可回收页缓存，不能当匿名内存外推。
 

@@ -153,9 +153,10 @@ def test_channel_is_specific_event(roots, make_image):
     make_image(roots["data"] / "敦煌003/P2002/1.tif")
     make_image(roots["data"] / "中国国博馆藏/BD00001/1.tif")
     files = {file.relative_path.parts[0]: file for file in scan(roots).images}
+    assert RULE_VERSION == "2026-10-30.1"
     assert source_policy(files["敦煌003"], "BnF 原图").acquisition == "第三方资料接收（接收事件 A）"
     assert source_policy(files["中国国博馆藏"], "国图 IDP 下载").acquisition == "IDP IIIF 下载（2026-10-21 起）"
-    assert "本地生成" in source_policy(files["敦煌003"], "本地合成").acquisition
+    assert source_policy(files["敦煌003"], "本地合成").acquisition == "本地生成（2026-10-21 脚本或拼接工作台）"
 
 
 def test_every_item_has_provenance():

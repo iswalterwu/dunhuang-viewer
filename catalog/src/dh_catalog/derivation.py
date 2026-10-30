@@ -7,7 +7,7 @@
 import json
 import re
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Literal, TextIO
@@ -89,7 +89,9 @@ class _Operation:
     raw: str
 
 
-def resolve_derivations(cache_dir: Path, images: Sequence[FileEntry]) -> DerivationResult:
+def resolve_derivations(
+    cache_dir: Path, images: Sequence[FileEntry], *, record_roots: Mapping[str, str] | None = None,
+) -> DerivationResult:
     """images 来自 scan；返回最终来源、成功输出位置、异常与所有打开尝试。
 
     outputs 包含成功生成的已扫描文件，即使其来源无法确定；不包含已被替换、
@@ -97,7 +99,7 @@ def resolve_derivations(cache_dir: Path, images: Sequence[FileEntry]) -> Derivat
     必须全部可确定（不返回会误导许可继承的部分来源）。
     """
     result = DerivationResult()
-    operations = _read_records(cache_dir.absolute(), result)
+    operations = _read_records(cache_dir.absolute(), result, record_roots=record_roots)
     _resolve_operations(operations, images, result)
     return result
 
@@ -111,7 +113,9 @@ def open_cache_record(cache_dir: Path, name: str, opened_paths: list[Path]) -> T
     return path.open("r", encoding="utf-8-sig")
 
 
-def _read_records(cache_dir: Path, result: DerivationResult) -> list[_Operation]:
+def _read_records(
+    cache_dir: Path, result: DerivationResult, *, record_roots: Mapping[str, str] | None = None,
+) -> list[_Operation]:
     operations = []
     for name in CACHE_FILES:
         try:
@@ -120,7 +124,7 @@ def _read_records(cache_dir: Path, result: DerivationResult) -> list[_Operation]
                     _validate_plan(json.load(stream), name)
                 elif name.endswith(".log"):
                     # 每个文件解析完再加入，解码 / 读取失败不留下半份证据。
-                    parsed, issues = _parse_log(stream, name)
+                    parsed, issues = _parse_log(stream, name, record_roots=record_roots)
                     operations.extend(parsed)
                     result.issues.extend(issues)
                 else:
@@ -156,11 +160,10 @@ def _validate_plan(value: object, name: str) -> None:
                 raise ValueError(f"{key}[{index}] 的 merged / move 格式错误")
 
 
-def _record_path(text: str) -> Location:
+def _record_path(text: str, *, record_roots: Mapping[str, str] | None = None) -> Location:
     """日志路径仅转为清单键，不交给文件系统。"""
     root: RootName = "data"
-    for prefix, label in (("/data/", "data"), ("/backup/", "backup"),
-                          ("/srv/example/data/", "data"), ("/srv/example/backup/", "backup")):
+    for label, prefix in (("data", "/data/"), ("backup", "/backup/"), *(record_roots or {}).items()):
         if text.startswith(prefix):
             text, root = text[len(prefix):], label
             break
@@ -170,7 +173,9 @@ def _record_path(text: str) -> Location:
     return root, path
 
 
-def _parse_log(stream: TextIO, name: str) -> tuple[list[_Operation], list[DerivationIssue]]:
+def _parse_log(
+    stream: TextIO, name: str, *, record_roots: Mapping[str, str] | None = None,
+) -> tuple[list[_Operation], list[DerivationIssue]]:
     operations, issues = [], []
     method: Method = "拼接" if name.startswith("merge_") else "PSB 转换"
     block = None
@@ -192,7 +197,7 @@ def _parse_log(stream: TextIO, name: str) -> tuple[list[_Operation], list[Deriva
                     raise ValueError("无效操作时间")
                 if action == "转换" and " / " in location:
                     location, block.psb_name = location.rsplit(" / ", 1)
-                block.directory = _record_path(location)[1]
+                block.directory = _record_path(location, record_roots=record_roots)[1]
             except ValueError as error:
                 block.error = str(error)
             continue
@@ -203,19 +208,19 @@ def _parse_log(stream: TextIO, name: str) -> tuple[list[_Operation], list[Deriva
         try:
             if text.startswith("PSBNAME:"):
                 block.psb_name = text.removeprefix("PSBNAME:").strip()
-                if len(_record_path(block.psb_name)[1].parts) != 1:
+                if len(_record_path(block.psb_name, record_roots=record_roots)[1].parts) != 1:
                     raise ValueError("PSBNAME 应为文件名")
             if count:
                 block.count = int(count.group(1) or count.group(2))
             piece = PIECE.match(text)
             if piece:
                 piece_name = piece.group(1)
-                if len(_record_path(piece_name)[1].parts) != 1:
+                if len(_record_path(piece_name, record_roots=record_roots)[1].parts) != 1:
                     raise ValueError("分片应为文件名")
                 block.names.append(piece_name)
             complete = COMPLETION.match(text)
             if complete and ((block.method == "拼接") == (complete.group(1) == "完成")):
-                block.output = _record_path(complete.group(2))
+                block.output = _record_path(complete.group(2), record_roots=record_roots)
                 block.completion_line, block.completion_raw = number, text
             if text == "已替换合并长卷.tif":
                 if block.method != "PSB 转换" or block.output is None:

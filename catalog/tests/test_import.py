@@ -25,6 +25,7 @@ from psycopg.types.json import Jsonb
 
 from dh_catalog import importer, rules
 from dh_catalog._compact import CompactMap
+from dh_catalog.config import load_settings
 from dh_catalog.db import ImportBusy, create_pool
 from dh_catalog.derivation import CACHE_FILES
 from dh_catalog.importer import (
@@ -43,6 +44,24 @@ def cache(tmp_path):
         key = {"seg_move_plan.json": "plan", "samefolder_plan.json": "has_merged", "validated_moves.json": "moves"}.get(name)
         (path / name).write_text(json.dumps({key: []}) if key else "", encoding="utf-8")
     return path
+
+
+@pytest.fixture
+def host_records(roots, cache, make_image):
+    """Synthetic legacy paths are record text only, distinct from the temporary scan roots."""
+    directory = "敦煌003/P2002"
+    make_image(roots["data"] / directory / "合并长卷.tif")
+    make_image(roots["backup"] / directory / "分段/native.tif")
+    make_image(roots["backup"] / directory / "分段/processed.tif", software="Photoshop synthetic")
+    (cache / "merge_all.log").write_text(
+        f"===== 10:00:00 开始: /srv/legacy/segments/{directory}/分段 =====\n"
+        "分片 2 个\nnative.tif x0= 0 w= 7\nprocessed.tif x0= 0 w= 7\n"
+        f"完成: /srv/legacy/images/{directory}/合并长卷.tif  14 x 5\n退出码: 0\n",
+        encoding="utf-8",
+    )
+    return {"DH_RECORD_DATA_ROOT": " /srv/legacy/images ",
+            "DH_RECORD_BACKUP_ROOT": "/srv/legacy/segments/",
+            "DH_V0_ENV_FILE": str(cache / "absent.env")}
 
 
 def _manifest(number="BD12345", entry="synthetic-entry"):
@@ -165,6 +184,32 @@ def test_derivation_license_and_unknown_source_not_inherited_from_old_state(root
     assert second.images[output["id"]]["license"] == "未知"
     assert not second.derivations
     assert "派生来源不明" in {a["category"] for a in second.anomalies}
+
+
+def test_configured_record_roots_reach_computation_and_strictest_license(roots, cache, host_records):
+    settings = load_settings(host_records)
+    unknown = _compute(roots, cache)
+    output = next(row for row in unknown.images.values() if row["lineage"] == "本地合成")
+    assert output["license"] == rules.UNKNOWN_LICENSE and not unknown.derivations
+    assert any("不是 data / backup" in issue.reason for issue in unknown.derivation.issues)
+    known = compute_import(roots, cache, run_id=2, previous=_state(unknown),
+                           attachment_sink=lambda file, raw: uuid4(), record_roots=settings.record_roots)
+    assert set(known.images) == set(unknown.images) and set(known.items) == set(unknown.items)
+    after = known.images[output["id"]]
+    assert len(known.derivations) == 2 and not known.derivation.issues
+    sources = [row for row in known.images.values() if row["root"] == "backup"]
+    assert {row["license"] for row in sources} == {rules.GALLICA_LICENSE, rules.PROCESSED_LICENSE}
+    assert after["license"] == rules.PROCESSED_LICENSE and after["display_policy"] == "仅供研究使用"
+    assert after["external_policy"] == "不对外" and after["collection"] == "法国国家图书馆"
+    assert after["attribution"] == "Source gallica.bnf.fr / BnF"
+    assert after["acquisition"] == rules.LOCAL_EVENT
+    assert {row["acquisition"] for row in sources} == {"第三方资料接收（接收事件 A）"}
+    assert after["field_basis"]["license"]["source_images"] == sorted(str(row["id"]) for row in sources)
+    assert {edge["source_image_id"] for edge in known.derivations.values()} == {row["id"] for row in sources}
+    assert all(edge["image_id"] == output["id"] and edge["method"] == "拼接"
+               and edge["evidence_file"] == "merge_all.log" and edge["evidence_line"] == 5
+               for edge in known.derivations.values())
+    assert output["license"] == rules.UNKNOWN_LICENSE  # Previous computation remains unchanged.
 
 
 @contextmanager
@@ -883,6 +928,83 @@ def import_runner(connection, test_database_url, roots, cache):
             prepared = prepare()
             return prepared.run_id, prepared.execute(roots, cache)
         yield run, prepare, payload
+
+
+@pytest.mark.db
+def test_prepared_import_passes_record_roots_and_preserves_history(connection, import_runner, roots, cache, host_records):
+    run, prepare, _ = import_runner
+    first, _ = run()  # Omitted parameter remains compatible; no implicit host prefix.
+    output = connection.execute("SELECT * FROM image WHERE lineage='本地合成'").fetchone()
+    past = value_at_run(connection, "image", output["id"], first)
+    assert output["license"] == rules.UNKNOWN_LICENSE
+    assert connection.execute("SELECT count(*) AS n FROM derivation").fetchone()["n"] == 0
+    settings = load_settings(host_records)
+    prepared = prepare()
+    report = prepared.execute(roots, cache, record_roots=settings.record_roots)
+    assert read_report(connection, prepared.run_id)["status"] == "succeeded"
+    assert report["counts"]["outputs_with_derivation"] == 1
+    after = connection.execute("SELECT * FROM image WHERE id=%s", (output["id"],)).fetchone()
+    assert after["license"] == rules.PROCESSED_LICENSE
+    assert after["display_policy"] == "仅供研究使用" and after["external_policy"] == "不对外"
+    edges = list(connection.execute("SELECT * FROM derivation"))
+    assert len(edges) == 2 and all(edge["image_id"] == output["id"] for edge in edges)
+    assert {row["id"] for row in connection.execute("SELECT id FROM image WHERE root='backup'")} == {
+        edge["source_image_id"] for edge in edges}
+    current = value_at_run(connection, "image", output["id"], prepared.run_id)
+    assert current["snapshot"]["license"] == rules.PROCESSED_LICENSE
+    assert current["run_id"] == prepared.run_id
+    assert value_at_run(connection, "image", output["id"], first) == past
+    third, _ = run()
+    assert connection.execute("SELECT count(*) AS n FROM derivation").fetchone()["n"] == 0
+    assert value_at_run(connection, "image", output["id"], third)["snapshot"]["license"] == rules.UNKNOWN_LICENSE
+    assert value_at_run(connection, "image", output["id"], prepared.run_id) == current
+    assert value_at_run(connection, "image", output["id"], first) == past
+
+
+@pytest.mark.db
+def test_public_event_upgrade_appends_history_without_changing_identifier_tenure(
+    connection, import_runner, roots, make_image,
+):
+    run, _, _ = import_runner
+    make_image(roots["data"] / "敦煌003/P2002/native.tif")
+    version, event = rules.RULE_VERSION, rules.TRANSFER_EVENT
+    try:
+        # Synthetic prior deployment configuration, never the private historical label.
+        rules.RULE_VERSION = "synthetic-previous-version"
+        rules.TRANSFER_EVENT = "第三方资料接收（合成旧事件）"
+        first, _ = run()
+    finally:
+        rules.RULE_VERSION, rules.TRANSFER_EVENT = version, event
+    old_run = read_report(connection, first)
+    image = connection.execute("SELECT * FROM image").fetchone()
+    item = connection.execute("SELECT * FROM item").fetchone()
+    identifier = connection.execute("SELECT * FROM identifier").fetchone()
+    history = list(connection.execute("SELECT * FROM history ORDER BY object_kind, object_id, run_id"))
+    second, _ = run()
+    assert read_report(connection, first) == old_run
+    assert old_run["rule_version"] == "synthetic-previous-version"
+    assert read_report(connection, second)["rule_version"] == "2026-10-30.1"
+    after = connection.execute("SELECT * FROM image").fetchone()
+    assert after["id"] == image["id"] and after["acquisition"] == "第三方资料接收（接收事件 A）"
+    for name in ("facts", "lineage", "collection", "license", "attribution", "display_policy", "external_policy"):
+        assert after[name] == image[name]
+    assert after["field_basis"]["acquisition"]["author"].endswith("@2026-10-30.1")
+    assert after["field_basis"]["acquisition"]["run"] == second
+    assert connection.execute("SELECT id FROM item").fetchone()["id"] == item["id"]
+    current_identifier = connection.execute("SELECT * FROM identifier").fetchone()
+    assert current_identifier == dict(identifier, field_basis=current_identifier["field_basis"])
+    assert list(connection.execute("SELECT * FROM history WHERE run_id=%s ORDER BY object_kind, object_id, run_id",
+                                   (first,))) == history
+    old_image = value_at_run(connection, "image", image["id"], first)
+    assert old_image["snapshot"]["acquisition"] == "第三方资料接收（合成旧事件）"
+    assert old_image["field_basis"]["acquisition"]["author"].endswith("@synthetic-previous-version")
+    new_history = list(connection.execute("SELECT * FROM history ORDER BY object_kind, object_id, run_id"))
+    assert len(new_history) == len(history) + 2
+    third, report = run()
+    assert not any(report["counts"]["changes"]["images"].values())
+    assert report["counts"]["changes"]["items"] == {"new": 0, "changed": 0}
+    assert list(connection.execute("SELECT * FROM history ORDER BY object_kind, object_id, run_id")) == new_history
+    assert value_at_run(connection, "image", image["id"], third)["run_id"] == second
 
 
 @pytest.mark.db

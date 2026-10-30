@@ -77,7 +77,9 @@ class PreparedImport:
         self._client = client
         self._finished = False
 
-    def execute(self, roots: Mapping[str, Path], cache_dir: Path) -> dict:
+    def execute(
+        self, roots: Mapping[str, Path], cache_dir: Path, *, record_roots: Mapping[str, str] | None = None,
+    ) -> dict:
         if self._finished:
             raise RuntimeError("批次已结束")
         monitor = None
@@ -89,7 +91,7 @@ class PreparedImport:
                 with self.connection.transaction():
                     previous = load_catalog_state(self.connection)
                     result = compute_import(
-                        roots, cache_dir, run_id=self.run_id, previous=previous,
+                        roots, cache_dir, run_id=self.run_id, previous=previous, record_roots=record_roots,
                         attachment_sink=lambda file, raw: _save_attachment(self.connection, self.run_id, file, raw),
                     )
                     persist_import(self.connection, self.run_id, previous, result)
@@ -201,7 +203,7 @@ def _state_cursor(connection, query):
 def compute_import(
     roots: Mapping[str, Path], cache_dir: Path, *, run_id: int,
     attachment_sink: Callable[[FileEntry, bytes], UUID], previous: CatalogState | None = None,
-    at: datetime | None = None,
+    at: datetime | None = None, record_roots: Mapping[str, str] | None = None,
 ) -> ImportComputation:
     """扫描 → 文件头 → 逐单元附件 / NLC → 派生 → 身份 → 规则 / 预备行。
 
@@ -215,7 +217,7 @@ def compute_import(
     readings = _read_images(inventory, roots, prior)
     attachments, nlc = _read_attachments(units, roots, attachment_sink)
     units.suggestions = _merge_suggestions(units.units)
-    derivation = resolve_derivations(cache_dir, inventory.images)
+    derivation = resolve_derivations(cache_dir, inventory.images, record_roots=record_roots)
     images = resolve_images([_image_state(row) for row in prior.images.values()], inventory.images, run_id, now)
     items = resolve_items(_item_states(prior), units.units, images.images)
     basis = _BasisPool(run_id, now)

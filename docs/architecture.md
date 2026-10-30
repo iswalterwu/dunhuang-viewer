@@ -1,5 +1,7 @@
 # dunhuang-viewer 系统架构（architecture.md）
 
+> 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
+
 > 与 `plan.md` 配套。本文档定义组件职责、ID 与缓存布局、图块管线、拼接工作台、认证、部署拓扑与内存安全红线。变更需同步 ADR。
 > 运行参数以 `docker-compose.yml`（环境变量）与代码默认值为准；本文只引用参数名，必要处注明 compose 当前值。
 > 本文描述 **v0**（现有查看器）。项目已确定前后端分离与选型（D-011、D-016），目标架构随各 feature 的 plan.md 逐步补充到本文；方向见 plan.md §6。
@@ -8,10 +10,9 @@
 
 ```
 浏览器（电脑 / 手机 / 平板）
-  │  局域网 http://192.0.2.10:8503 · Tailscale http://192.0.2.20:8503
-  │  如开放公网：部署方负责 HTTPS、可信代理头与登录墙
-  │       私人网关组件链、实例与端口非公开
-  │       （可选入口配置由部署方非公开管理，见 §9）
+  │  局域网 / Tailscale：由部署方提供访问地址
+  │  如开放公网：部署方负责 HTTPS 终结、可信代理头与登录墙
+  │  私人入口、代理拓扑及配置不属于公开部署实例，见 §9
   ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ dunhuang-viewer 容器（FastAPI + uvicorn :8000 → 宿主 :8503）       │
@@ -21,7 +22,7 @@
 └───────────────┬──────────────────────────────┬───────────────┘
                 │ /data（rw）                   │ /cache（rw）
                 ▼                               ▼
-     /srv/example/data（原始 TIFF）       /srv/example/cache
+     ${DH_HOST_DATA_DIR}（原始 TIFF）       ${DH_HOST_CACHE_DIR}
                 ▲ /data（ro）                   ▲ /cache（rw）
 ┌───────────────┴──────────────────────────────┴───────────────┐
 │ pyramid-builder 容器：全量 DZI（跑完退出，restart: on-failure）     │
@@ -55,7 +56,7 @@
 ### 3.1 原图目录约定
 
 ```
-/srv/example/data/
+${DH_HOST_DATA_DIR}/
 └── <分类>/                 # 一级目录 = 分类（@、#、. 开头的目录被忽略，含 #recycle、@eaDir）
     └── …/<卷目录>/          # 任意层级中含 TIFF 的目录 = 一卷；目录名即卷标题
         ├── 1.tif, 2.tif …   # 分段；扩展名 .tif/.tiff/.btf；纯数字文件名按数值排在最前
@@ -73,7 +74,7 @@
 - 同一映射在三处各实现一份，必须保持一致：`app.py`（`encode_id` / `file_hash` / `pyramid_files`）、
   `pyramid_worker.py`（`encode_id` / `file_hash` / `pyramid_paths`）、`stitch_apply.py`（内联）
 
-### 3.3 缓存布局（`/srv/example/cache`，容器内 `/cache`）
+### 3.3 缓存布局（`${DH_HOST_CACHE_DIR}`，容器内 `/cache`）
 
 ```
 cache/
@@ -188,21 +189,21 @@ cache/
 | `pyramid-builder` | on-failure | 1536m | ro | `python -u pyramid_worker.py`；跑完正常退出不再重启 |
 | `pyramid-huge` | on-failure | 2304m | ro | 同上 + `PROCESS_DEFERRED=1` |
 
-- **镜像**：`python:3.12-slim` + `libvips42`；apt / pip 软件源镜像用于构建网络兼容，不表示私人主机联网状态
-- **开机**：由部署方安装的 `auto_huge_boot.sh` **拷贝**拉起 `auto_huge_daemon.sh`，安装位置非公开
+- **镜像**：`python:3.12-slim` + `libvips42`；仓库 Dockerfile 的 apt / pip 镜像源选择不代表私人主机联网状态
+- **开机**：由部署方安装的 `auto_huge_boot.sh` **拷贝**拉起 `auto_huge_daemon.sh`，安装位置非公开配置
+- **显式宿主配置**：根 Compose 使用 `DH_HOST_DATA_DIR`、`DH_HOST_CACHE_DIR`、`DH_HOST_STATIC_DIR`；这三项是宿主挂载输入，不是容器内的 `DATA_DIR=/data`、`CACHE_DIR=/cache`。三个 shell 脚本均要求 `DH_DEPLOY_DIR`；访问 data/cache 的脚本还要求相应 `DH_HOST_DATA_DIR` / `DH_HOST_CACHE_DIR`，调用 stitch 时传为 `DATA_DIR` / `CACHE_DIR`。缺必要配置在任何动作前报错并非0退出，不能推断私人目录
 - **代码同步**（D-009）：本机工作副本 → `git push origin main`（GitHub）→ `git push nas main`（NAS 部署目录，updateInstead 直接更新工作区）
 - **生效方式**：`static/` 推送即生效；`app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 需在 NAS 上
-  `cd /srv/example/viewer && /usr/local/bin/docker-compose up -d --build dunhuang-viewer`（经用户确认；不带服务名会同时拉起两个生成器）
-- **运维入口**：文件操作角色与容器管理角色由部署方配置；可选公网入口配置非公开
-- **不在本仓库的运行配置**（改动不经 git，需手动同步，plan.md RK-07）：
-  - NAS `.env`：`AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` / `AUTH_SESSION_HOURS`（权限 600）
-  - 开机钩子：`auto_huge_boot.sh` 的拷贝，安装位置由部署方非公开配置
-  - 可选公网入口：部署方负责访问控制；私人网关实例、组件链及端口不公开
-  - 可选 HTTPS 入口：部署方负责 TLS 与可信 `Host`、`X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto`；具体网关配置非公开
+  `cd "${DH_DEPLOY_DIR:?必须配置部署目录}" && docker-compose up -d --build dunhuang-viewer`（经用户确认；不带服务名会同时拉起两个生成器；Docker/Compose 可执行路径由部署方确认）
+- **运维入口**：部署方非公开配置的文件操作角色与容器管理角色；本文 `nas` / `nasroot` 只是角色别名。访问、重建或重启仍须单独授权
+- **不在本仓库的运行配置**（需由获准操作者管理，plan.md RK-07）：
+  - 部署 `.env`：`AUTH_USER` / `AUTH_PASS` / `AUTH_SECRET` / `AUTH_SESSION_HOURS`（权限 600，不入库）
+  - 开机钩子：`auto_huge_boot.sh` 的拷贝及其显式宿主环境
+  - 可选公网入口：部署方负责 TLS、访问控制及可信代理头；具体域名、网络与网关拓扑不公开，不从本文推定任何主机已配置
 
 ## 10. 内存安全红线（D-005）
 
-背景：2026-10-18，对 4GB 单卷整卷解码，把 NAS 拖进交换；设备规格、容器数量与交换现场非公开。
+背景：历史事故中，对 4GB 单卷整卷解码使宿主陷入交换；私人设备规格、容器数量和现场状态非公开保全，事故事实与以下软件红线保留。
 
 | 层面 | 机制 | 参数 |
 |---|---|---|
@@ -219,5 +220,19 @@ cache/
 
 - **原图**：两个生成器只读挂载；查看器读写挂载，本仓库代码的唯一写入路径是拼接输出（D-008）；外部写入方见 plan.md §1.4
 - **凭证**：`.env`（权限 600，不入库）；用户表 `cache/users.json`（权限 600）
-- **公网**：开放公网须配置受控 HTTPS 入口；私人拓扑与端口现场非公开；登录墙 fail-open（§7）；请求头的信任前提见 §7 与 plan.md RK-03
+- **公网**：如开放公网，必须由部署方配置 HTTPS 与受控入口，不公开私人拓扑或现场端口状态；v0 登录墙仍为 fail-open（§7），请求头的信任前提见 §7 与 plan.md RK-03
 - **下载**：任何已登录用户都可经 `/file/{fid}` 下载 GB 级原图
+
+## 12. 目录服务隔离与公开配置契约（部署仍待验）
+
+目录服务是独立的 `dunhuang-catalog` Compose 项目：FastAPI API + PostgreSQL，不把目录接口并入 v0。原目录需求/计划与历史软件评审见 `specs/catalog-foundation/`；真实材料与正式服务验收尚未完成，历史合成结果见 [公开验证摘要](verification.md)。
+
+- `catalog-api` 512m、`catalog-db` 384m，memswap分别等于内存硬限；PG无宿主端口。API仅绑定显式 `CATALOG_LAN_IP` / `CATALOG_TAILSCALE_IP`，不接公网。
+- 宿主挂载输入 `DH_HOST_DATA_DIR` / `DH_HOST_BACKUP_DIR` / `DH_HOST_CACHE_DIR` / `DH_HOST_V0_ENV_FILE` 必填，分别只读挂载 `/data` / `/backup` / `/v0cache` / `/run/v0.env`；PG使用工作区外专用 `DH_HOST_PGDATA_DIR`。HOST输入不同于容器 `DH_DATA_DIR` / `DH_BACKUP_DIR`，不从记录前缀推断挂载位置。
+- Compose显式要求 `DH_V0_URL`。可选 `DH_V0_PUBLIC_URL` 从env_file进入配置入口，空值等同缺省并回退明确的前者，不用嵌套插值；开发 `load_settings` 后备仅 `http://localhost:8503`，不作为生产入口。
+- 共用v0会话与只读用户表，目录服务缺 `AUTH_SECRET` 拒绝所有请求；导入用触发者原会话访问v0，不另签会话。GET只读，唯一写入口是管理员POST导入；材料/cache不写、不全量遍历cache。
+- `DH_RECORD_DATA_ROOT` / `DH_RECORD_BACKUP_ROOT` 只配置旧执行记录中的POSIX字符串前缀。空时只识别 `/data/`、`/backup/` 与相对记录；配置后只将对应旧绝对记录转换为库存键，不访问该宿主路径，派生择最后成功及最严格许可继承不变。
+- 公开事件标签 `第三方资料接收（接收事件 A）` 不含私人日期；规则版本 `2026-10-30.1`，机构下载/本地派生标签保持。旧数据库和过去批次不被本轮文档修订改写。
+- 编号记录的 `historical` 表示完整记录历史，不保证编号值曾改变。N1修复只在值不变、仅依据变化时保留id/持有起点并更新依据；同号但来源/路径/主号来源变化仍可能历史化并重插。此既有语义如需改变，先Clarify/必要Gate1。
+
+未来部署只能从获准合并提交进行，并需另获容器操作许可。正式只读挂载/绑定/默认启动/v0认证，以及真实全量资源、耗时/P95与连续健康由T25/T26验收；不把旧446或36k结果称作本轮隐私候选新实测。

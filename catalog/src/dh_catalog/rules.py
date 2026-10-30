@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .scan import FileEntry, ReadResult, RootName
     from .units import Unit
 
-RULE_VERSION = "2026-10-28.1"
+RULE_VERSION = "2026-10-30.1"
 
 NLC_CATEGORY = "中国国博馆藏"
 BATCH_CATEGORIES = {

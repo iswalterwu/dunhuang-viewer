@@ -2,9 +2,14 @@
 """处理手动拼接输出队列：把 cache/stitch_out/*.tif 搬到卷目录，并加入图块重建队列。"""
 import glob, hashlib, base64, json, os, shutil, time
 
-OUT = '/srv/example/cache/stitch_out'
-DATA = '/srv/example/data'
-CACHE = '/srv/example/cache'
+# 宿主调用方显式传入路径；不使用容器路径或私人部署位置作为后备。
+DATA = os.environ.get('DATA_DIR')
+CACHE = os.environ.get('CACHE_DIR')
+if not DATA:
+    raise SystemExit('DATA_DIR must be configured')
+if not CACHE:
+    raise SystemExit('CACHE_DIR must be configured')
+OUT = os.path.join(CACHE, 'stitch_out')
 STATE = os.path.join(CACHE, 'pyramid_build_state.json')
 LOG = os.path.join(CACHE, 'stitch_apply.log')
 

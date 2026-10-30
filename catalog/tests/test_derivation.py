@@ -260,8 +260,8 @@ def test_unrecorded_output_and_move_plans_do_not_invent_derivations(cache, roots
     images = material(roots, make_image)
     rel = f"{DIRECTORY}/分段"
     plans = {
-        "seg_move_plan.json": {"plan": [{"src": f"/srv/example/data/{rel}",
-            "dst": f"/srv/example/backup/{rel}", "rel": rel, "segment_count": 2}], "skipped": []},
+        "seg_move_plan.json": {"plan": [{"src": f"/srv/legacy/images/{rel}",
+            "dst": f"/srv/legacy/segments/{rel}", "rel": rel, "segment_count": 2}], "skipped": []},
         "samefolder_plan.json": {"has_merged": [{"rel": DIRECTORY,
             "merged": {"name": "合并长卷.tif", "w": 14}, "move": [{"name": "1.tif"}]}],
             "sequence": [], "other": []},
@@ -311,9 +311,14 @@ def test_moved_output_resolves_only_at_backup_mirror(cache, roots, make_image):
     assert result.outputs == frozenset({("backup", PurePosixPath(FINAL))})
 
 
-def test_cache_access_is_exact_readonly_whitelist_without_directory_listing(cache, roots, make_image):
+@pytest.mark.parametrize("record_roots", [None, {"data": "/srv/legacy/images/", "backup": "/srv/legacy/segments/"}])
+def test_cache_access_is_exact_readonly_whitelist_without_directory_listing(cache, roots, make_image, record_roots):
     images = material(roots, make_image)
-    write_log(cache, "merge_all.log", stitch())
+    text = stitch()
+    if record_roots:
+        text = text.replace(f"开始: {DIRECTORY}", f"开始: /srv/legacy/segments/{DIRECTORY}")
+        text = text.replace("完成: /data/", "完成: /srv/legacy/images/")
+    write_log(cache, "merge_all.log", text)
     write_log(cache, "psb_convert.log", (
         "PSBNAME: 合成源.psb\nraw 完成: /cache/private.raw  1GB\n"
         "rm -rf /data\n退出码: 0\n"
@@ -329,9 +334,10 @@ def test_cache_access_is_exact_readonly_whitelist_without_directory_listing(cach
 
     sys.addaudithook(audit)
     try:
-        result = resolve_derivations(cache, images)
+        result = resolve_derivations(cache, images, record_roots=record_roots)
     finally:
         active = False
+    assert len(result.edges) == 2
     assert {event for event, _ in events} == {"open"}
     actual = [Path(args[0]) for _, args in events]
     names = (
@@ -357,6 +363,65 @@ def test_log_paths_are_data_not_files_to_open(cache, roots, make_image):
     images = material(roots, make_image)
     write_log(cache, "merge_all.log", stitch().replace(f"/data/{FINAL}", "/etc/unknown.tif"))
     result = resolve_derivations(cache, images)
+    assert not result.edges and not result.outputs
+    assert any("不是 data / backup" in issue.reason for issue in result.issues)
+
+
+@pytest.mark.parametrize("output_root", ["data", "backup"])
+@pytest.mark.parametrize("style", ["container", "host"])
+def test_record_prefixes_select_inventory_roots(cache, roots, make_image, output_root, style):
+    material(roots, make_image)
+    # Both locations exist, so an incorrect role cannot be hidden by backup fallback.
+    make_image(roots["backup"] / FINAL)
+    prefixes = ({"data": "/srv/legacy/images/", "backup": "/srv/legacy/segments/"}
+                if style == "host" else {"data": "/data/", "backup": "/backup/"})
+    text = stitch().replace(f"开始: {DIRECTORY}", f"开始: {prefixes['backup']}{DIRECTORY}")
+    text = text.replace(f"/data/{FINAL}", prefixes[output_root] + FINAL)
+    write_log(cache, "merge_all.log", text)
+    kwargs = {"record_roots": prefixes} if style == "host" else {}
+    result = resolve_derivations(cache, scan(roots).images, **kwargs)
+    assert len(result.edges) == 2
+    assert {edge.source.root for edge in result.edges} == {"backup"}
+    assert {edge.source.relative_path.name for edge in result.edges} == {"1.tif", "2.tif"}
+    assert all(edge.output.root == output_root and edge.output.relative_path == PurePosixPath(FINAL)
+               and edge.method == "拼接" and edge.evidence_line == 5 for edge in result.edges)
+    assert result.outputs == frozenset({(output_root, PurePosixPath(FINAL))})
+    issue, = result.issues
+    assert issue.root != output_root and issue.relative_path == PurePosixPath(FINAL)
+    assert "无可确认的成功输出记录" in issue.reason
+
+
+def test_relative_record_output_remains_supported(cache, roots, make_image):
+    images = material(roots, make_image)
+    write_log(cache, "merge_all.log", stitch().replace(f"/data/{FINAL}", FINAL))
+    result = resolve_derivations(cache, images)
+    assert len(result.edges) == 2 and not result.issues
+    assert result.outputs == frozenset({("data", PurePosixPath(FINAL))})
+
+
+@pytest.mark.parametrize("prefix", ["/srv/legacy/images/", "/srv/legacy/segments/", "/srv/legacy/images-other/"])
+def test_unknown_absolute_record_prefix_is_explicit_issue(cache, roots, make_image, prefix):
+    images = material(roots, make_image)
+    write_log(cache, "merge_all.log", stitch().replace(f"/data/{FINAL}", prefix + FINAL))
+    result = resolve_derivations(cache, images)
+    assert not result.edges and not result.outputs
+    assert any("不是 data / backup" in issue.reason and issue.evidence_file == "merge_all.log"
+               for issue in result.issues)
+
+
+@pytest.mark.parametrize("suffix", ["../outside.tif", "nested/../../outside.tif", "nested\\outside.tif"])
+def test_configured_record_root_preserves_path_rejection(cache, roots, make_image, suffix):
+    images = material(roots, make_image)
+    write_log(cache, "merge_all.log", stitch().replace(f"/data/{FINAL}", "/srv/legacy/images/" + suffix))
+    result = resolve_derivations(cache, images, record_roots={"data": "/srv/legacy/images/"})
+    assert not result.edges and not result.outputs
+    assert any("不是 data / backup" in issue.reason for issue in result.issues)
+
+
+def test_configured_root_does_not_match_neighboring_directory(cache, roots, make_image):
+    images = material(roots, make_image)
+    write_log(cache, "merge_all.log", stitch().replace(f"/data/{FINAL}", "/srv/legacy/images-other/" + FINAL))
+    result = resolve_derivations(cache, images, record_roots={"data": "/srv/legacy/images/"})
     assert not result.edges and not result.outputs
     assert any("不是 data / backup" in issue.reason for issue in result.issues)
 

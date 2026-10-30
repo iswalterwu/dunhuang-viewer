@@ -18,9 +18,10 @@ from fastapi.testclient import TestClient
 
 from dh_catalog import rules
 from dh_catalog.api import create_app
+from dh_catalog.config import load_settings
 from dh_catalog.importer import prepare_import
 from test_auth import _cookie, auth_files  # 共用合成认证输入，不替换认证实现。
-from test_import import _manifest, _seed_previous_identifier_basis, cache  # 共用合成白名单与旧部署输入。
+from test_import import _manifest, _seed_previous_identifier_basis, cache, host_records  # 共用合成白名单与旧部署输入。
 
 
 def _login(client, secret, username="owner"):
@@ -185,6 +186,44 @@ def test_auth_and_admin_import(api_db, connection, roots, make_image):
     _login(api.client, api.secret, "reader")
     assert api.client.get(f"/api/v1/imports/{run}").status_code == 200
     assert api.client.get("/api/v1/items").json()["total"] == 1
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("configured", [False, True])
+def test_background_import_uses_configured_record_roots(api_db, host_records, configured):
+    api = api_db
+    settings = load_settings(host_records)
+    if configured:
+        api.app.state.settings = replace(api.settings, record_roots=settings.record_roots)
+    else:
+        assert api.app.state.settings.record_roots == {}
+    response = api.client.post("/api/v1/imports")
+    assert response.status_code == 202
+    _join(api.app)
+    record = api.client.get(f"/api/v1/imports/{response.json()['id']}").json()
+    assert record["status"] == "succeeded"
+    assert record["rule_version"] == "2026-10-30.1"
+    assert record["report"]["counts"]["outputs_with_derivation"] == int(configured)
+    item = _item(api, "P2002")
+    output, = [row for row in item["images"] if row["lineage"] == "本地合成"]
+    sources = [row for row in item["images"] if row["root"] == "backup"]
+    assert len(sources) == 2 and item["display_policy"] == "仅供研究使用"
+    assert {row["acquisition"] for row in sources} == {"第三方资料接收（接收事件 A）"}
+    assert output["display_policy"] == "仅供研究使用" and output["external_policy"] == "不对外"
+    if configured:
+        assert output["license"] == rules.PROCESSED_LICENSE
+        assert {edge["source_image_id"] for edge in output["derivations"]} == {row["id"] for row in sources}
+        assert len(output["derivations"]) == 2
+        assert output["field_basis"]["license"]["source_images"] == sorted(row["id"] for row in sources)
+        assert all(edge["method"] == "拼接" and edge["evidence_file"] == "merge_all.log"
+                   and edge["evidence_line"] == 5 for edge in output["derivations"])
+    else:
+        assert output["license"] == rules.UNKNOWN_LICENSE and not output["derivations"]
+        assert any("不是 data / backup" in anomaly["description"] for anomaly in record["report"]["anomalies"])
+    history = api.client.get(f"/api/v1/images/{output['id']}/history", params={"run": record["id"]})
+    assert history.status_code == 200
+    assert history.json()["snapshot"]["license"] == output["license"]
+    assert history.json()["snapshot"]["derivations"] == output["derivations"]
 
 
 @pytest.mark.db

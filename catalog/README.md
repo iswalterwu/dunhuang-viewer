@@ -1,6 +1,8 @@
 # 目录服务（catalog-foundation）
 
-当前是开发中的独立后端。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，原软件Gate2已获用户批准；用户随后确认保持Public，D-019已登记。交接/PR/合并等待public-release-privacy脱敏规格批准、实施与验证，当前尚未批量清理；未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
+> 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
+
+当前是开发中的独立后端。以下开头两段为隐私实施前的软件历史状态，后续公开发布进度以 `specs/public-release-privacy/` 为准，不把旧证据当新验证。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，原软件Gate2已获用户批准；用户随后确认保持Public，D-019已登记。交接/PR/合并等待public-release-privacy脱敏规格批准、实施与验证，当前尚未批量清理；未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
 已实现配置、只读材料与影像事实、编号解析、单元/备份映射、稳定身份、谱系/许可/出处、共用认证、v0快照/采样/链接、只读API与管理员导入。R2已软件通过并关闭原主要问题；本轮用户批准的N1最小修复保留依据升级时未变编号的id/持有起点，当前依据更新、过去历史保留，同版本无变化重导不制造曾用号或无条件更新。具体实现/测试矩阵、失败与清理证据见feature的tasks.md/converge.md/review.md，不把主会话回归当独立审核。
 
@@ -26,19 +28,27 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 | DH_DATA_DIR / DH_BACKUP_DIR | 只读原图 / 分片根，容器默认 /data、/backup |
 | DH_V0_CACHE_DIR | 只读 v0 cache 根，默认 /v0cache；不能扫描此目录 |
 | DH_V0_ENV_FILE | 只读 v0 .env 路径，默认 /run/v0.env；只使用 AUTH_SECRET |
-| DH_V0_URL / DH_V0_PUBLIC_URL | v0 请求地址 / 查看器链接地址，后者默认同前者 |
+| DH_V0_URL / DH_V0_PUBLIC_URL | v0 请求地址 / 查看器链接地址；正式 Compose 的 DH_V0_URL 必填，PUBLIC_URL 由可选 env_file 进入配置入口，空值等同缺省并回退前者；不依赖 Compose 嵌套插值 |
 | DH_DATABASE_URL | 目录数据库连接；没有凭证默认值 |
 | DH_CODE_VERSION | 导入记录中的运行代码版本；本机缺省 development，生产镜像须注入实际提交版本 |
 | DH_TEST_DATABASE_URL | 仅测试用的一次性 PostgreSQL 库，库名须以 dh_catalog_test_ 开头，绝不能指向正式库 |
+| DH_HOST_DATA_DIR / DH_HOST_BACKUP_DIR / DH_HOST_CACHE_DIR | Compose 必填的宿主原图 / 备份 / v0缓存根；只读挂载到 /data、/backup、/v0cache，不是容器 DH_DATA_DIR / DH_BACKUP_DIR |
+| DH_HOST_V0_ENV_FILE / DH_HOST_PGDATA_DIR | Compose 必填的宿主 v0环境文件 / 外部专用PG目录；前者只读挂载，不复制凭证；后者不得置于git工作区 |
+| CATALOG_LAN_IP / CATALOG_TAILSCALE_IP | Compose 必填的局域网 / Tailscale 绑定地址，不可用公网或通配地址 |
+| DH_RECORD_DATA_ROOT / DH_RECORD_BACKUP_ROOT | 可选的旧记录绝对路径字符串前缀；为空仅识别 /data/、/backup/ 与相对记录，不从 HOST 输入推断，不访问所填路径 |
 
-配置在启动入口读取，导入模块不加载运行配置或原始材料、不连接网络或数据库。API 工厂是 `dh_catalog.api:create_app`（uvicorn `--factory`）；缺少 v0 AUTH_SECRET 时，登录墙对所有请求返回 503，不退回环境中另一份 secret；每个通过的请求只验证一次 cookie、只读一次用户记录，后续路由消费 Principal。
+`load_settings` 的开发后备仅为 `http://localhost:8503`，不代表生产入口。旧记录前缀在配置入口去首尾空白、要求绝对且不等于 `/` 并补尾斜杠；例如中性字符串 `/legacy/data` 与 `/legacy/backup` 仅示意记录格式，不是实际主机路径。未配置的绝对记录不能悄悄猜测其来源。
+
+公开隐私修订使用 `第三方资料接收（接收事件 A）` 和 `RULE_VERSION=2026-10-30.1`；机构下载、本地派生标签及许可严格度不变，旧库和过去批次不被覆写。后续部署前须填写上述必填参数；本次文档修订不操作任何已部署配置。
+
+配置在启动入口读取，导入模块不加载运行配置或原始材料、不连接网络或数据库。上述配置契约已按公开隐私方案修订；下面的旧候选测试数字仍是历史证据，不能代本轮源码/配置新验证。API 工厂是 `dh_catalog.api:create_app`（uvicorn `--factory`）；缺少 v0 AUTH_SECRET 时，登录墙对所有请求返回 503，不退回环境中另一份 secret；每个通过的请求只验证一次 cookie、只读一次用户记录，后续路由消费 Principal。
 
 运维 CLI 已实现 `migrate`、只读 `report [--run ID]` 与 `health`，不提供 CLI 导入。设置专用数据库连接后，在仓库根使用 `PYTHONPATH=catalog/src python -m dh_catalog <命令>`。report 在数据库只读事务中取已保存批次，不加载认证文件或调用 v0；health 校验 secret 与数据库 / 迁移可用性，不走 HTTP、不读用户表或原图、不加载扫描 / 导入器。三个 CLI 的合成 PostgreSQL 路径均已由 T-24 验证（含失败/只读约束），不据此宣称生产部署成功。
 
 ## 导入器集成接口（实现与数据库集成已验证，真实材料待验）
 
 - `prepare_import(pool, triggered_by=..., code_version=..., session_cookie=..., v0_url=...)` 同步持连接与咨询锁并创建批次，返回含 run_id 的 PreparedImport；已在跑则抛 ImportBusy。管理员 API 先完成这一段再返回 202，ImportBusy 同步转 409。
-- 后台调用 `PreparedImport.execute(roots, cache_dir)`；派发失败则 `cancel()` 清理。内部复用真实 scan / nlc / derivation / identity / rules，附件读取即消费，不在内存保留全量原文。
+- 后台调用 `PreparedImport.execute(roots, cache_dir, record_roots=...)`；配置入口解析的可选旧记录前缀随 API → execute → compute → derivation 传递，默认空映射。派发失败则 `cancel()` 清理。内部复用真实 scan / nlc / derivation / identity / rules，附件读取即消费，不在内存保留全量原文。
 - `compute_import(...)` 是可本机验证的真实计算阶段；持久化、唯一约束互换、失败回滚与历史读取已在 T-24 真实 PostgreSQL 通过。仍区分本机 DTO/计算测试与真库证据，不把合成集成测试代替真实材料验收。
 - `read_report()` 读取已有批次。当前 `import_run.counts` 保存完整报告对象，其中的 `counts` 子键才是统计计数；API 将完整对象明确返回为 `report`，统计位于 `report.counts`；`acceptance/compare.py` 只消费这些计数，不再扫描原始材料重算业务判断。
 
@@ -48,7 +58,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 
 本机当前只验证不依赖数据库的模块。默认 pytest 会把缺少测试连接的 db 项明确列为跳过，不能宣称全部数据库测试通过。数据库测试会清空指定临时库的业务表，只接受 `dh_catalog_test_*` 库名，不读取 DH_DATABASE_URL 作为后备。
 
-真实 PostgreSQL 与 Python 3.12 镜像测试使用用户批准的候选快照与一次性容器，不启动正式Compose、不挂正式pgdata、真实材料或v0文件。本轮T38-A2/private-candidate-063为446项全通过/0skip（73.22秒），含57个实际db项；首轮A1的445通过/1新增HTTP请求元数据期望错误及Astra一行修正均保留原件，见任务T37/T38及handoff/2026-10-30。T24旧402/404和T36旧442仍是各自候选的历史证据。测试中的v0 HTTP仅边界替身，不代实际v0健康；隔离测试许可不等于正式部署许可。
+以下历史真实 PostgreSQL 与 Python 3.12 镜像测试使用当时用户批准的候选快照与一次性容器，不启动正式Compose、不挂正式pgdata、真实材料或v0文件。本轮T38-A2/private-candidate-063为446项全通过/0skip（73.22秒），含57个实际db项；首轮A1的445通过/1新增HTTP请求元数据期望错误及Astra一行修正均保留原件，见任务T37/T38及[公开验证摘要](../docs/verification.md)（原件非公开）。T24旧402/404和T36旧442仍是各自候选的历史证据。测试中的v0 HTTP仅边界替身，不代实际v0健康；隔离测试许可不等于正式部署许可。
 
 当前 Starlette 的 TestClient 会对已固定版本的 httpx 发出一条弃用警告；测试仍可运行，未静默屏蔽警告或为消除警告升级依赖。
 
@@ -61,13 +71,13 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 - 启动先执行 migrate，成功后才 exec uvicorn 工厂；健康检查调用 `python -m dh_catalog health`，不签 cookie、不走 HTTP。`DH_CODE_VERSION` 同时作为构建参数与运行环境传入，不在镜像里执行 git。
 - `docker-compose.yml` 只有 `catalog-db` / `catalog-api`；每次操作都指定 `-p dunhuang-catalog`。内存硬限额及 memswap、PostgreSQL 参数、外部 pgdata 和四项只读挂载以此文件为准。API 按计划以 root 读取 root:600 用户表，不增加宿主可写挂载。
 - API 仅绑定 NAS 的 LAN / Tailscale 显式地址；数据库没有宿主端口。配置变量不得改为 `0.0.0.0`、`::` 或其他公网 / 通配地址。不添加 nginx / frp 公网入口，不修改真实防火墙；T-25 还须检查实际端口绑定。
-- `.env.example` 只有非秘密设置和空占位。获准操作时才在对应 NAS 部署位置准备 `catalog/.env`（权限 600），**先填写新生成的数据库密码和实际提交完整 SHA**。Compose 对两项空值直接报错；不复制 v0 的 `.env`，不把 AUTH_SECRET 填入新配置。认证只读取只读 `/run/v0.env`。
+- `.env.example` 只有非秘密设置和空占位。获准操作时才在对应 NAS 部署位置准备 `catalog/.env`（权限 600），**先填写新生成的数据库密码、实际提交完整 SHA、显式 DH_V0_URL、两项绑定地址及五项 DH_HOST 输入**。Compose 对必要空值直接报错；不复制 v0 的 `.env`，不把 AUTH_SECRET 填入新配置。认证只读取只读 `/run/v0.env`。
 - 当前 Compose 将 POSTGRES_PASSWORD 原样放进数据库 URI，故须使用 URL 安全的随机字符，建议随机十六进制；不要使用含 `@ : / % $ #`、空格等字符的密码，也不要仅把 PostgreSQL 原密码改成百分号编码（两端会不一致）。配置通过环境传值，不 source `.env`、不把密码或其他配置拼进 shell 命令。不要将真实配置 / 展开的连接串打印、提交或放进构建上下文。
 - `.dockerignore` 排除凭证、Windows venv、缓存、日志和 Python 产物，保留源码、合成测试与验收文件。`tests/test_runtime.py` 仅保护这些关键文本契约，**不是 YAML / Compose 校验器，也不是构建、Python 3.12 或运行证明**。
 
 ## T-24：在 NAS 隔离快照验证（已完成，保留执行方法）
 
-本机没有 Docker，本轮未在本机安装 Docker/Compose。经用户批准，主会话已按下列范围完成测试与清理，实际候选/命令/输出在 tasks.md 与 T24-A1（非公开历史记录）、`T24-A2/`、`T24-A3/`。下面是执行方法，不是要求再次启动资源：只在唯一隔离目录工作，不推送 nas main、不起正式 Compose、不访问正式 pgdata、真实材料或认证文件。测试前记录候选完整 SHA、目录与预算，低峰且 NAS `MemAvailable >= 2GB` 才执行；构建限额不生效则停止报告。
+本机没有 Docker，本轮未在本机安装 Docker/Compose。经用户批准，主会话已按下列范围完成测试与清理，实际候选/命令/输出在 tasks.md 与 [公开验证摘要](../docs/verification.md)（详细原件非公开）、非公开 T24-A2 阶段记录、非公开 T24-A3 阶段记录。下面是执行方法，不是要求再次启动资源：只在唯一隔离目录工作，不推送 nas main、不起正式 Compose、不访问正式 pgdata、真实材料或认证文件。测试前记录候选完整 SHA、目录与预算，低峰且 NAS `MemAvailable >= 2GB` 才执行；构建限额不生效则停止报告。
 
 1. 从本机用 `git archive <候选完整 SHA> catalog` 导出已记录候选快照，送入获准的 NAS **隔离临时目录**（不是部署 git 工作区）。下文 `SNAPSHOT` 指解包根目录，`CANDIDATE` 指该 SHA。只在隔离位置工作，不能修改快照代码来修测试。
 2. 核实目标 Docker 构建后端支持并实际落实内存与 swap 硬限制。以下命令以支持 legacy builder 的环境为前提；若禁用 BuildKit 不可用，或后端忽略 / 不支持资源参数，**停止并报告，请用户决定受限构建方式，不得删参数后无上限重试**。
@@ -77,7 +87,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
      --build-arg DH_CODE_VERSION="$CANDIDATE" -t dh-catalog-test "$SNAPSHOT/catalog"
    ```
 
-3. 正式 Compose 的 `config -q` 留 T-25。若 T-24 额外做语法检查，只能在隔离快照的 `catalog/` 里从 `.env.example` 准备权限 600 的**合成配置**，填临时随机密码与候选 SHA，再执行 `/usr/local/bin/docker-compose -p dunhuang-catalog config -q`；绝不执行 up，也不运行会打印展开凭证的 `config`。这不会证明挂载或端口在运行时成立。
+3. 正式 Compose 的 `config -q` 留 T-25。若 T-24 额外做语法检查，只能在隔离快照的 `catalog/` 里从 `.env.example` 准备权限 600 的**合成配置**，填临时随机密码、候选 SHA、合成的显式 URL/两项绑定地址和五项 HOST 输入，再执行 `/usr/local/bin/docker-compose -p dunhuang-catalog config -q`；绝不执行 up，也不运行会打印展开凭证的 `config`。这不会证明挂载或端口在运行时成立。
 4. 在隔离目录中、构建上下文之外准备权限 600 的 `db-test.env` 与 `api-test.env`，仅使用新生成的 URL 安全临时随机口令：前者设置 `POSTGRES_USER=dh_catalog_test`、`POSTGRES_DB=dh_catalog_test_runtime` 与 `POSTGRES_PASSWORD`；后者设置 `DH_TEST_DATABASE_URL` 指向 `postgresql://dh_catalog_test:<同一临时口令>@dh-catalog-test-db:5432/dh_catalog_test_runtime`，并设置 `DH_CODE_VERSION=<候选 SHA>`。尖括号是说明，不是可用默认值。不要配置正式 DH_DATABASE_URL；真实测试会自行生成合成材料 / 认证文件并清空这个专用测试库。
 5. 确认下面的临时名称未被占用（若占用先调查，不删除未知资源），建立一次性网络和 PostgreSQL。不挂任何宿主数据卷，不发布端口；PG 镜像的匿名数据卷随 `--rm` 容器删除。
 
@@ -106,7 +116,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 前置：T-24 证据补齐 → Converge / 独立 Review → 用户 Gate 2 → merge 到 main → **另获部署许可**。部署时低峰、`MemAvailable >= 2GB`；不重建、不重启 v0，不启动图块生成器。以下命令只用于已获准阶段，不能据此提前执行。
 
 1. 本机依次 `git push origin main`、`git push nas main`，仅传已合并提交；文件操作走 `ssh nas`，容器操作走 `ssh nasroot`。在 NAS 核实部署工作区 HEAD 与获准 main SHA 一致，不在 NAS 修改代码。
-2. 在 `/srv/example/viewer/catalog/` 准备权限 600 的 `.env`，填写实际 SHA、独立数据库随机密码及明确接口地址；只读确认 plan §4.8 的 host 路径存在、v0 `.env` / `cache/users.json` 可读。不要列目录或遍历 cache；不要改 v0 配置。确认 pgdata 为新项目专用且不在 git 工作区，首次初始化后不能只改 `.env` 密码而不更新数据库口令。
+2. 在 `${DH_DEPLOY_DIR}/catalog/` 准备权限 600 的 `.env`，填写实际 SHA、独立数据库随机密码及明确接口地址；只读确认 plan §4.8 的 host 路径存在、v0 `.env` / `cache/users.json` 可读。不要列目录或遍历 cache；不要改 v0 配置。确认 pgdata 为新项目专用且不在 git 工作区，首次初始化后不能只改 `.env` 密码而不更新数据库口令。
 3. 进入上述 `catalog/` 目录，把 `DH_CODE_VERSION` 导出为已核实提交的完整 SHA（`export DH_CODE_VERSION="$(git rev-parse HEAD)"`），确认与 `.env` 相同；运行配置静默校验。正式构建也须沿用 T-24 已验证的受限构建方式，不用未设构建限额的 `up --build`：
 
    ```bash
@@ -159,7 +169,7 @@ printf '%s\n' "$?" > "$EVIDENCE/A2-compare-with-notes.exit"
 ```bash
 catalog/.venv/Scripts/python.exe -I -X utf8 -m pytest -c catalog/pytest.ini -m 'not db' catalog/tests catalog/acceptance/test_compare.py
 python -m py_compile app.py pyramid_worker.py stitch_apply.py
-# 历史命令（非公开历史记录，不可执行）：python -I -X utf8 private-audit-record .
+python -I -X utf8 tools/check_docs.py .
 git diff --check
 ```
 
@@ -170,7 +180,7 @@ git diff --check
 ### 前置与证据位置
 
 - T-24 测试许可、T-25 部署许可、T-26 全量验收许可分别取得；Gate 2 / merge 不能替代许可。低峰且宿主 `MemAvailable >= 2GB`，先保存 `grep '^MemAvailable:' /proc/meminfo`。不关闭或重启 v0，不恢复 Q-025 删除的暂停/中止、内容指纹等机制。
-- 宿主证据目录 `E` 由用户批准，例如 `/srv/example/acceptance/catalog/<本次时间戳>`；本机对应 `EVIDENCE` 例如 `/srv/example/private-audit/evidence/<本次时间戳>`。两者均必须在部署 git 工作区、pgdata、原材料与 cache **之外**，权限仅供验收人员；先 `umask 077` 再创建。不要将这些变量设为仓库子目录。所有真实报告、元数据、差异与截图不入库，不进入构建上下文。
+- 宿主证据目录 `E` 与本机对应 `EVIDENCE` 均由用户在非公开配置中批准指定；本说明不提供私人路径。两者均必须在部署 git 工作区、pgdata、原材料与 cache **之外**，权限仅供验收人员；先 `umask 077` 再创建。不要将这些变量设为仓库子目录。所有真实报告、元数据、差异与截图不入库，不进入构建上下文。
 - 浏览器启用“每次下载询问保存位置”，以下 `save` 下载均存入本机 `EVIDENCE`。只用用户正常登录 v0 的真实会话；在同一 NAS 主机名的 catalog 受保护文档页操作。不能读取/复制 `.env` 或 users.json 来签发会话；不复制 cookie 到代码、脚本、命令、日志或 HAR，不使用“Copy as cURL”。
 - 先做 A5 前快照并启动资源采样，再由用户在 `/api/v1/docs` 手动触发 POST，记录返回批次 ID。本节没有 CLI 导入或自动 POST。无变化重跑也由用户自行触发，分别记录两批 ID。
 
@@ -282,6 +292,9 @@ save('A4-canvas.json', {run:run.id, nlc_tiff:n, nlc_tiff_with_canvas:matched, ra
 
 ```bash
 # 在已批准的 NAS 证据目录上下文；E 预先设为外部证据目录
+# 显式导出获准原图/备份根；缺配置在创建证据前失败，不猜测路径
+: "${DH_HOST_DATA_DIR:?必须配置原图根}" "${DH_HOST_BACKUP_DIR:?必须配置备份根}"
+export DH_HOST_DATA_DIR DH_HOST_BACKUP_DIR
 STAGE=before  # 完成两批导入后改为 after，再执行同一段
 python3 - "$E/$STAGE-metadata.jsonl" <<'PY'
 import json, os, pathlib, sys
@@ -290,7 +303,7 @@ def fail(error):
     raise error
 
 with open(sys.argv[1], 'x', encoding='utf-8', newline='\n') as out:
-    for root in ('/srv/example/data', '/srv/example/backup'):
+    for root in (os.environ['DH_HOST_DATA_DIR'], os.environ['DH_HOST_BACKUP_DIR']):
         for directory, _, files in os.walk(root, followlinks=False, onerror=fail):
             for name in sorted(files):
                 path = pathlib.Path(directory) / name

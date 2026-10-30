@@ -338,7 +338,10 @@ def _import_route(app, http_client):
 
 def _execute_import(prepared, settings):
     try:
-        prepared.execute({"data": settings.data_dir, "backup": settings.backup_dir}, settings.v0_cache_dir)
+        prepared.execute(
+            {"data": settings.data_dir, "backup": settings.backup_dir}, settings.v0_cache_dir,
+            record_roots=settings.record_roots,
+        )
     except BaseException as error:
         # 不打印 traceback / 消息：外部异常可能含 cookie、secret 或连接串。
         logger.error("导入失败：run=%s type=%s", prepared.run_id, type(error).__name__)
