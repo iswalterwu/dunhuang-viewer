@@ -1,6 +1,6 @@
 # 会话交接 — catalog-foundation
 
-## 当前安全点（2026-10-30，独立R3待运行）
+## 当前安全点（2026-10-30，独立R3软件通过，待用户Gate2）
 
 - 唯一仓库/srv/example/project、feat/catalog-foundation，普通功能分支持续同步获准；main/origin-main仍private-candidate-023，未merge/push nas/正式部署或真实导入。
 - 用户「同意并继续」仅批准N1最小修复/隔离真PG完整复验/独立重审。Analyze16审private-candidate-059全12项通过（Anthropic Claude，09:48:03～09:55:40 （原始时刻；时区非公开）/exit0），spec7/plan10不变、checklist16在实施中冻结。
@@ -8,7 +8,8 @@
 - A1/private-candidate-061目标445通过/1新HTTP元数据期望失败/0skip；P15 Astra派private-candidate-062、10:25:52～10:29:51 exit0，仅新HTTP一行requested_run期望修正，完整历史内容断言保留。失败原件不覆盖。
 - **最新实际目标候选private-candidate-063：NAS Python3.12.15/PG17.4全446 passed/0 failed/0 skipped/1原有警告，73.22秒，57db实际**。512m构建/测试、384m PG均=memswap，API无绑定/端口/真实挂载；pip check通过、A1/A2完整freeze相同。
 - **T38全部资源/凭据已清理**，v0 ID/启动/restarts0/runningtrue未变；实例、原启动时刻与宿主可用内存非公开。无当前子agent/NAS资源/恢复命令。
-- 当前下一步：冻结候选与新证据，派独立Claude CodeReview-R3（首选桥已有接入不可用证据，引用R1证据而实际Anthropic；后续按实际可用性先试首选通道），核N1/旧修复与两个函数差异及原资源证据适用边界。R3不能代用户Gate2。
+- **独立CodeReview-R3已结束并软件通过/N1关闭**：审private-candidate-064，源码/测试同private-candidate-063，前后固定干净；Anthropic Claude 10:47:51～11:00:57 （原始时刻；时区非公开）、exit0，桥仍原已证实的接入不可用状态引用R1证据未调用。无新P0/P1/P2，旧R1关闭项维持；亲跑本机389通过/57skip/1警告（10.14秒），NAS仅核原件未亲跑，归档review/CodeReview-R3。当前无子agent。
+- **下一步只请求用户Gate2**：确认本轮评审、现行边界及review.md列出的真实材料/并发/v0健康/规则升级成本/真实性能/依赖/正式部署待验风险后，才Handoff/补architecture目录服务章/PR/merge；正式T25/T26仍另许可。R3据差异认可旧T36支持新候选首轮/同版本重导而无需本轮再36k，但不是新候选直接实测。非回归P3边界：同号但路径/来源/主号来源变化仍会同号historical，记录历史不保证编号值曾变；Handoff写明，改语义先Clarify，不擅扩修/接受风险。
 - 本轮未新36k/规则升级足规模/真实材料/并发/v0连续健康/真实性能；旧private-candidate-056/T36的36k仅直接覆盖旧候选，cgroup含缓存触512，无可声称77MiB总余量。T25/T26仍待另获许可。当前证据：private-audit-record（N1-Analyze16；非公开历史记录，不是可执行入口）、implement/P14-T37与P15-T38、logs/T38-A1及T38-A2（先读各README）。
 
 ## 本轮过程与2026-10-29历史交接（保留当时状态，以上方当前安全点为准）

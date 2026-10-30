@@ -1,6 +1,6 @@
 # catalog-foundation — Converge 实现核对
 
-## 2026-10-30 N1修复候选（主会话软件核对，独立R3待）
+## 2026-10-30 N1修复（软件收敛，独立R3通过，Gate2未批）
 
 用户批准N1在Gate2前最小修复后，Analyze16全12项通过，P14/P15独立openai/gpt-6-astra串行实施。实际生产差异仅importer._identifier_rows/_persist_identifiers（+6/-1）；值与来源/状态等全等、仅依据变化时复制旧行保id/since_run/until_run，不就地改S0；只UPDATE真实变化field_basis，沿同一私有Jsonb边界。原真正改号历史化、撤销pending删除、身份算法/事务/游标/CompactMap/schema/规则/依赖/配置/v0全部不变。
 
@@ -8,8 +8,8 @@
 - 新真PG test_identifier_basis_upgrade_keeps_database_rows_and_history核id/起止、全部字段/作者/时间、新旧history与同版本零新增，用xmin确认变化依据真正UPDATE、历史/未变编号不无条件UPDATE；真实HTTP test_identifier_basis_upgrade_detail_resolve_and_history核resolve/detail/旧新历史/无变化后续批次。
 - A1/private-candidate-061为445通过/1新增HTTP元数据期望失败/0skip；原API requested_run应随请求变化，P15仅修新断言一行且完整快照/run_id/basis比较不减。所有旧测试函数AST未改、其余生产AST未改、UTF8LF/3.12 AST/diff通过；静态AST不冒充目标运行。
 - **A2/private-candidate-063：Python3.12.15/PG17.4完整446 passed/0 failed/0 skipped/1原有警告，73.22秒，57db实际**。包含所有旧回归及新PG/HTTP。临时资源/凭据已全清理、v0未重启；证据在 P14-T37（非公开历史记录）、`P15-T38/` 与 `logs/T38-A1/`、`T38-A2/`。
-- 对应AC-004-5/AC-011-2/AC-013-1/AC-013-3等既有契约，无需求/冻结设计变化。主会话判断软件实现候选已收敛，**N1是否关闭交独立R3**，不是用户Gate2。
-- 本轮未新36k或规则升级足规模。旧T36/private-candidate-056的足规模证据仅直接覆盖旧候选；R3须根据两个函数差异判断支持范围，不能把446小规模集成全绿当新全量资源实测。真实材料/并发/连续v0健康/耗时/P95/正式挂载等仍T25/T26，feature保持in-progress，未merge/部署/真实导入。
+- 对应AC-004-5/AC-011-2/AC-013-1/AC-013-3等既有契约，无需求/冻结设计变化。主会话软件核对后，**独立R3已软件通过、N1关闭**（审private-candidate-064/源码private-candidate-063，Anthropic Claude，10:47:51～11:00:57 （原始时刻；时区非公开）、exit0），原文在CodeReview-R3归档，不代用户Gate2。
+- 本轮未新36k或规则升级足规模。旧T36/private-candidate-056的足规模证据仅直接覆盖旧候选；R3已据两个函数差异判旧T36支持新候选首轮/同版本无变化重导、不要求本轮再36k；不能把446小规模集成全绿当新全量资源实测。规则升级足规模仍未验。同号但路径/来源/主号来源变化的记录仍可能同号historical，属既有边界而非本轮回归，Handoff文档注明、改语义须先Clarify。真实材料/并发/连续v0健康/耗时/P95/正式挂载等仍T25/T26，feature保持in-progress，未merge/部署/真实导入。
 
 ## 2026-10-29及以前历史核对（保留原阶段状态）
 
