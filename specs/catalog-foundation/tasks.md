@@ -241,12 +241,31 @@
 
 ### T-25 正式部署与只读冒烟（1 小时；需另获许可）
 
-- **状态**：待用户许可，未开始
+- **状态**：待用户许可，未开始。2026-10-30补充下方“部署前置”，须与T-25一并获准。独立Analyze17（claude-bridge/claude-fable-5-1，2026-10-30T19:17Z～19:24Z，exit0）结论为需小修、无P0；P1×2、P2×4、P3-1～3 已修订，P3-4（提交身份与 `TZ=UTC`）于提交时执行。独立Analyze18（claude-bridge/claude-fable-5-1，2026-10-30T19:26Z～19:30Z，exit0）复核通过、无新P0～P2，3条P3措辞已采纳；可向用户请求许可，尚未获准。原报告非公开保全。
+
+#### T-25 部署前置：部署远端首次同步与 v0 宿主配置迁移（2026-10-30 补充）
+
+- **原因**：公开历史已重写；部署远端 main 仍是旧历史，不是新 main 的祖先，普通 `git push nas main` 会被拒。已部署 v0 的根 Compose、守护/开机脚本与 `stitch_apply.py` 使用旧的写死宿主路径；新版改为必须显式提供 `DH_HOST_*`、`DH_DEPLOY_DIR` 或 `DATA_DIR` / `CACHE_DIR`。若只同步代码、不迁移配置，仍在运行的旧守护循环会以缺环境的方式调用新 `stitch_apply.py` 而失败，拼接后也无法经根 Compose 拉起 `pyramid-huge`；下次开机，旧钩子副本也无法启动新守护循环。
+- **v0 运行代码差异（本机只读比对）**：`app.py` 除注释外仅删去无调用的 `_stitch_wait_rescan`；根 Dockerfile 仅注释变化；`static/`、`pyramid_worker.py`、`requirements.txt` 未变；根 Compose 只有宿主挂载来源改为变量，取值与原路径相同即等价。三个脚本的可执行位不变。因此本前置不重建、不重启 v0 容器，也不对 `dunhuang-viewer` 执行 `up`。
+- **只读前检**（任一不符即停）：低峰且宿主 MemAvailable≥2GB，图块生成器未运行；部署工作区 HEAD 等于本机私有记录的部署旧 OID；先用 `git check-ignore` 确认 `cache/`、`pyramids/`、`thumbs/` 在忽略规则内（否则不在部署目录运行 status，以免遍历 cache），再执行 `git status --porcelain`（不加 `--ignored`），要求没有已跟踪或索引改动，未跟踪路径与新树无冲突；部署仓库仍为 `receive.denyCurrentBranch=updateInstead` 且 `receive.denyNonFastForwards` 未开启（否则停止另议，不改仓库保护）；记录 v0 容器 ID、启动时间、重启次数与运行状态，记录旧守护进程 PID 与运行用户；部署 `.env` 只核键名、不读出值；目录服务 pgdata 目标在 git 工作区外且尚不存在。
+- **私有备份**：部署 `.env` 与开机钩子副本复制到仓库外私有位置（权限 600），记录部署旧 OID；不入库。
+- **配置迁移（必须先于历史替换）**：在部署 `.env` 追加 `DH_HOST_DATA_DIR`、`DH_HOST_CACHE_DIR`、`DH_HOST_STATIC_DIR`，取值与旧 Compose 的原路径逐字相同。追加后，以新版根 Compose 的临时副本（项目目录指向部署目录）运行 `config -q`，并在主机内只输出布尔值地确认三个服务插值后的挂载来源与旧路径一致；不打印展开配置（其中含 `env_file` 凭证）。两项通过后才替换历史。这三项同时进入 `dunhuang-viewer` 的 `env_file`，`app.py` 不读取；但 Compose 配置哈希会改变，下次对该服务 `up` 会重新创建容器（不重建镜像），仍须按 AGENTS 另获确认，本前置不执行。守护循环对 `pyramid-huge` 执行 `up` 时，若哈希不同只会用现有镜像重新创建该批处理容器，不影响查看器。开机钩子副本改为显式导出 `DH_DEPLOY_DIR`、`DH_HOST_DATA_DIR`、`DH_HOST_CACHE_DIR` 后调用部署目录的 `auto_huge_boot.sh "$1"`（透传 start/stop），不按自身位置推断。私有值只写在主机，不进入仓库或公开记录。
+- **历史替换**：本机单 ref 推送 `git push --force-with-lease=refs/heads/main:<部署旧OID> nas refs/heads/main:refs/heads/main`，只替换部署远端 main；updateInstead 随之更新工作区。租约不符、远端拒绝或工作区更新失败即停，不裸 force、不刷新租约。旧历史留在部署仓库的私有对象/reflog，不回传 origin。
+- **同步后验证**：部署工作区 HEAD 为获准 main，`git status --porcelain` 无已跟踪改动；根 Compose `config -q` 通过，挂载来源布尔比对再次一致；v0 容器 ID、启动时间、重启次数不变。
+- **守护循环重启**：由容器管理角色执行。经更新后的钩子 `stop`，循环等待前检记录的旧 PID 消失后再 `start`；确认只有一个守护进程、PID 不同于旧 PID、运行用户与原来相同；钩子 `start` 须返回 0，新 PID 出现并持续存在（缺环境时脚本在动作前以非 0 退出，其 stderr 不进入日志）；至少等待一轮（20 秒以上）后，`auto_huge.log` 新增行不得出现 `must be configured`。若当时 deferred 队列非空，新循环按既有行为拉起 `pyramid-huge`（旧循环本也如此），不顺带启动全量生成器。旧拼接通道下线仍归 PD-07 / `stitch-hardening`，本前置不改变其生命周期。
+- **回滚**：先经更新后的钩子 `stop` 新守护循环并确认 PID 消失；以新 main OID 为租约推回部署旧 OID（要求部署工作区同样干净；若已创建 `catalog/.env`，它在旧树下是未跟踪文件，不阻止推送，去留写入私有记录）；恢复备份的钩子副本与 `.env`，按旧钩子启动旧守护循环并做同样检查。v0 容器始终不动。回滚窗口内，本机与部署仓库均不运行 `gc`、`prune` 或 `remote prune`。
+- **停止条件**：HEAD 与旧 OID 不符、存在已跟踪改动或路径冲突、仓库接收配置不符、内存不足或生成器运行、`config -q` 或挂载比对失败、租约不符或推送被拒、v0 容器 ID/启动时间/重启次数变化、旧守护 PID 未消失、重启后任一确认项不符（钩子返回 0、单进程、PID 变化、运行用户相同）、新循环日志出现上述错误。任一触发即停，按回滚处理已完成的步骤。
+- **完成标准**：部署远端与工作区为获准 main；v0 未重建、未重启且挂载来源不变；新守护循环正常运行；私有值只在主机与私有备份。之后才进入下述 T-25 目录服务步骤。
+
+#### T-25 目录服务部署
 - **上下文**：M7；正式部署前必须通过独立 Review、Gate 2，并 merge 到 main；这是运行验收，不提前绕过交付闸门。
 - **依赖**：T-24、Review / Gate 2 / merge、用户部署许可、NAS 可用内存 >=2GB
 - **修改范围**：不改 v0；仅部署已合并的目录服务。若需修代码，回本机任务并重新评审，不在 NAS 工作区编辑。
 - **完成标准**：核实 AC-011-1、AC-011-5、AC-012-1 的运行前提：项目独立、只读挂载、硬内存限额、数据库无宿主端口，未登录请求拒绝、普通用户不能 POST、管理员 GET 通过；不重建或重启 v0。secret 缺失拒绝服务与合成导入以 T-24 的测试结果为证，不在正式服务删 secret 或触发导入；正式首次导入留 T-26。
-- **验证命令**：按 `catalog/README.md` 的获准部署步骤，`git push origin main` 后再 `git push nas main`；只启动 `dunhuang-catalog`。`python -m dh_catalog health`、`docker inspect` 核对挂载与限额；只读核验权限与导入记录接口，不执行管理员 POST 导入。
+- **目录服务配置补充**：`catalog/.env` 的 `DH_RECORD_DATA_ROOT` / `DH_RECORD_BACKUP_ROOT` 填旧执行记录中实际出现的宿主前缀（私有），否则旧合并长卷的派生记录会作为未配置的绝对路径进入异常；`DH_HOST_PGDATA_DIR` 为新建的专用目录。数据库口令为新生成的 URL 安全随机值，只写权限 600 的 `catalog/.env`。
+- **冒烟分工**：匿名 GET 被拒可由主会话验证；普通账号 GET 通过、POST 导入被 403 拒绝、管理员 GET 通过，须由用户在浏览器以真实登录会话执行；主会话不另签 cookie、不读 users.json。若 v0 只有管理员账号，普通账号项依赖用户先在 v0 `/admin` 新增，否则该项记为待验。
+- **正式依赖记录**：按 Gate2 待验项，在正式 `catalog-api` 容器内执行 `python -m pip freeze`，与 T-39 的 29 项逐项比对并写入本任务。
+- **验证命令**：按 `catalog/README.md` 的获准部署步骤，`git push origin main` 后，首次同步按上述部署前置以精确租约替换部署远端 main，此后恢复普通 `git push nas main`；只启动 `dunhuang-catalog`。`python -m dh_catalog health`、`docker inspect` 核对挂载与限额；只读核验权限与导入记录接口，不执行管理员 POST 导入。
 
 ### T-26 全量导入与 A1～A7 验收（2 小时；需另获许可）
 

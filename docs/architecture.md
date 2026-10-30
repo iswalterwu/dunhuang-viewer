@@ -192,7 +192,7 @@ cache/
 - **镜像**：`python:3.12-slim` + `libvips42`；仓库 Dockerfile 的 apt / pip 镜像源选择不代表私人主机联网状态
 - **开机**：由部署方安装的 `auto_huge_boot.sh` **拷贝**拉起 `auto_huge_daemon.sh`，安装位置非公开配置
 - **显式宿主配置**：根 Compose 使用 `DH_HOST_DATA_DIR`、`DH_HOST_CACHE_DIR`、`DH_HOST_STATIC_DIR`；这三项是宿主挂载输入，不是容器内的 `DATA_DIR=/data`、`CACHE_DIR=/cache`。三个 shell 脚本均要求 `DH_DEPLOY_DIR`；访问 data/cache 的脚本还要求相应 `DH_HOST_DATA_DIR` / `DH_HOST_CACHE_DIR`，调用 stitch 时传为 `DATA_DIR` / `CACHE_DIR`。缺必要配置在任何动作前报错并非0退出，不能推断私人目录
-- **代码同步**（D-009）：本机工作副本 → `git push origin main`（GitHub）→ `git push nas main`（NAS 部署目录，updateInstead 直接更新工作区）
+- **代码同步**（D-009）：本机工作副本 → `git push origin main`（GitHub）→ `git push nas main`（NAS 部署目录，updateInstead 直接更新工作区）。公开历史重写后的首次同步须按 catalog-foundation T-25 部署前置以精确租约替换，并迁移 `.env` 与开机钩子配置；之后恢复普通推送
 - **生效方式**：`static/` 推送即生效；`app.py` / `pyramid_worker.py` / `Dockerfile` / `requirements.txt` 需在 NAS 上
   `cd "${DH_DEPLOY_DIR:?必须配置部署目录}" && docker-compose up -d --build dunhuang-viewer`（经用户确认；不带服务名会同时拉起两个生成器；Docker/Compose 可执行路径由部署方确认）
 - **运维入口**：部署方非公开配置的文件操作角色与容器管理角色；本文 `nas` / `nasroot` 只是角色别名。访问、重建或重启仍须单独授权

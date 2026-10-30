@@ -6,7 +6,7 @@
 
 代码保持公开（D-019），不代表影像已获开放许可，也不代表服务对匿名用户开放。许可未知的影像仅供登录墙内研究；对外优先链接原机构 IIIF。私人地址、账户、网关拓扑与材料接收操作不发布。
 
-只部署经 Review、用户 Gate 2 并合并到 main 的提交：本机 `git push origin main` 后，再获准 `git push nas main`。`nas` 是部署远端角色名，由操作者非公开配置。禁止在 NAS 工作区改代码。**重建或重启前另征得用户确认，并且只操作目标服务。** 目录服务的独立部署见 [catalog/README.md](catalog/README.md)，不要混用两个 Compose 项目。
+只部署经 Review、用户 Gate 2 并合并到 main 的提交：本机 `git push origin main` 后，再获准 `git push nas main`。`nas` 是部署远端角色名，由操作者非公开配置。公开历史重写后的首次部署同步须按 `specs/catalog-foundation/tasks.md` T-25 部署前置执行（精确租约替换部署远端 main、迁移 `.env` 与开机钩子），不得裸 force。禁止在 NAS 工作区改代码。**重建或重启前另征得用户确认，并且只操作目标服务。** 目录服务的独立部署见 [catalog/README.md](catalog/README.md)，不要混用两个 Compose 项目。
 
 ## 配置与访问
 

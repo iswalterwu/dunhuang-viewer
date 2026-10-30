@@ -117,7 +117,7 @@ python -I -X utf8 -m pytest -c catalog/pytest.ini
 
 前置：T-24 证据补齐 → Converge / 独立 Review → 用户 Gate 2 → merge 到 main → **另获部署许可**。部署时低峰、`MemAvailable >= 2GB`；不重建、不重启 v0，不启动图块生成器。以下命令只用于已获准阶段，不能据此提前执行。
 
-1. 本机依次 `git push origin main`、`git push nas main`，仅传已合并提交；文件操作走 `ssh nas`，容器操作走 `ssh nasroot`。在 NAS 核实部署工作区 HEAD 与获准 main SHA 一致，不在 NAS 修改代码。
+1. 本机先 `git push origin main`。公开历史重写后的**首次**部署同步按 `specs/catalog-foundation/tasks.md` T-25 部署前置执行：先迁移 v0 的 `.env` 与开机钩子宿主配置，再以单 ref 精确租约替换部署远端 main。此后恢复普通 `git push nas main`，仅传已合并提交；文件操作走 `ssh nas`，容器操作走 `ssh nasroot`。在 NAS 核实部署工作区 HEAD 与获准 main SHA 一致，不在 NAS 修改代码。
 2. 在 `${DH_DEPLOY_DIR}/catalog/` 准备权限 600 的 `.env`，填写实际 SHA、独立数据库随机密码及明确接口地址；只读确认 plan §4.8 的 host 路径存在、v0 `.env` / `cache/users.json` 可读。不要列目录或遍历 cache；不要改 v0 配置。确认 pgdata 为新项目专用且不在 git 工作区，首次初始化后不能只改 `.env` 密码而不更新数据库口令。
 3. 进入上述 `catalog/` 目录，把 `DH_CODE_VERSION` 导出为已核实提交的完整 SHA（`export DH_CODE_VERSION="$(git rev-parse HEAD)"`），确认与 `.env` 相同；运行配置静默校验。正式构建也须沿用 T-24 已验证的受限构建方式，不用未设构建限额的 `up --build`：
 
