@@ -343,6 +343,8 @@
 
 ### T-38 N1新候选隔离目标回归与独立CodeReview-R3（1～2小时，依赖T37，已获本轮复验许可）
 
+- **A1实际结果/修正入口**：候选private-candidate-061在Python3.12.15/PG17.4完整 **445 passed/1 failed/0 skipped/1原有警告，72.66秒**，57db实际执行；编号/历史新PG回归通过。唯一失败是新HTTP测试最后把请求批次元数据`requested_run`也当旧响应完全相同：API原有`_history_at`返回requested_run=本次请求，实际4!=旧3，其余3项一致。非生产缺陷；交独立Astra P15仅`test_api.py`该新增断言修正期望为新requested_run、仍完整比较run_id/快照/依据，不改API或删内容断言。旧测试AST保持，形成新候选后重跑全套目标测试，不能沿用A1或旧442。A1库/容器/卷/网络/镜像/快照/凭据全清理，v0不变；stop后--rm异步删除初检曾exit1，后续等待确认清理成功留两日志。证据 T38-A1（非公开历史记录），R3/Gate2仍待。
+
 - **范围/顺序**：T37本机集成通过并形成完整候选SHA后，主会话按既有T24/T36通道导出 `git archive <SHA> catalog` 到新NAS隔离临时目录，仅构建候选并跑完整真实Python3.12/PostgreSQL17.4 pytest。所有新旧db项实际执行、0跳过；不是正式部署/材料导入，也不自动重跑36k规模。T36旧36k只属private-candidate-056，本轮若未新做规模不得称新候选已足规模实测；用限定差异/回归与独立R3判断原资源证据适用边界。
 - **安全/停止**：前检NAS MemAvailable≥2GB且低峰；构建/测试512m=memswap、PG384m=memswap，PG64MB buffers/20连接/work_mem4MB，先inspect验证限额再start；不挂真实材料/v0 cache或.env/正式pgdata、不发布端口、不起正式Compose、不重启v0/生成器、不全局prune。新随机临时凭据只写权限600外部env文件、不打印/入库；测试库只dh_catalog_test_*。预算/连接/模型失败则报告，不扩限/换模型/隐瞒跳过；业务缺陷派回Astra。
 - **完成标准**：上述AC在目标环境全部回归并取得候选SHA/快照哈希、完整pytest与exit、资源限制/OOM/依赖解析与pip freeze、v0前后ID/启动/restarts、临时库/容器/匿名卷/网络/镜像/快照/凭据清理证据。保持Starlette/httpx原警告、不升级/屏蔽；依赖漂移如实记录。仅合成软件证据，T25/T26与真实资源/连续健康/性能仍待单独许可。
