@@ -576,6 +576,8 @@ def _identifier_rows(item, resolution, unit_map, nlc, prior, run, at, basis):
         values["field_basis"] = _basis(values, semantic, old, basis)
         if old and values["field_basis"] == old["field_basis"]:
             result.append(old)
+        elif old:
+            result.append(dict(old, field_basis=values["field_basis"]))
         else:
             result.append(dict(values, since_run=run, until_run=None))
     return result
@@ -633,7 +635,7 @@ def _upsert(connection, table, row, keys):
 
 def _persist_identifiers(connection, run, previous, result):
     for owner, rows in result.identifiers.items():
-        retained = {row["id"] for row in rows if "id" in row}
+        retained = {row["id"]: row for row in rows if "id" in row}
         for old in previous.identifiers.get(owner, []):
             if old["id"] not in retained:
                 if old["state"] == "pending":
@@ -641,6 +643,9 @@ def _persist_identifiers(connection, run, previous, result):
                     connection.execute("DELETE FROM identifier WHERE id = %s", (old["id"],))
                 else:
                     connection.execute("UPDATE identifier SET state = 'historical', until_run = %s WHERE id = %s", (run, old["id"]))
+            elif retained[old["id"]]["field_basis"] != old["field_basis"]:
+                connection.execute("UPDATE identifier SET field_basis = %s WHERE id = %s",
+                                   (Jsonb(retained[old["id"]]["field_basis"], dumps=_json_dumps), old["id"]))
         for row in rows:
             if "id" not in row:
                 columns = list(row)

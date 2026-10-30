@@ -16,10 +16,11 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from dh_catalog import rules
 from dh_catalog.api import create_app
 from dh_catalog.importer import prepare_import
 from test_auth import _cookie, auth_files  # 共用合成认证输入，不替换认证实现。
-from test_import import _manifest, cache  # 共用合成白名单与 IIIF 材料。
+from test_import import _manifest, _seed_previous_identifier_basis, cache  # 共用合成白名单与旧部署输入。
 
 
 def _login(client, secret, username="owner"):
@@ -267,6 +268,75 @@ def test_resolve(api_db, roots, make_image):
     assert not _resolve(api, "P2006")
     assert any(i["normalized"] == "P.2006" and i["state"] == "historical"
                for i in _item(api, "P2008")["identifiers"])
+
+
+@pytest.mark.db
+def test_identifier_basis_upgrade_detail_resolve_and_history(api_db, connection, roots, make_image):
+    api = api_db
+    base = roots["data"] / "敦煌003"
+    for name in ("P2002", "P2003"):
+        make_image(base / name / "native.tif")
+    directory = roots["data"] / "中国国博馆藏/bd12345a"
+    make_image(directory / "BD12345a_0000_0.tif")
+    (directory / "manifest.json").write_bytes(_manifest("BD12345a"))
+    api.run()
+    (base / "P2002").rename(base / "副本 P2003")
+    pending_run, _ = api.run()
+    owners = [row["id"] for row in connection.execute(
+        "SELECT id FROM item WHERE grouping_key IN ('pelliot:2002', 'nlc:BD12345a')")]
+    _seed_previous_identifier_basis(connection, owners)
+    queries = ("P2002", "bd12345a")
+    before = {q: _item(api, q) for q in queries}
+    past = {}
+    for q, detail in before.items():
+        response = api.client.get(f"/api/v1/items/{detail['id']}/history", params={"run": pending_run})
+        assert response.status_code == 200
+        past[q] = response.json()
+        assert all(leaf["author"] == "rule:identifier@previous-version"
+                   for row in past[q]["snapshot"]["identifiers"] for leaf in row["field_basis"].values())
+    current_holder = _resolve(api, "P2003")
+    assert len(current_holder) == 1 and current_holder[0]["id"] != before["P2002"]["id"]
+    upgraded_run, _ = api.run()
+    new_history = {}
+    for q in queries:
+        detail = _item(api, q)
+        assert detail["id"] == before[q]["id"]
+        assert not any(r["state"] == "historical" for r in detail["identifiers"])
+        old_rows = {r["id"]: r for r in before[q]["identifiers"]}
+        assert {r["id"] for r in detail["identifiers"]} == set(old_rows)
+        for row in detail["identifiers"]:
+            old = old_rows[row["id"]]
+            assert row == dict(old, field_basis=row["field_basis"])
+            for name, leaf in row["field_basis"].items():
+                assert leaf == dict(old["field_basis"][name], author="rule:identifier@" + rules.RULE_VERSION,
+                                    run=upgraded_run, at=leaf["at"])
+                assert leaf["at"] != old["field_basis"][name]["at"]
+        history_url = f"/api/v1/items/{detail['id']}/history"
+        assert api.client.get(history_url, params={"run": pending_run}).json() == past[q]
+        response = api.client.get(history_url, params={"run": upgraded_run})
+        assert response.status_code == 200
+        new_history[q] = response.json()
+        assert new_history[q]["run_id"] == upgraded_run
+        expected = [{k: v for k, v in row.items() if k not in {"id", "until_run"}}
+                    for row in detail["identifiers"]]
+        assert sorted(new_history[q]["snapshot"]["identifiers"], key=lambda r: r["raw"]) == sorted(expected, key=lambda r: r["raw"])
+    pending = _item(api, "P2002")
+    assert {(r["normalized"], r["state"], r["is_primary"]) for r in pending["identifiers"]} == {
+        ("P.2002", "current", True), ("P.2003", "pending", False),
+    }
+    nlc = _item(api, "bd12345a")
+    assert {(r["raw"], r["source"], r["is_primary"]) for r in nlc["identifiers"]} == {
+        ("bd12345a", "文件名解析", False), ("BD12345a", "外部清单", True),
+        ("synthetic-entry", "外部清单", False),
+    }
+    assert _resolve(api, "P2003") == current_holder
+    assert _resolve(api, "bd12345a") == _resolve(api, "synthetic-entry")
+    repeated_run, _ = api.run()
+    for q, detail in (("P2002", pending), ("bd12345a", nlc)):
+        assert _item(api, q)["identifiers"] == detail["identifiers"]
+        history_url = f"/api/v1/items/{detail['id']}/history"
+        assert api.client.get(history_url, params={"run": repeated_run}).json() == new_history[q]
+        assert api.client.get(history_url, params={"run": pending_run}).json() == past[q]
 
 
 @pytest.mark.db

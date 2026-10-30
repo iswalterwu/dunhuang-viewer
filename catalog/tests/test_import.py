@@ -2,6 +2,7 @@
 
 import base64
 from contextlib import contextmanager, nullcontext
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 import gc
 import json
@@ -562,6 +563,98 @@ def test_rule_version_change_is_field_history_not_forced_value_change(roots, cac
     assert _report(second, previous)["counts"]["changes"]["images"]["metadata_changed"] == 1
     assert image["field_basis"]["facts"]["pixel_size"] is old_basis
     assert old_basis["author"] == "rule:file-header@" + rules.RULE_VERSION
+
+
+def _previous_identifier_basis(row):
+    # 合成旧部署输入；逐层新建，不改真实规则配置或共享的依据叶。
+    return {name: dict(leaf, author="rule:identifier@previous-version")
+            for name, leaf in row["field_basis"].items()}
+
+
+@pytest.mark.parametrize("with_id", [False, True], ids=["compute-s0", "persisted-s0"])
+def test_identifier_basis_upgrade_preserves_tenure_and_s0(roots, cache, make_image, with_id):
+    base = roots["data"] / "敦煌003"
+    for name in ("P2002", "P2003"):
+        make_image(base / name / "native.tif")
+    directory = roots["data"] / "中国国博馆藏/bd12345a"
+    make_image(directory / "BD12345a_0000_0.tif")
+    (directory / "manifest.json").write_bytes(_manifest("BD12345a"))
+    first = _compute(roots, cache)
+    sink = lambda file, raw: first.attachments[file]
+    (base / "P2002").rename(base / "副本 P2003")
+    pending = _compute(roots, cache, previous=_state(first), run=2, sink=sink)
+    owner = next(key for key, row in pending.items.items() if row["grouping_key"] == "pelliot:2002")
+    nlc_owner = next(key for key, row in pending.items.items() if row["grouping_key"] == "nlc:BD12345a")
+    assert {(r["normalized"], r["state"], r["since_run"]) for r in pending.identifiers[owner]} == {
+        ("P.2002", "current", 1), ("P.2003", "pending", 2),
+    }
+    nlc_rows = pending.identifiers[nlc_owner]
+    assert {(r["system"], r["raw"], r["normalized"], r["source"], r["is_primary"]) for r in nlc_rows} == {
+        ("nlc", "bd12345a", "BD12345a", "文件名解析", False),
+        ("nlc", "BD12345a", "BD12345a", "外部清单", True),
+        ("idp", "synthetic-entry", "synthetic-entry", "外部清单", False),
+    }
+    assert all(r["parent_number"] == "BD12345" and r["part"] == "a" for r in nlc_rows if r["system"] == "nlc")
+    previous = _state(pending)
+    previous.identifiers = {
+        key: [dict(row, field_basis=_previous_identifier_basis(row)) if key in {owner, nlc_owner}
+              else dict(row) for row in rows]
+        for key, rows in previous.identifiers.items()
+    }
+    if with_id:
+        for number, row in enumerate((r for rows in previous.identifiers.values() for r in rows), 1):
+            row["id"] = number  # 合成已持久化 S0 的元数据，不模拟 SQL。
+    before = deepcopy(previous)
+    original = deepcopy(pending.identifiers)
+    references = [(key, index, row, row["field_basis"], dict(row["field_basis"]))
+                  for key, rows in previous.identifiers.items() for index, row in enumerate(rows)]
+    at = datetime(2026, 10, 30, tzinfo=UTC)
+    upgraded = compute_import(roots, cache, previous=previous, run_id=3, at=at, attachment_sink=sink)
+    assert previous == before and pending.identifiers == original
+    for key, index, row, fields, leaves in references:
+        assert previous.identifiers[key][index] is row
+        assert row["field_basis"] is fields
+        assert all(fields[name] is leaf for name, leaf in leaves.items())
+    for key, old_rows in previous.identifiers.items():
+        for old, new in zip(old_rows, upgraded.identifiers[key], strict=True):
+            assert new == dict(old, field_basis=new["field_basis"])
+            if key in {owner, nlc_owner}:
+                assert new is not old and new["field_basis"] is not old["field_basis"]
+                for name, leaf in new["field_basis"].items():
+                    assert leaf is not old["field_basis"][name]
+                    assert leaf == dict(old["field_basis"][name], author="rule:identifier@" + rules.RULE_VERSION,
+                                        run=3, at=at.isoformat())
+            else:
+                assert new is old  # 完全未变编号仍复用，不为每行制造更新。
+    assert _report(upgraded, previous)["counts"]["changes"]["items"] == {"new": 0, "changed": 2}
+    repeated = _compute(roots, cache, previous=_state(upgraded), run=4, sink=sink)
+    assert repeated.identifiers == upgraded.identifiers
+    assert all(new is old for key, rows in upgraded.identifiers.items()
+               for old, new in zip(rows, repeated.identifiers[key], strict=True))
+    assert _report(repeated, _state(upgraded))["counts"]["changes"]["items"] == {"new": 0, "changed": 0}
+
+    # 真正路径/来源/主号变化不是 basis-only；撤销 pending 与真实改号仍走旧语义。
+    moved = directory.with_name("BD12345a")
+    directory.rename(moved)
+    (base / "副本 P2003").rename(base / "P2002")
+    attachment_id, = first.attachments.values()
+    relocated = _compute(roots, cache, previous=_state(repeated), run=5, sink=lambda file, raw: attachment_id)
+    assert all(r["since_run"] == 5 and "id" not in r for r in relocated.identifiers[nlc_owner])
+    assert {r["source_path"] for r in relocated.identifiers[nlc_owner]} == {
+        "data:中国国博馆藏/BD12345a", "data:中国国博馆藏/BD12345a/manifest.json",
+    }
+    held, = relocated.identifiers[owner]
+    assert held is next(r for r in repeated.identifiers[owner] if r["state"] == "current")
+    (moved / "manifest.json").unlink()
+    (base / "P2002").rename(base / "P2004")
+    changed = _compute(roots, cache, previous=_state(relocated), run=6)
+    directory_number, = changed.identifiers[nlc_owner]
+    assert directory_number["source"] == "文件名解析" and directory_number["is_primary"]
+    assert directory_number["since_run"] == 6 and "id" not in directory_number
+    new_number, = changed.identifiers[owner]
+    assert new_number["normalized"] == "P.2004" and new_number["state"] == "current"
+    assert new_number["since_run"] == 6 and "id" not in new_number
+    assert previous == before and pending.identifiers == original
 
 
 def test_share_numbers_and_zhihao_are_not_doubtful_collection_numbers(roots, cache, make_image):
@@ -1410,6 +1503,91 @@ def test_pending_numbers_and_original_primary_remain_current(connection, import_
     historical, = [r for r in rows if r["state"] == "historical"]
     assert historical == dict(original, state="historical", until_run=changed_run)
     assert value_at_run(connection, "item", owner, pending_run) == past
+
+
+def _seed_previous_identifier_basis(connection, owners):
+    """仅构造合成旧部署编号及配套历史；真实 SQL，不替换导入/规则函数。"""
+    with connection.transaction():
+        for row in connection.execute("SELECT * FROM identifier WHERE item_id = ANY(%s)", (owners,)):
+            connection.execute("UPDATE identifier SET field_basis=%s WHERE id=%s",
+                               (Jsonb(_previous_identifier_basis(row)), row["id"]))
+        for row in connection.execute(
+            "SELECT * FROM history WHERE object_kind='item' AND object_id = ANY(%s)", (owners,),
+        ):
+            snapshot = row["snapshot"]
+            snapshot["identifiers"] = [dict(ident, field_basis=_previous_identifier_basis(ident))
+                                       for ident in snapshot["identifiers"]]
+            connection.execute("UPDATE history SET snapshot=%s WHERE object_kind='item' AND object_id=%s AND run_id=%s",
+                               (Jsonb(snapshot), row["object_id"], row["run_id"]))
+
+
+@pytest.mark.db
+def test_identifier_basis_upgrade_keeps_database_rows_and_history(connection, import_runner, roots, make_image):
+    run, _, _ = import_runner
+    base = roots["data"] / "敦煌003"
+    for name in ("P2001", "P2003"):
+        make_image(base / name / "native.tif")
+    directory = roots["data"] / "中国国博馆藏/bd12345a"
+    make_image(directory / "BD12345a_0000_0.tif")
+    (directory / "manifest.json").write_bytes(_manifest("BD12345a"))
+    first, _ = run()
+    (base / "P2001").rename(base / "P2002")
+    changed_run, _ = run()  # 留下真正曾用号，升级不得碰这条 historical。
+    (base / "P2002").rename(base / "副本 P2003")
+    pending_run, _ = run()
+    owners = {row["grouping_key"]: row["id"] for row in connection.execute("SELECT * FROM item")}
+    upgraded_owners = [owners["pelliot:2002"], owners["nlc:BD12345a"]]
+    _seed_previous_identifier_basis(connection, upgraded_owners)
+    query = "SELECT *, xmin::text AS row_version FROM identifier ORDER BY id"
+    before = list(connection.execute(query))
+    history_query = "SELECT * FROM history ORDER BY object_kind, object_id, run_id"
+    past = list(connection.execute(history_query))
+    assert {(r["normalized"], r["state"], r["since_run"], r["until_run"])
+            for r in before if r["item_id"] == owners["pelliot:2002"]} == {
+        ("P.2001", "historical", first, changed_run),
+        ("P.2002", "current", changed_run, None), ("P.2003", "pending", pending_run, None),
+    }
+    nlc_rows = [r for r in before if r["item_id"] == owners["nlc:BD12345a"]]
+    assert {(r["system"], r["raw"], r["normalized"], r["source"], r["source_path"], r["is_primary"])
+            for r in nlc_rows} == {
+        ("nlc", "bd12345a", "BD12345a", "文件名解析", "data:中国国博馆藏/bd12345a", False),
+        ("nlc", "BD12345a", "BD12345a", "外部清单", "data:中国国博馆藏/bd12345a/manifest.json", True),
+        ("idp", "synthetic-entry", "synthetic-entry", "外部清单", "data:中国国博馆藏/bd12345a/manifest.json", False),
+    }
+    assert all(r["parent_number"] == "BD12345" and r["part"] == "a" for r in nlc_rows if r["system"] == "nlc")
+    upgraded_run, report = run()
+    after = list(connection.execute(query))
+    record = read_report(connection, upgraded_run)
+    started_at, ended_at = (datetime.fromisoformat(record[name]) for name in ("started_at", "ended_at"))
+    assert len(after) == len(before)
+    for old, new in zip(before, after, strict=True):
+        if old["item_id"] in upgraded_owners and old["state"] != "historical":
+            assert new == dict(old, field_basis=new["field_basis"], row_version=new["row_version"])
+            assert new["row_version"] != old["row_version"]
+            for name, leaf in new["field_basis"].items():
+                assert leaf == dict(old["field_basis"][name], author="rule:identifier@" + rules.RULE_VERSION,
+                                    run=upgraded_run, at=leaf["at"])
+                assert started_at <= datetime.fromisoformat(leaf["at"]) <= ended_at
+                assert old["field_basis"][name]["author"] == "rule:identifier@previous-version"
+                assert leaf["at"] != old["field_basis"][name]["at"]
+        else:
+            assert new == old  # xmin 也不变：历史行/未变编号没有无条件 UPDATE。
+    assert report["counts"]["changes"]["items"] == {"new": 0, "changed": 2}
+    history = list(connection.execute(history_query))
+    assert [h for h in history if h["run_id"] < upgraded_run] == past
+    assert len(history) == len(past) + 2
+    for owner in upgraded_owners:
+        latest = value_at_run(connection, "item", owner, upgraded_run)
+        assert latest["run_id"] == upgraded_run
+        expected = [{key: value for key, value in row.items() if key not in {"id", "until_run", "row_version"}}
+                    for row in after if row["item_id"] == owner and row["state"] != "historical"]
+        assert sorted(latest["snapshot"]["identifiers"], key=lambda r: r["raw"]) == sorted(_json_value(expected), key=lambda r: r["raw"])
+    repeated_run, report = run()
+    assert list(connection.execute(query)) == after  # 包括完整字段及 xmin；不是只有行数没变。
+    assert list(connection.execute(history_query)) == history
+    assert report["counts"]["changes"]["items"] == {"new": 0, "changed": 0}
+    for owner in upgraded_owners:
+        assert value_at_run(connection, "item", owner, repeated_run)["run_id"] == upgraded_run
 
 
 @pytest.mark.db
