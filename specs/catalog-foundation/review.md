@@ -1,5 +1,9 @@
 # catalog-foundation 实际实现评审记录
 
+> **2026-10-30：N1最小修复候选准备CodeReview-R3**。用户批准后经Analyze16/P14/P15，本机389通过/57skip/1原有警告；T38-A1/private-candidate-061真实445通过/1新HTTP期望错误/0skip已留证，P15一行修正后新候选private-candidate-063/T38-A2完整446通过/0skip/1原有警告（73.22秒，57db实际），资源/凭据全清理、v0未重启。主会话软件Converge候选具备，N1关闭与原36k证据适用边界待独立R3判断，本轮未新规模，未Gate2/merge/部署。spec7/plan10与实施期间checklist16未改。
+
+## R2及以前历史评审（后续R3不得篡改原结论）
+
 > **最新独立CodeReview-R2（2026-10-29）软件层面通过，可向用户请求Gate2**：审阅private-candidate-057、源码等同已测private-candidate-056。CR1-01代码级关闭，CR1-02/05关闭；真实材料/并发/连续v0/耗时等仍待验。新N1/P3为R1已有的规则版本升级重插未变编号问题，审核员不阻断但须用户决定修复时机。主会话已独立复核，不擅自修/接受风险，Gate2仍未批准、未合并/部署。有效原文 CodeReview-R2 anthropic.out.txt（非公开历史记录）。
 
 > 历史：2026-10-29，CodeReview-R1；审阅HEAD **`private-candidate-039`**，被测源码对应候选 `private-candidate-038`。审核员A的有效独立结论为 **「需修复后重审」**，不是通过或Gate 2批准。后续用户批准Plan10 A+C，经独立核对后P12/P13串行实现；最新候选private-candidate-056在T36/NAS全442项通过/0跳过、原512硬限36k差异化首轮/真实PG重导实际成功（RSS341.98/435.05MiB，cgroup含缓存触512、exit0无OOM）。资源已清理，现准备独立CodeReview-R2判断P1/02/05关闭，主会话不代审；未Gate2/merge/部署。历史阶段与局限下列保留，不把旧趋势当新实测。

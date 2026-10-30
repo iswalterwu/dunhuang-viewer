@@ -1,5 +1,18 @@
 # 会话交接 — catalog-foundation
 
+## 当前安全点（2026-10-30，独立R3待运行）
+
+- 唯一仓库/srv/example/project、feat/catalog-foundation，普通功能分支持续同步获准；main/origin-main仍private-candidate-023，未merge/push nas/正式部署或真实导入。
+- 用户「同意并继续」仅批准N1最小修复/隔离真PG完整复验/独立重审。Analyze16审private-candidate-059全12项通过（Anthropic Claude，09:48:03～09:55:40 （原始时刻；时区非公开）/exit0），spec7/plan10不变、checklist16在实施中冻结。
+- P14 Astra派private-candidate-060、09:59:27～10:09:41 exit0，生产仅importer两个函数+6/-1，保未变编号id/持有起点、只UPDATE真正变化basis，不改S0/旧history；新两非DB参数项/PG/HTTP回归，旧测试及其他生产AST不变。主会话本机389通过/57skip/1原有警告（446项），旧源码反事实2失败留证。
+- A1/private-candidate-061目标445通过/1新HTTP元数据期望失败/0skip；P15 Astra派private-candidate-062、10:25:52～10:29:51 exit0，仅新HTTP一行requested_run期望修正，完整历史内容断言保留。失败原件不覆盖。
+- **最新实际目标候选private-candidate-063：NAS Python3.12.15/PG17.4全446 passed/0 failed/0 skipped/1原有警告，73.22秒，57db实际**。512m构建/测试、384m PG均=memswap，API无绑定/端口/真实挂载；pip check通过、A1/A2完整freeze相同。
+- **T38全部资源/凭据已清理**，v0 ID/启动/restarts0/runningtrue未变；实例、原启动时刻与宿主可用内存非公开。无当前子agent/NAS资源/恢复命令。
+- 当前下一步：冻结候选与新证据，派独立Claude CodeReview-R3（首选桥已有接入不可用证据，引用R1证据而实际Anthropic；后续按实际可用性先试首选通道），核N1/旧修复与两个函数差异及原资源证据适用边界。R3不能代用户Gate2。
+- 本轮未新36k/规则升级足规模/真实材料/并发/v0连续健康/真实性能；旧private-candidate-056/T36的36k仅直接覆盖旧候选，cgroup含缓存触512，无可声称77MiB总余量。T25/T26仍待另获许可。当前证据：private-audit-record（N1-Analyze16；非公开历史记录，不是可执行入口）、implement/P14-T37与P15-T38、logs/T38-A1及T38-A2（先读各README）。
+
+## 本轮过程与2026-10-29历史交接（保留当时状态，以上方当前安全点为准）
+
 > **2026-10-30续接**：用户回复「同意并继续」，批准R2 N1/P3在Gate2前最小修复、隔离真实PostgreSQL完整复验与独立重审。已细化T37/T38，独立Analyze16于private-candidate-059全12项通过（09:48:03～09:55:40 （原始时刻；时区非公开），Anthropic Claude，exit0），允许仅T37/T38；原文在private-audit-record（N1-Analyze16；非公开历史记录，不是可执行入口）。P14 Astra已自然exit0（09:59:27～10:09:41），仅importer两个函数+6/-1及两测试文件；主会话本机389通过/57skip/1原有警告（446项，10.15秒），旧源码反事实2失败留证，旧断言/其他生产AST不变。证据handoff/2026-10-30/implement/P14-T37。T38-A1/private-candidate-061目标3.12/PG全446项：445通过/1新增HTTP断言失败/0skip（72.66秒）；新PG编号历史/xmin回归通过。唯一新HTTP断言误把requested_run也当旧值，API原契约无误；P15 Astra已仅修新HTTP一行requested_run期望（10:25:52～10:29:51，exit0），主会话本机389/57skip/1原有警告复验、生产与其他测试不变；待A2新候选复验，未R3。A1所有资源/凭据已清理，v0未变；证据handoff/2026-10-30/logs/T38-A1。不跑新36k，旧private-candidate-056/442/36k只属旧候选。仍未Gate2、merge、push nas、正式部署或真实导入。下列2026-10-29记录为上一安全点。
 
 > **当前（2026-10-29）：Plan10 A+C候选private-candidate-056已在NAS全442项通过、0跳过；原512MiB硬限额内36k差异化合成影像首轮/真PG重导均成功，RSS峰值341.98/435.05MiB、343.12/307.41秒。** cgroup峰值达到512MiB（含页缓存），exit0无OOM，不等于实际材料/并发API/真实v0健康已验。T36资源/凭据已全清理，v0未重启；独立CodeReview-R2已软件通过、CR1-01代码级/02/05关闭，可以请求Gate2；新N1/P3为旧基线规则升级重插未变编号，待用户决定先修或登记接受，当前未擅修/未Gate2/merge/部署。
