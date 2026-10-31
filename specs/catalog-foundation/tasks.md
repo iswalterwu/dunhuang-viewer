@@ -446,6 +446,24 @@
 - **其余结论不回退**：除异常总数 4,651→1,357（仅「画布对不上」3,364→70）与画布计数外，报告全部计数与批次 2 相同；覆盖、排除清单、新类别、目录谱系、未归属附件与建议证据各节均与批次 2 相同；`compare.py` 对本批报告的输出与 T-26 A2 完全相同（退出码 1，同样 6 项已逐项解释的差异）。A6 性能与 A7 链接未重测：本次只改画布字段，查询与 v0 链接路径未变，沿用 T-26 结果，不作新证明。
 - **保留与风险**：NAS 私有备份（`.env` 备份 600、构建与启动日志）与证据目录均仅 root 可读，确认稳定后另行清理。API 内存峰值 94.0%（T-26 重跑 95.2%），余量仍薄；不放宽限额，如需调整先立 ADR。文档页前端渲染失败的原因未查明（未核实的推测：页面加载的 Swagger UI 版本变化），不影响服务端；`catalog/README.md` 已补控制台单次 POST 的后备做法。
 
+### T-42 `native (n).tif` 命名变体视同 BnF 命名（0.5 小时，Astra）
+
+- **独立核对**：Analyze20（claude-bridge/claude-fable-5-1，2026-10-31T09:53Z～09:56Z，exit0）通过、可在用户确认规则版本后派实施，无 P0/P1/P2；P3-1（docs/plan.md §1.3 补变体短语）、P3-3（完成标准写明正则）、P3-4（T-43 预期补全）已补入；用户确认规则版本不提升后，P3-2（plan §4.4 归因说明）亦已补入。
+- **上下文**：T-26 A3 中 `2019年新增1` 的 3 个单图目录（P.2016、P.2018、P.2019）文件名为 `native (1).tif`（括号前一个空格），无软件标签，因不合 `NATIVE_TIFF` 正则判为「未判定」并列「谱系未判定」异常。用户于 2026-10-31 澄清：视同 BnF 命名。AC-005-2 不变（TIFF 按 plan 判定，判不出的列异常），按 plan §4.4 谱系判定表的补充实现，不需重过 Gate1。真实材料另见 2 个 `native-(n).tif`（连字符），均带 CS6 软件标签，无论命名都判第三方加工图，故不纳入。
+- **修改范围**：仅 `catalog/src/dh_catalog/rules.py` 的 `NATIVE_TIFF` 正则与 `catalog/tests/test_rules.py`。不改判定顺序、软件标签条件、来源与许可规则、导入器、数据库与依赖；不为未观察到的变体加分支。
+- **完成标准**：满足 AC-005-2。`NATIVE_TIFF` 改为 `native(?: ?\(\d+\))?\.(?:tif|tiff|btf)`（可选空格放在括号组内；放在组外会误收 `native .tif`），仍忽略大小写、整名匹配。`native (n).tif`（`native` 与括号之间恰好一个空格）且软件标签缺失时判 BnF 原图；有软件标签时仍判第三方加工图；`native.tif`、`native(n).tif` 的现有判定不变；`native-(n).tif`、两个及以上空格、空格后无括号序号等变体仍判「未判定」。现有断言全部保留不改；新用例可加入 `test_lineage` 参数表。
+- **规则版本（用户已于 2026-10-31 确认不提升）**：不提升 `RULE_VERSION`，与 T-40 同理；修复部署后的记录与 verification 须注明 `2026-10-30.1` 自该批次起包含本次放宽。改判只涉及这 3 个文件：谱系及随之而来的来源与许可六项、至多 3 件写卷的展示策略；其依据作者由 `rule:lineage-unresolved@…` 变为 `rule:lineage-bnf-native@…`，逐字段可见，并可由导入批次的 `code_version` 与历史记录的批次归因。此前没有任何空格变体文件以 `lineage-bnf-native` 判定，既有记录的依据含义不受影响。若提升，约 3.6 万影像与 6 千写卷的全部规则依据都会变化并各写一条历史，正是“规则升级足规模未验”的路径，而 T-26/T-41 重导的 API 内存峰值已达 94～95%。
+- **真实测试**：沿用 `make_image` 生成真实小 TIFF（有无软件标签两种），经 `scan`、`read_facts`、`detect_lineage` 判定；不 mock。
+- **验证命令**：`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_rules.py`，再跑完整 `catalog/tests catalog/acceptance`（DB/仅 Linux 项如实 skip）；`git diff --check`、UTF-8 LF、Python 3.12 AST 与改动范围核对。实施者不提交、不推送、不连 NAS。
+
+### T-43 命名变体修复的复验、部署与重导（1～2 小时；须另获许可）
+
+- **依赖**：T-42 本机通过、独立 CodeReview 通过、用户 Gate2；PR 合并到 main 后，另获目标测试、部署与重导许可。
+- **步骤**：同 T-41。（1）以合并后 main 快照隔离构建并跑完整目标测试（DB 项 0 skip），清理资源；（2）普通 `git push nas main` 快进同步，受限构建新镜像，更新 `catalog/.env` 的 `DH_CODE_VERSION`，只重建 `catalog-api`，健康、限额、挂载、端口与匿名 401 复核，不动 v0；（3）用户以管理员触发一次导入（文档页渲染失败时用 `catalog/README.md` 的控制台单次 POST），主会话监控资源并导出报告；（4）复验并归因。
+- **预期**：3 个 `native (1).tif` 由「未判定」改判 BnF 原图；影像行值变化恰为 `lineage`、`collection`、`license`、`attribution`、`display_policy`、`external_policy` 六项，`acquisition` 值不变（两种谱系下都是接收事件 A），只是其依据作者由 `license-unknown` 变为 `license-bnf`；`field_basis` 中谱系与来源六项共 7 个依据变化。3 个目录的谱系汇总改为 BnF 原图，「谱系未判定」异常减 3。报告中 `changes.images.metadata_changed` 为 3、各写一条影像历史；写卷至多 3 件变化（只有当该写卷全部影像均为「登录墙内可展示」时，`display_policy` 及其依据才变），逐件归因。随之变化的计数还有 `images_by_lineage`、`directories_by_lineage`、`anomalies` 与 `anomalies_by_category`、`directory_lineages`；`compare.py` 的 BnF 原图目录差值由 −12 变为 −9，退出码仍为 1、差异项仍为 6 项。文件事实全部复用；A4 仍为 99.68%；其余计数与批次 3 相同；原图与备份零变化。复验时顺带核对这 3 条影像已入库的事实字段（压缩、分辨率、软件标签）是否与 docs/plan.md §1.3 乙类特征一致，作为用户澄清之外的独立佐证。
+- **停止条件**：其他任何影像的谱系或来源字段变化，先停下归因，不连续重导；`catalog-api` 被 OOM 终止即停，单事务回滚，由用户决定，不自动重试、不放宽限额；部署时必须更新 `DH_CODE_VERSION`。
+- **完成标准**：3 个文件满足 AC-005-2 的新判定，其余 T-26/T-41 结论不回退；全部临时资源清理；记录脱敏后写入本任务与 verification。
+
 CR1-03（扩展名紧邻裸号，未证实）与CR1-04（备份散放，低概率）现在不改代码或冻结编号规则；留T-26按实际材料核查，必要时先澄清/登记。评审范围、全部发现与Gate2待验风险见review.md，原文按哈希归档，不勾改设计checklist。
 
 ## 子 agent 实施记录
