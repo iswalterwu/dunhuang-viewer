@@ -10,6 +10,8 @@
 
 **F-1 修复与复验（T-40/T-41，2026-10-31）**：`report.json` 的 `pages` 结构支持经独立 Analyze19、CodeReview-F1 与用户 Gate2 后由 PR #2 合并（`db64233f4b91`）。合并后隔离目标测试 498 通过/0 跳过；部署远端普通快进，只重建 `catalog-api`，复核通过，v0 未动；用户触发批次 3 重导，427 秒成功，原图零变化。A4 由 84.5% 升至 99.68%，剩余 70 个整卷拼长图列为异常，其余结论不回退，F-1 关闭；API 内存峰值 94.0% 仍列风险。详见[catalog任务T-40/T-41](specs/catalog-foundation/tasks.md)。
 
+**命名变体（T-42/T-43）**：用户澄清 `2019年新增1` 中 3 个 `native (1).tif`（括号前一个空格、无软件标签）视同 BnF 命名。T-42 只改 `NATIVE_TIFF` 正则并补测试，规则版本按用户确认不提升；独立 Analyze20 与 CodeReview-N2 通过，待 Gate2。部署与重导复验（T-43）须另获许可。详见[catalog任务T-42/T-43](specs/catalog-foundation/tasks.md)。
+
 **合并后隔离目标回归（T-39）**：经用户另行批准，以main `646a29ee64ba` 快照在隔离目录受限构建并用一次性PG运行完整目标测试：**483 passed/0 failed/0 skipped/1原有警告，84.45秒**，61个db项（含新增4项）全部实际执行通过。首批因操作就绪探针过早而在pytest前停止并清理；两批临时资源均已清理，v0未变。详见[catalog任务T-39](specs/catalog-foundation/tasks.md)。
 
 初期PRIV-01～04集成记录：完整 **489 passed/61 skipped/1原有警告，550项，42.67秒**；61=58缺DB+3仅Linux，不算通过。配置/旧记录前缀/中性标签与主机模板/脚本、公开文档/归档和发布工具均有局部证明。初始集成树112文件的index+worktree检查224文本实例0命中，新增状态文件须重新复扫；旧Git历史尚未据此自动清理。
