@@ -62,7 +62,7 @@ def parse_nlc(unit: Unit, manifest: bytes | None, report: bytes | None) -> NlcRe
 
     None 表示附件不可用；读取失败由调用方另记。JSON / 字段格式错误在此
     记为 issues，不中断导入。有清单但 Pressmark 不可用时不信任目录号。
-    report 的 strips 非列表（含没有 report）时使用文件名序号。
+    report 的 strips 空列表时读取 pages 列表，非列表（含没有 report）时使用文件名序号。
     三种附件的原始字节由调用方存储，index.json 不参与业务解析。
     """
     issues: list[NlcIssue] = []
@@ -160,13 +160,14 @@ def _read_strips(unit: Unit, raw: bytes | None, issues: list[NlcIssue]) -> dict[
     data = _json_object(raw, origin, issues)
     if data is None or not isinstance(data.get("strips"), list):
         return None
+    field = "pages" if not data["strips"] and isinstance(data.get("pages"), list) else "strips"
     strips = {}
-    for index, entry in enumerate(data["strips"]):
+    for index, entry in enumerate(data[field]):
         if not (
             isinstance(entry, dict) and isinstance(entry.get("file"), str) and entry["file"]
             and type(entry.get("index")) is int and entry["index"] >= 0
         ):
-            _format_issue(origin, f"strips[{index}]", entry, "分片应有 file 字符串与从 0 起的整数 index", issues)
+            _format_issue(origin, f"{field}[{index}]", entry, "分片应有 file 字符串与从 0 起的整数 index", issues)
             continue
         strips[unit.relative_path / entry["file"]] = entry["index"]
     return strips
