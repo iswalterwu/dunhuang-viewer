@@ -2,7 +2,7 @@
 
 > 公开隐私修订：私人部署实例与原件非公开保全；历史验证为脱敏衍生记录，不是逐字原文。配置占位不代表真实主机。
 
-**当前交付（2026-10-30）**：目录底座R3与隐私R5均独立通过，原软件及本轮隐私Gate2均获用户确认；当前运行实现已就绪，origin两分支历史按原租约受保护更新并实际远端复扫、本机迁移完成，交接与PR #1正常匿名UTC合并完成。交接本机489通过/61跳过/1原警告（48.99秒）；合并后T-39隔离目标回归483通过/0跳过（61个db项含新增4项实际通过）。**T-25 已获准执行（2026-10-30）**：部署远端首次同步与 v0 宿主配置迁移完成，目录服务两容器健康，限额、只读挂载、端口绑定核验通过，匿名访问均得 401；登录态冒烟经用户完成并核对，T-25 完成。v0 未重建、未重启。T-26 仍须另许可，v0 根镜像重建亦另议。新前端/标注工作台不在本feature，v0继续原状；不宣称真实材料或生产验收通过。
+**当前交付（2026-10-30）**：目录底座R3与隐私R5均独立通过，原软件及本轮隐私Gate2均获用户确认；当前运行实现已就绪，origin两分支历史按原租约受保护更新并实际远端复扫、本机迁移完成，交接与PR #1正常匿名UTC合并完成。交接本机489通过/61跳过/1原警告（48.99秒）；合并后T-39隔离目标回归483通过/0跳过（61个db项含新增4项实际通过）。**T-25 已获准执行（2026-10-30）**：部署远端首次同步与 v0 宿主配置迁移完成，目录服务两容器健康，限额、只读挂载、端口绑定核验通过，匿名访问均得 401；登录态冒烟经用户完成并核对，T-25 完成。v0 未重建、未重启。T-26 已获准执行：导入、只读、性能与链接验收达标，画布对应发现 F-1 待修复后重导复验，详见 tasks T-26；v0 根镜像重建另议。新前端/标注工作台不在本feature，v0继续原状；不宣称真实材料或生产验收通过。
 
 当前是独立后端。以下开头两段为隐私实施前的软件历史状态，后续公开发布进度以 `specs/public-release-privacy/` 为准，不把旧证据当新验证。**2026-10-30 N1修复候选private-candidate-063在NAS隔离Python3.12.15/PostgreSQL17.4全446项通过、0跳过；独立CodeReview-R3已软件通过、N1关闭，原软件Gate2已获用户批准；用户随后确认保持Public，D-019已登记。交接/PR/合并等待public-release-privacy脱敏规格批准、实施与验证，当前尚未批量清理；未部署或真实材料验收**。需求与任务以 `../specs/catalog-foundation/` 为准；不改 v0。
 
@@ -183,7 +183,7 @@ git diff --check
 
 - T-24 测试许可、T-25 部署许可、T-26 全量验收许可分别取得；Gate 2 / merge 不能替代许可。低峰且宿主 `MemAvailable >= 2GB`，先保存 `grep '^MemAvailable:' /proc/meminfo`。不关闭或重启 v0，不恢复 Q-025 删除的暂停/中止、内容指纹等机制。
 - 宿主证据目录 `E` 与本机对应 `EVIDENCE` 均由用户在非公开配置中批准指定；本说明不提供私人路径。两者均必须在部署 git 工作区、pgdata、原材料与 cache **之外**，权限仅供验收人员；先 `umask 077` 再创建。不要将这些变量设为仓库子目录。所有真实报告、元数据、差异与截图不入库，不进入构建上下文。
-- 浏览器启用“每次下载询问保存位置”，以下 `save` 下载均存入本机 `EVIDENCE`。只用用户正常登录 v0 的真实会话；在同一 NAS 主机名的 catalog 受保护文档页操作。不能读取/复制 `.env` 或 users.json 来签发会话；不复制 cookie 到代码、脚本、命令、日志或 HAR，不使用“Copy as cURL”。
+- 浏览器启用“每次下载询问保存位置”，以下 `save` 下载均存入本机 `EVIDENCE`；catalog 与 v0 走局域网 HTTP，浏览器可能拦截这些下载，须在下载列表点“保留”。只用用户正常登录 v0 的真实会话；在同一 NAS 主机名的 catalog 受保护文档页操作。不能读取/复制 `.env` 或 users.json 来签发会话；不复制 cookie 到代码、脚本、命令、日志或 HAR，不使用“Copy as cURL”。
 - 先做 A5 前快照并启动资源采样，再由用户在 `/api/v1/docs` 手动触发 POST，记录返回批次 ID。本节没有 CLI 导入或自动 POST。无变化重跑也由用户自行触发，分别记录两批 ID。
 
 以下浏览器辅助片段均仅 GET，置于已登录 catalog 页控制台；没有会话字面量。定义一次后供 A1～A4、A6、A7 使用。任何非 200、重定向、非 JSON 均拒绝，不把登录页当结果：
@@ -309,7 +309,7 @@ with open(sys.argv[1], 'x', encoding='utf-8', newline='\n') as out:
         for directory, _, files in os.walk(root, followlinks=False, onerror=fail):
             for name in sorted(files):
                 path = pathlib.Path(directory) / name
-                st = path.stat(follow_symlinks=False)
+                st = os.lstat(path)  # 等价于 stat(follow_symlinks=False)，兼容宿主 Python 3.8
                 out.write(json.dumps([root, str(path.relative_to(root)), st.st_size, st.st_mtime_ns], ensure_ascii=False)+'\n')
 PY
 ```
@@ -354,10 +354,14 @@ with open(sys.argv[1], 'x', encoding='utf-8') as out:
     tick = time.monotonic()
     try:
         while True:
-            r = subprocess.run(['/usr/local/bin/docker', 'stats', '--no-stream', '--format', '{{json .}}', *sys.argv[2:]],
-                               capture_output=True, text=True, timeout=5)
+            try:  # 单次 docker stats 超时只记一条，不能让采样器整体退出
+                r = subprocess.run(['/usr/local/bin/docker', 'stats', '--no-stream', '--format', '{{json .}}', *sys.argv[2:]],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=5)
+                rc, lines = r.returncode, r.stdout.splitlines()
+            except subprocess.TimeoutExpired:
+                rc, lines = 'timeout', []
             out.write(json.dumps({'at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                                  'returncode':r.returncode, 'stats':r.stdout.splitlines()})+'\n')
+                                  'returncode':rc, 'stats':lines})+'\n')
             out.flush()
             tick += 5
             time.sleep(max(0, tick-time.monotonic()))
