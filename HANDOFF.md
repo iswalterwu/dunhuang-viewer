@@ -10,7 +10,7 @@
 
 **F-1 修复与复验（T-40/T-41，2026-10-31）**：`report.json` 的 `pages` 结构支持经独立 Analyze19、CodeReview-F1 与用户 Gate2 后由 PR #2 合并（`db64233f4b91`）。合并后隔离目标测试 498 通过/0 跳过；部署远端普通快进，只重建 `catalog-api`，复核通过，v0 未动；用户触发批次 3 重导，427 秒成功，原图零变化。A4 由 84.5% 升至 99.68%，剩余 70 个整卷拼长图列为异常，其余结论不回退，F-1 关闭；API 内存峰值 94.0% 仍列风险。详见[catalog任务T-40/T-41](specs/catalog-foundation/tasks.md)。
 
-**命名变体（T-42/T-43）**：用户澄清 `2019年新增1` 中 3 个 `native (1).tif`（括号前一个空格、无软件标签）视同 BnF 命名。T-42 只改 `NATIVE_TIFF` 正则并补测试，规则版本按用户确认不提升；独立 Analyze20 与 CodeReview-N2 通过，待 Gate2。部署与重导复验（T-43）须另获许可。详见[catalog任务T-42/T-43](specs/catalog-foundation/tasks.md)。
+**命名变体（T-42/T-43）**：用户澄清 `2019年新增1` 中 3 个 `native (1).tif`（括号前一个空格、无软件标签）视同 BnF 命名。T-42 只改 `NATIVE_TIFF` 正则并补测试，规则版本按用户确认不提升；独立 Analyze20 与 CodeReview-N2 通过，用户 Gate2 后由 PR #3 合并（`a5b1a21d15c8`）。T-43 经用户批准执行：合并后隔离目标测试 503 通过/0 跳过；部署远端普通快进、只重建 `catalog-api`；批次 4 重导 529 秒成功，原图零变化；3 张影像改判 BnF 原图、2 件写卷展示策略随之放宽，没有其他对象变化，「谱系未判定」归零，其余结论不回退。详见[catalog任务T-42/T-43](specs/catalog-foundation/tasks.md)。
 
 **合并后隔离目标回归（T-39）**：经用户另行批准，以main `646a29ee64ba` 快照在隔离目录受限构建并用一次性PG运行完整目标测试：**483 passed/0 failed/0 skipped/1原有警告，84.45秒**，61个db项（含新增4项）全部实际执行通过。首批因操作就绪探针过早而在pytest前停止并清理；两批临时资源均已清理，v0未变。详见[catalog任务T-39](specs/catalog-foundation/tasks.md)。
 
