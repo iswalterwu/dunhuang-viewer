@@ -18,6 +18,11 @@ NOW = datetime(2026, 10, 28, 13, 0, tzinfo=UTC)
 @pytest.mark.parametrize("name,software,expected", [
     ("敦煌003/P2002/native.tif", "", "BnF 原图"),
     ("敦煌003/P2002/native(2).tif", "", "BnF 原图"),
+    ("敦煌003/P2002/native (1).tif", "", "BnF 原图"),
+    ("敦煌003/P2002/native (1).tif", "Photoshop CS6", "第三方加工图"),
+    ("敦煌003/P2002/native-(1).tif", "", "未判定"),
+    ("敦煌003/P2002/native  (1).tif", "", "未判定"),
+    ("敦煌003/P2002/native .tif", "", "未判定"),
     ("敦煌003/P2002/native.tif", "Photoshop CS6", "第三方加工图"),
     ("敦煌003/P2002/1.tif", "Photoshop CS6", "第三方加工图"),
     ("敦煌003/P2002/1.tif", "", "未判定"),

@@ -42,7 +42,7 @@ NON_DUNHUANG_MARKERS = (
     ("紫紙金字", ("紫紙金字", "紫纸金字")),
     ("大橋家来翰集", ("大橋家来翰集",)),
 )
-NATIVE_TIFF = re.compile(r"native(?:\(\d+\))?\.(?:tif|tiff|btf)", re.IGNORECASE)
+NATIVE_TIFF = re.compile(r"native(?: ?\(\d+\))?\.(?:tif|tiff|btf)", re.IGNORECASE)
 
 Lineage = Literal["BnF 原图", "第三方加工图", "本地合成", "国图 IDP 下载", "未判定"]
 Confidence = Literal["确定", "推断"]

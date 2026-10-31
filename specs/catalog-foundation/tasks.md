@@ -448,6 +448,7 @@
 
 ### T-42 `native (n).tif` 命名变体视同 BnF 命名（0.5 小时，Astra）
 
+- **状态**：本机实施完成，待独立 CodeReview 与 Gate2。P23 由 openai/gpt-6-astra 实施（2026-10-31，exit0），只改 `rules.py` 的 `NATIVE_TIFF` 一行（`native(?: ?\(\d+\))?\.(?:tif|tiff|btf)`）与 `test_rules.py`：`test_lineage` 参数表新增 5 行（空格变体无/有软件标签，连字符、两个空格、空格后无序号三种不收），原有断言未改。主会话复核：旧代码配新测试 1 failed / 37 passed（唯一失败即无软件标签的 `native (1).tif` 应判 BnF 原图），新代码 `test_rules.py` 38 passed，完整本机 509 passed / 61 skipped / 1 原有警告（52.22 秒；跳过为 58 项缺测试库、3 项仅 Linux）；`git diff --check`、UTF-8 LF 无 BOM、Python 3.12 语法通过，顶层语句变化只有 `NATIVE_TIFF`。本机为 Python 3.14，目标运行与真实重导留 T-43。
 - **独立核对**：Analyze20（claude-bridge/claude-fable-5-1，2026-10-31T09:53Z～09:56Z，exit0）通过、可在用户确认规则版本后派实施，无 P0/P1/P2；P3-1（docs/plan.md §1.3 补变体短语）、P3-3（完成标准写明正则）、P3-4（T-43 预期补全）已补入；用户确认规则版本不提升后，P3-2（plan §4.4 归因说明）亦已补入。
 - **上下文**：T-26 A3 中 `2019年新增1` 的 3 个单图目录（P.2016、P.2018、P.2019）文件名为 `native (1).tif`（括号前一个空格），无软件标签，因不合 `NATIVE_TIFF` 正则判为「未判定」并列「谱系未判定」异常。用户于 2026-10-31 澄清：视同 BnF 命名。AC-005-2 不变（TIFF 按 plan 判定，判不出的列异常），按 plan §4.4 谱系判定表的补充实现，不需重过 Gate1。真实材料另见 2 个 `native-(n).tif`（连字符），均带 CS6 软件标签，无论命名都判第三方加工图，故不纳入。
 - **修改范围**：仅 `catalog/src/dh_catalog/rules.py` 的 `NATIVE_TIFF` 正则与 `catalog/tests/test_rules.py`。不改判定顺序、软件标签条件、来源与许可规则、导入器、数据库与依赖；不为未观察到的变体加分支。
