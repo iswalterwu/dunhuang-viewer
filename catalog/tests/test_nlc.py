@@ -175,6 +175,89 @@ def test_canvas_mapping_pages_and_preview(nlc_case):
     assert not result.issues
 
 
+def test_canvas_mapping_report_pages_uses_file_and_index_not_order_or_filename(nlc_case):
+    unit, result = nlc_case(
+        files=("BD61234a_p0000_0.tif", "BD61234a_p0001_1.tif"), manifest=manifest_data(),
+        report={"strips": [], "pages": [
+            {"file": "BD61234a_p0000_0.tif", "index": 1, "label": "0"},
+            {"file": "BD61234a_p0001_1.tif", "index": 0, "label": "1"},
+        ]},
+    )
+    assert result.canvases == {
+        unit.relative_path / "BD61234a_p0000_0.tif": CanvasRef(1, MANIFEST_ID + "/items/1"),
+        unit.relative_path / "BD61234a_p0001_1.tif": CanvasRef(0, MANIFEST_ID + "/items/0"),
+    }
+    assert not result.issues
+
+
+@pytest.mark.parametrize("entry", [
+    {"file": "BD61234a_0000_9.tif", "index": "0"},
+    {"file": "BD61234a_0000_9.tif", "index": -1},
+    {"file": "BD61234a_0000_9.tif", "index": True},
+    {"file": "BD61234a_0000_9.tif"},
+    {"file": "", "index": 0},
+    {"file": 7, "index": 0},
+    {"index": 0},
+    None,
+])
+def test_invalid_report_page_is_reported_and_valid_page_still_maps(nlc_case, entry):
+    unit, result = nlc_case(
+        files=("BD61234a_0000_9.tif", "BD61234a_p0001_1.tif"), manifest=manifest_data(),
+        report={"strips": [], "pages": [
+            {"file": "BD61234a_p0001_1.tif", "index": 1}, entry,
+        ]},
+    )
+    assert result.canvases == {
+        unit.relative_path / "BD61234a_p0001_1.tif": CanvasRef(1, MANIFEST_ID + "/items/1"),
+    }
+    invalid, unmatched = result.issues
+    assert invalid.category == "读不了的文件"
+    assert invalid.relative_path == unit.relative_path / "report.json"
+    assert invalid.field == "pages[1]"
+    assert invalid.reason
+    assert unmatched.category == "画布对不上"
+    assert unmatched.relative_path == unit.relative_path / "BD61234a_0000_9.tif"
+    assert unmatched.reason == "未取得画布序号"
+
+
+def test_canvas_mapping_nonempty_strips_takes_priority_over_report_pages(nlc_case):
+    unit, result = nlc_case(
+        files=("BD61234a_p0000_0.tif",), manifest=manifest_data(),
+        report={
+            "strips": [{"file": "BD61234a_p0000_0.tif", "index": 1}],
+            "pages": [{"file": "BD61234a_p0000_0.tif", "index": 0}],
+        },
+    )
+    assert result.canvases == {
+        unit.relative_path / "BD61234a_p0000_0.tif": CanvasRef(1, MANIFEST_ID + "/items/1"),
+    }
+    assert not result.issues
+
+
+@pytest.mark.parametrize("report", [
+    {"strips": []}, {"strips": [], "pages": 2}, {"strips": [], "pages": []},
+])
+def test_canvas_mapping_empty_strips_without_report_pages_does_not_fall_back(nlc_case, report):
+    unit, result = nlc_case(manifest=manifest_data(), report=report)
+    assert not result.canvases
+    issue, = result.issues
+    assert issue.category == "画布对不上"
+    assert issue.relative_path == unit.relative_path / "BD61234a_0000_9.tif"
+    assert issue.reason == "未取得画布序号"
+
+
+@pytest.mark.parametrize("strips", [None, 0])
+def test_canvas_mapping_nonlist_strips_ignores_report_pages(nlc_case, strips):
+    unit, result = nlc_case(
+        manifest=manifest_data(),
+        report={"strips": strips, "pages": [{"file": "BD61234a_0000_9.tif", "index": 1}]},
+    )
+    assert result.canvases == {
+        unit.relative_path / "BD61234a_0000_9.tif": CanvasRef(0, MANIFEST_ID + "/items/0"),
+    }
+    assert not result.issues
+
+
 def test_attribution_is_passed_to_real_source_policy(nlc_case):
     data = manifest_data()
     data["requiredStatement"]["value"] = {"en": ["Synthetic Library", "Credit the photographer"], "zh": ["合成署名"]}

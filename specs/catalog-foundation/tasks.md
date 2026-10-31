@@ -416,6 +416,23 @@
 - **清理**：两批次的临时容器、匿名卷、网络、测试镜像、隔离快照目录与临时凭据均删除，并按标签/名称复核无残留；v0容器标识、启动时间、重启次数与运行状态前后一致；未全局prune、未起正式Compose。原始命令/输出/事件仅非公开保全。
 - **边界**：合成软件证据，不是T-25正式部署或T-26真实材料/规模/性能/v0连续健康验收；旧36k不变成新候选实测，规则升级足规模仍未验。隔离测试镜像构建成功不等于正式镜像重建；v0根Dockerfile（仅注释变化）的镜像仍未重建。
 
+### T-40 F-1 修复：`report.json` 的 `pages` 结构画布对应（0.5～1 小时，Astra）
+
+- **状态**：本机实施完成；**独立 CodeReview-F1 通过**（claude-bridge/claude-fable-5-1，2026-10-31T07:27Z～07:31Z，exit0；无 P0/P1/P2，可请求 Gate2；审核员亲跑 test_nlc 51 passed、完整本机 504 passed/61 skipped/1 警告，旧代码配新测试 9 failed/42 passed）。三条 P3 不阻断：docstring 未写“pages 非列表时不对应”、一个新用例与原有用例等价、导入器级无 `pages` 夹具（导入器只复制字典、无分支）。**用户已批准 Gate2（2026-10-31）**，接受上述三条 P3 不改，允许 PR 合并；同时批准 T-41 全部步骤。P22 由 openai/gpt-6-astra 实施（2026-10-31，exit0），只改 `nlc.py` 与 `test_nlc.py`：`_read_strips` 在 `strips` 为空列表且 `pages` 为列表时改读 `pages`，共用原条目校验，异常字段随之为 `pages[i]`；`parse_nlc` 只改一句 docstring。新增 5 个测试函数（参数化后 15 项），原有断言未改。主会话复核：旧代码配新测试 9 failed / 42 passed（复现缺口），新代码 `test_nlc.py` 51 passed，完整本机 504 passed / 61 skipped / 1 原有警告（46.95 秒；跳过为 58 项缺测试库、3 项仅 Linux）；`git diff --check`、UTF-8 LF 无 BOM、Python 3.12 语法通过，顶层定义变化只有 `_read_strips` 与 `parse_nlc`。本机为 Python 3.14，目标运行与真实重导留 T-41。
+- **上下文**：T-26 A4 对应率 84.5%。3,364 个缺口均为“未取得画布序号”：2,878 个（730 卷）文件名为 `BDxxxxx_pNNNN_n.tif`，其 `report.json` 为 `has_strips: false`、`strips: []`、`pages: [{index, label, file}]`；`_read_strips` 只读 `strips`，空列表时又不启用文件名后备，故整卷不对应。另 416 个（72 卷，常规命名、多为新下载卷）推断为同一结构，待 T-41 重导核实；70 个整卷拼长图 `BDxxxxx_scroll.tif` 不对应单一画布，按现行规格保留异常。需求 AC-005-4 不变，按 plan §4.6 的 T-26 补充实现，不需重过 Gate1。独立 Analyze19（claude-bridge/claude-fable-5-1，2026-10-31T07:12Z～07:15Z，exit0）通过、可派实施，无 P0/P1；P3 两条已补入。**P2 规则版本决策**：建议本次不提升 `RULE_VERSION`——只改 `report.json` 的结构覆盖，现有输入的规则语义不变；画布字段的变化可由批次 `code_version` 与历史记录的批次归因。若提升，约 3.6 万影像与 6 千写卷的规则来源字段依据全部变化并各写一条历史，正是“规则升级足规模未验”的路径，且 T-26 重跑内存已达 95.2%。**用户已确认不提升**（2026-10-31），修改范围维持 `nlc.py` 与 `test_nlc.py`。
+- **修改范围**：仅 `catalog/src/dh_catalog/nlc.py`（`report.json` 读取及相应 docstring）与 `catalog/tests/test_nlc.py`。不改文件名后备正则、页图 JPG 规则、清单解析、导入器、数据库、规则版本、其他模块与依赖；不为未观察到的结构加分支。
+- **完成标准**：满足 AC-005-4。`strips` 为空列表且 `pages` 为列表时，按每条 `pages[i].file` 与 `pages[i].index` 对应到清单画布；条目缺 `file` 字符串或非从 0 起整数 `index` 时记「读不了的文件」（字段 `pages[i]`）并跳过该条。`strips` 为非空列表时只用 `strips`（同一文件在 `pages` 中的不同序号不影响结果）；`strips` 为空列表而 `pages` 缺失、为整数或为空列表时，照旧无对应并记「画布对不上」；`strips` 不是列表（含无 report）时照旧按文件名序号。现有 `test_nlc.py` 断言全部保留不改。
+- **真实测试**：沿用 `nlc_case` 夹具从真实小 TIFF 与真实 JSON 文件扫描、划分单元后调用 `parse_nlc`：新增 `pages` 结构正常对应（`_p` 文件名、序号来自条目而非文件名或顺序）、不合格 `pages` 条目报告字段、非空 `strips` 优先、空 `strips` 无 `pages` 照旧不对应等用例；不 mock 解析器。
+- **验证命令**：`catalog/.venv/Scripts/python.exe -B -I -X utf8 -m pytest -p no:cacheprovider -c catalog/pytest.ini catalog/tests/test_nlc.py`，再跑完整 `catalog/tests catalog/acceptance`（DB/仅 Linux 项如实 skip）；`git diff --check`、UTF-8 LF、Python 3.12 AST 与改动范围核对。实施者不提交、不推送、不连 NAS。
+
+### T-41 F-1 复验、部署与重导（1～2 小时；须另获许可）
+
+- **状态**：用户已于 2026-10-31 批准（含隔离目标测试、部署与重导），待 PR 合并后执行。
+- **依赖**：T-40 本机通过、独立 CodeReview 通过、用户 Gate2；PR 合并到 main 后，另获目标测试、部署与重导许可。
+- **步骤**：（1）以合并后 main 快照按 T-39 方式隔离构建并跑完整目标测试（DB 项 0 skip），清理资源；（2）普通 `git push nas main` 快进同步（已非首次同步），按 T-25 受限构建新目录服务镜像、更新 `catalog/.env` 的 `DH_CODE_VERSION`、只重建 `catalog-api` 容器，健康、限额、挂载、端口与匿名 401 复核，不动 v0；（3）用户以管理员触发一次导入，主会话监控资源并导出报告；（4）复验 A4 对应率与剩余异常逐类归因（416 个常规命名是否随之对应、70 个拼长图保留），并确认其他计数与 T-26 一致或差异可归因。预期：本批是首次全量“有变化”重导，影像变化约 2,878 加至多 416 条、各写一条历史；写卷快照不含画布，写卷不应变化；文件事实应全部复用；原图与备份仍零变化。若 `catalog-api` 在导入中被 OOM 终止，单事务回滚、不影响 v0，记录后由用户决定，不自动重试。
+- **停止条件（CodeReview-F1 带入）**：重导后 A4 对应率若低于约 97.8%（即 2,878 个 `_p` 文件未全部对应），先按卷抽样核 `report.json` 再议，不连续重导；416 个常规命名若其 `report.json` 为空 `strips` 且无 `pages`，属另一结构，回 Clarify 而不扩代码；`catalog-api` 被 OOM 终止即停，单事务回滚，由用户决定，不自动重试、不放宽限额；部署时必须更新 `DH_CODE_VERSION`（规则版本不变，批次归因依赖代码版本与历史批次）；影像变化应约等于新对应数、写卷变化为 0、文件事实全部复用、原图与备份零变化，偏离须先归因。
+- **完成标准**：AC-005-4 的 `pages` 结构卷全部对应或剩余缺口逐项有异常与原因；其余 T-26 结论不回退；全部临时资源清理；记录脱敏后写入本任务与 verification。若内存峰值逼近或触及上限，按 AC-012-3 记录并另议，不放宽限额。
+
 CR1-03（扩展名紧邻裸号，未证实）与CR1-04（备份散放，低概率）现在不改代码或冻结编号规则；留T-26按实际材料核查，必要时先澄清/登记。评审范围、全部发现与Gate2待验风险见review.md，原文按哈希归档，不勾改设计checklist。
 
 ## 子 agent 实施记录
