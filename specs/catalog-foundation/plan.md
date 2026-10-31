@@ -267,6 +267,7 @@ T33源码与weakref确认_image_rows局部递归policy自捕获，额外可达�
 
 - `manifest.json`：Pressmark → 馆藏号；`id` 末段 → IDP 条目 ID；`requiredStatement` → 署名；`items[n].id` → 画布 ID
 - `report.json`：`strips[i].file` → 本地 TIFF 与画布序号 `strips[i].index`；`strips` 不是列表（如 0）时，按本地 TIFF 文件名中的序号（`BDxxxxx_NNNN_n.tif` 的 NNNN）对应，仍对不上的记「画布对不上」
+  - T-26 补充（F-1）：真实材料中另有一种结构，`strips` 为空列表、`pages` 为列表（条目同样含 `file` 与从 0 起的 `index`，文件名多为 `BDxxxxx_pNNNN_n.tif`）。此时按 `pages[i].file` → `pages[i].index` 对应，逐条校验与 `strips` 相同，不合格条目记「读不了的文件」（字段 `pages[i]`）。`strips` 为非空列表时仍只用 `strips`；`strips` 为空列表而 `pages` 不是列表时照旧不对应；`strips` 不是列表时照旧按文件名序号。整卷拼长图 `BDxxxxx_scroll.tif` 不对应单一画布，仍按现行规格记「画布对不上」，本次不改。规则版本不提升（用户已确认，见 tasks T-40），画布字段变化由导入批次的 `code_version` 与历史记录的批次归因；全量规则版本升级的资源成本另行验证。
 - `pages/NNNN_WxH.jpg`：文件名前缀 NNNN → 画布序号
 - 三份 JSON 都原样存为附件
 
@@ -323,7 +324,7 @@ T33源码与weakref确认_image_rows局部递归policy自捕获，额外可达�
 | AC-005-1 | `scan.py`、事实字段表 | `test_scan.py::test_facts_by_kind`（有值 / 不适用 / 缺失；读不了的文件下次导入重读） |
 | AC-005-2 | `rules.py` 谱系、`importer.py` 目录级汇总 | `test_rules.py::test_lineage`（含 `合并长卷.psb`、读不了的 TIFF、混合目录）；NAS A3 |
 | AC-005-3 | `derivation.py` | `test_derivation.py::test_stitch_and_psb_logs`（仿照格式的合成日志，含白名单文件缺失）；NAS A2 |
-| AC-005-4 | `nlc.py` | `test_nlc.py::test_canvas_mapping`（`strips` 是列表与不是列表）；NAS A4 |
+| AC-005-4 | `nlc.py` | `test_nlc.py::test_canvas_mapping`（`strips` 是列表与不是列表）及 T-40 新增 `pages` 结构用例；NAS A4（T-26 首测、T-41 复验） |
 | AC-005-5 | `item_image` 来源目录 | `test_identity.py::test_image_sets_distinguishable` |
 | AC-006-1 | `rules.py` 许可 | `test_rules.py::test_license_defaults` |
 | AC-006-2 | `rules.py` | `test_rules.py::test_item_policy_most_restrictive` |
